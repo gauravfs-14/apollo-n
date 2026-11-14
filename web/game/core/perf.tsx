@@ -47,7 +47,19 @@ export function useQuality() {
 export function PerfProbe({ phase }: { phase: string }) {
   const gl = useThree((s) => s.gl);
   const last = useRef(0);
+  // Post-processing renders several passes per frame and three resets info on every render() call, so a naive read
+  // sees only the last pass (1 call, 1 triangle). Accumulate over the whole frame: read the previous frame, then reset.
+  const frameInfo = useRef({ calls: 0, triangles: 0 });
+  useEffect(() => {
+    gl.info.autoReset = false;
+    return () => {
+      gl.info.autoReset = true;
+    };
+  }, [gl]);
   useFrame((_, delta) => {
+    frameInfo.current.calls = gl.info.render.calls;
+    frameInfo.current.triangles = gl.info.render.triangles;
+    gl.info.reset();
     frames[idx] = delta * 1000;
     idx = (idx + 1) % N;
     filled = Math.min(filled + 1, N);
@@ -62,8 +74,8 @@ export function PerfProbe({ phase }: { phase: string }) {
       fps: Math.round(1000 / (avg || 16.7)),
       frameMsAvg: +avg.toFixed(2),
       frameMsP95: +(arr[Math.floor(arr.length * 0.95)] ?? 0).toFixed(2),
-      drawCalls: gl.info.render.calls,
-      triangles: gl.info.render.triangles,
+      drawCalls: frameInfo.current.calls,
+      triangles: frameInfo.current.triangles,
       geometries: gl.info.memory.geometries,
       textures: gl.info.memory.textures,
       heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : null,
