@@ -1,9 +1,8 @@
 "use client";
-import { StubHud } from "../../ui/StubPhase";
 import type { PhaseModule } from "../../types";
+import { ASTRONAUT_URL } from "../../three/Astronaut";
+import { PAD_TEXTURES } from "../../three/ship/Pad";
+import { BoardHud } from "./Hud";
+import { BOARD_HDRI, BoardScene } from "./Scene";
 
-function Hud() {
-  return <StubHud id="board" title="Boarding" />;
-}
-
-export const phase: PhaseModule = { id: "board", Hud };
+export const phase: PhaseModule = { id: "board", Scene: BoardScene, Hud: BoardHud, preload: [BOARD_HDRI, ...PAD_TEXTURES, ASTRONAUT_URL] };

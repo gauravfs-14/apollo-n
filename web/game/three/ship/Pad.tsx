@@ -10,7 +10,7 @@ import { Build } from "./geo";
 export const PAD_H = 14;
 export const TOWER_X = 38;
 export const TOWER_H = 125;
-export const ACCESS_ARM_Y = 112;
+export const ACCESS_ARM_Y = 109.5; // arm centre; walkway is at ACCESS_ARM_Y + 1.3
 export const PAD_TEXTURES = [
   "/textures/ship/concrete_diff.jpg", "/textures/ship/concrete_nor_gl.jpg", "/textures/ship/concrete_arm.jpg",
   "/textures/ship/ground_diff.jpg", "/textures/ship/ground_nor_gl.jpg", "/textures/ship/ground_arm.jpg",
@@ -74,8 +74,6 @@ function buildPad() {
     lattice(b, x, z, 3, 150, 12, 0.1);
     b.strut("tower", [x, 150, z], [x, 160, z], 0.2, 5);
   }
-  // fuel storage spheres in the distance
-  for (const [x, z] of [[-180, -60], [-210, -20]] as const) b.sph("white", 14, [x, 14, z], 1, 32);
   return b;
 }
 

@@ -226,7 +226,7 @@ export function buildPowerPods(v: number) {
 export function buildPayload(v: number) {
   const b = new Build();
   const y0 = DECK_Y + 0.04;
-  const z = -1.62;
+  const z = 0;
   if (v === 0) {
     // drill rig: lattice mast, motor head, drill string
     const h = 2.7;
@@ -258,7 +258,7 @@ export function buildPayload(v: number) {
     b.cyl("orange", 0.03, 0.03, 0.8, [0.55, y0 + 0.65, z + 0.1]);
   } else {
     // relay satellite pallet: gold drum, patch panel, small dish
-    b.cyl("gold", 0.5, 0.5, 0.9, [0, y0 + 0.45, z], [0, 0, 0], 28);
+    b.cyl("gold", 0.42, 0.42, 0.9, [0, y0 + 0.45, z], [0, 0, 0], 28);
     b.cyl("alu", 0.52, 0.52, 0.06, [0, y0 + 0.92, z], [0, 0, 0], 28);
     b.cyl("alu", 0.55, 0.55, 0.06, [0, y0 + 0.05, z], [0, 0, 0], 28);
     b.box("white", 0.45, 0.45, 0.04, [0, y0 + 0.7, z - 0.52], [0, PI, 0]);
@@ -268,7 +268,7 @@ export function buildPayload(v: number) {
     b.box("solar", 0.01, 0.01, 0.01, [0, -50, 0]);
     for (const s of [-1, 1]) b.add(new THREE.PlaneGeometry(0.9, 0.45), "solar", [s * 0.62, y0 + 0.5, z], [0, s * PI / 2, 0]);
   }
-  return b;
+  return b.translate(1.3, 0, 1.2); // front-right of the deck so it is visible from the hatch side
 }
 
 // ---------------- comms (cabin top, +X side) ----------------

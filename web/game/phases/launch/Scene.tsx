@@ -68,6 +68,7 @@ export function LaunchScene() {
     useLaunchClock.getState().reset();
     // dev only: ?lt=<seconds> starts the cinematic at that time (for screenshots)
     const lt = process.env.NODE_ENV !== "production" ? Number(new URLSearchParams(location.search).get("lt")) : 0;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (lt > 0) { st.t = lt; if (lt >= T.spaceCut) setSpace(true); st.cut = lt >= T.spaceCut; st.spoke = st.ign = st.roar = st.rumble = true; st.sep1 = lt >= T.sep1; st.sep2 = lt >= T.sep2; }
     persp.fov = 32;
     persp.updateProjectionMatrix();

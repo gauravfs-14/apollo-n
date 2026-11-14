@@ -51,6 +51,11 @@ export class Build<K extends string = MatKey> {
     return this;
   }
 
+  translate(x: number, y: number, z: number) {
+    for (const list of this.map.values()) for (const g of list) g.translate(x, y, z);
+    return this;
+  }
+
   merged(): [K, THREE.BufferGeometry][] {
     const out: [K, THREE.BufferGeometry][] = [];
     for (const [k, list] of this.map) {
