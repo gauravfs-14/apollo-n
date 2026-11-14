@@ -78,7 +78,7 @@ export function DebrisField({ ship }: { ship: React.RefObject<THREE.Group | null
   const q = useQuality();
   const mesh = useRef<THREE.InstancedMesh>(null);
   const waves = useMemo(() => makeWaves(rt.seed, rt.level), []); // eslint-disable-line react-hooks/exhaustive-deps -- fixed per mount (scene remounts per hurdle)
-  const geo = useMemo(rockGeometry, []);
+  const geo = useMemo(() => rockGeometry(), []);
   const mat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#8d8780", roughness: 0.95, metalness: 0.05 }), []);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const maxInst = useMemo(() => Math.ceil(waves.reduce((m, w) => Math.max(m, w.n), 0) * 6 * (0.5 + 0.5 * q.instances)), [waves, q.instances]);

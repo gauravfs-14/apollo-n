@@ -64,6 +64,7 @@ export function CommsBlackout({ ctx }: { ctx: HurdleCtx }) {
   const hint = ctx.level < 0.3 || secs > 14;
 
   // waveform: noise shrinks as the signal improves
+  const sBucket = Math.round(s * 20);
   const path = useMemo(() => {
     const r = mulberry(tick * 7 + 1);
     const amp = 38, noise = (1 - s) * 70;
@@ -74,7 +75,7 @@ export function CommsBlackout({ ctx }: { ctx: HurdleCtx }) {
     }
     return `M${pts.join("L")}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick, Math.round(s * 20)]);
+  }, [tick, sBucket]);
 
   const dir = (v: number, target: number) => (Math.abs(v - target) < 4 ? "" : v < target ? "Higher" : "Lower");
   const tone = s > 0.88 ? "#4ade80" : s > 0.4 ? "#ffb547" : "#ff5a4f";
