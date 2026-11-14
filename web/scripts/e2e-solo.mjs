@@ -159,7 +159,7 @@ await step("checklist", async () => {
   log.checklistStyle = style;
   if (style === "order_steps") await solveOrder(page, plan.checklist.items);
   else if (style === "quiz") await solveQuiz(page, plan.checklist.items);
-  else if (style === "memory_match") await solveMemory(page, plan.checklist.items);
+  else if (style === "memory_match") await solveMemory(page, plan.checklist.items).catch((e) => { console.log(JSON.stringify(plan.checklist.items)); throw e; });
   else if (style === "switch_panel") await solveSwitches(page, plan.checklist.items);
   else {
     await forceSkip("checklist", `style ${style} has no scripted solver`);
