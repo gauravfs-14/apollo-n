@@ -8,10 +8,10 @@ const _o = new THREE.Object3D();
 const _q = new THREE.Quaternion();
 const _up = new THREE.Vector3(0, 1, 0);
 
-export class Build {
-  map = new Map<MatKey, THREE.BufferGeometry[]>();
+export class Build<K extends string = MatKey> {
+  map = new Map<K, THREE.BufferGeometry[]>();
 
-  add(g: THREE.BufferGeometry, k: MatKey, p: V3 = [0, 0, 0], r: V3 = [0, 0, 0], s: V3 | number = 1) {
+  add(g: THREE.BufferGeometry, k: K, p: V3 = [0, 0, 0], r: V3 = [0, 0, 0], s: V3 | number = 1) {
     _o.position.set(...p);
     _o.rotation.set(...r);
     if (typeof s === "number") _o.scale.setScalar(s);
@@ -24,20 +24,20 @@ export class Build {
     return this;
   }
 
-  box(k: MatKey, w: number, h: number, d: number, p: V3, r: V3 = [0, 0, 0]) {
+  box(k: K, w: number, h: number, d: number, p: V3, r: V3 = [0, 0, 0]) {
     return this.add(new THREE.BoxGeometry(w, h, d), k, p, r);
   }
-  cyl(k: MatKey, rt: number, rb: number, h: number, p: V3, r: V3 = [0, 0, 0], seg = 20) {
+  cyl(k: K, rt: number, rb: number, h: number, p: V3, r: V3 = [0, 0, 0], seg = 20) {
     return this.add(new THREE.CylinderGeometry(rt, rb, h, seg), k, p, r);
   }
-  sph(k: MatKey, rad: number, p: V3, s: V3 | number = 1, seg = 24) {
+  sph(k: K, rad: number, p: V3, s: V3 | number = 1, seg = 24) {
     return this.add(new THREE.SphereGeometry(rad, seg, Math.max(8, seg / 2)), k, p, [0, 0, 0], s);
   }
-  torus(k: MatKey, rad: number, tube: number, p: V3, r: V3 = [Math.PI / 2, 0, 0], seg = 28) {
+  torus(k: K, rad: number, tube: number, p: V3, r: V3 = [Math.PI / 2, 0, 0], seg = 28) {
     return this.add(new THREE.TorusGeometry(rad, tube, 8, seg), k, p, r);
   }
   /** Cylinder from point a to point b. */
-  strut(k: MatKey, a: V3, b: V3, rad: number, seg = 8) {
+  strut(k: K, a: V3, b: V3, rad: number, seg = 8) {
     const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
     const d = vb.clone().sub(va);
     const len = d.length();
@@ -51,10 +51,12 @@ export class Build {
     return this;
   }
 
-  merged(): [MatKey, THREE.BufferGeometry][] {
-    const out: [MatKey, THREE.BufferGeometry][] = [];
+  merged(): [K, THREE.BufferGeometry][] {
+    const out: [K, THREE.BufferGeometry][] = [];
     for (const [k, list] of this.map) {
-      const g = mergeGeometries(list, false);
+      const mixed = list.some((x) => !x.index) && list.some((x) => !!x.index);
+      const src = mixed ? list.map((x) => (x.index ? x.toNonIndexed() : x)) : list;
+      const g = mergeGeometries(src, false);
       list.forEach((x) => x.dispose());
       if (g) out.push([k, g]);
     }

@@ -118,12 +118,14 @@ interface Props {
   ambient?: number;
   glowColor?: string;
   glowPos?: [number, number, number];
+  /** Live glow position (world); overrides glowPos without re-rendering. */
+  glowRef?: React.MutableRefObject<THREE.Vector3>;
   glowRadius?: number;
   renderOrder?: number;
 }
 
 export const Particles = forwardRef<ParticlesApi, Props>(function Particles(
-  { max = 400, additive = false, opacity = 1, drag = 0.4, gravity = [0, 0, 0], lightDir = [0.5, 0.8, 0.3], ambient = 0.45, glowColor = "#ff8a3a", glowPos = [0, 0, 0], glowRadius = 0, renderOrder = 10 },
+  { max = 400, additive = false, opacity = 1, drag = 0.4, gravity = [0, 0, 0], lightDir = [0.5, 0.8, 0.3], ambient = 0.45, glowColor = "#ff8a3a", glowPos = [0, 0, 0], glowRef, glowRadius = 0, renderOrder = 10 },
   ref,
 ) {
   const mesh = useRef<THREE.InstancedMesh>(null);
@@ -176,7 +178,7 @@ export const Particles = forwardRef<ParticlesApi, Props>(function Particles(
     u.uOpacity.value = opacity;
     u.uDrag.value = drag;
     u.uGravity.value.set(...gravity);
-    u.uGlowPos.value.set(...glowPos);
+    if (glowRef) u.uGlowPos.value.copy(glowRef.current); else u.uGlowPos.value.set(...glowPos);
     u.uGlowR.value = glowRadius;
     u.uAmbient.value.setScalar(ambient);
     lightV.set(...lightDir).transformDirection(state.camera.matrixWorldInverse);
