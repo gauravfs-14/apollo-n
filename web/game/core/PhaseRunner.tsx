@@ -3,7 +3,7 @@
 // context, no context churn between phases). Quality adapts to measured FPS.
 import { AdaptiveDpr, PerformanceMonitor, useProgress } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import type { PhaseModule } from "../types";
 import { getLoadedPhase, loadPhase, preloadAssets, preloadNext } from "./phases";
@@ -28,6 +28,13 @@ export function PhaseRunner() {
   const quality = useStore((s) => s.quality);
   const setQuality = useStore((s) => s.setQuality);
   const [mod, setMod] = useState<PhaseModule | null>(() => getLoadedPhase(phaseId) ?? null);
+
+  // shader compiles and asset uploads at a phase start dip the FPS; don't let that drop the quality tier
+  const phaseStart = useRef(0);
+  useEffect(() => {
+    phaseStart.current = performance.now();
+  }, [phaseId]);
+  const settled = () => performance.now() - phaseStart.current > 6000;
 
   useEffect(() => {
     let alive = true;
@@ -68,9 +75,9 @@ export function PhaseRunner() {
       >
         <PerformanceMonitor
           flipflops={3}
-          onDecline={() => useStore.getState().qualityMode === "auto" && setQuality(DOWN[useStore.getState().quality])}
+          onDecline={() => settled() && useStore.getState().qualityMode === "auto" && setQuality(DOWN[useStore.getState().quality])}
           onIncline={() => useStore.getState().qualityMode === "auto" && setQuality(UP[useStore.getState().quality])}
-          onFallback={() => useStore.getState().qualityMode === "auto" && setQuality("low")}
+          onFallback={() => settled() && useStore.getState().qualityMode === "auto" && setQuality("low")}
         />
         <AdaptiveDpr pixelated={false} />
         <color attach="background" args={["#000"]} />
