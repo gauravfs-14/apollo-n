@@ -142,7 +142,7 @@ export interface GameState {
 export type ActionKind = "patch" | "set_plan" | "complete" | "goto" | "reset";
 
 export type ClientMsg =
-  | { type: "join"; id: string; name: string }
+  | { type: "join"; id: string; name: string; rejoin?: boolean }
   | { type: "pick_role"; role: Role | null }
   | { type: "action"; phase: PhaseId; kind: ActionKind; data?: Record<string, unknown> }
   | { type: "emit"; kind: string; data?: Record<string, unknown> }

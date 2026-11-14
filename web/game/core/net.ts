@@ -9,6 +9,7 @@ import { emitLocal, useStore } from "./store";
 let ws: WebSocket | null = null;
 let local: GameState | null = null;
 let retry = 0;
+let everOnline = false;
 let closedByUs = false;
 let current: { room: string; mode: GameState["mode"]; name: string } | null = null;
 
@@ -20,6 +21,7 @@ function handle(msg: ServerMsg) {
 }
 
 export function connect(room: string, mode: GameState["mode"], name: string) {
+  if (!current || current.room !== room) everOnline = false;
   current = { room, mode, name };
   closedByUs = false;
   const { setConnection, meId } = useStore.getState();
@@ -39,12 +41,19 @@ export function connect(room: string, mode: GameState["mode"], name: string) {
     retry = 0;
     clearTimeout(timeout);
     setConnection("online");
-    sock.send(JSON.stringify({ type: "join", id: meId, name } satisfies ClientMsg));
+    // rejoin: the room existed before (server restart / network blip), so the server may recreate it instead of rejecting.
+    sock.send(JSON.stringify({ type: "join", id: meId, name, ...(everOnline ? { rejoin: true } : {}) } satisfies ClientMsg));
+    everOnline = true;
   };
   sock.onmessage = (e) => handle(JSON.parse(e.data) as ServerMsg);
-  sock.onclose = () => {
+  sock.onclose = (ev) => {
     clearTimeout(timeout);
     if (closedByUs || ws !== sock) return;
+    if (ev.code === 4404) {
+      // unknown room: stop retrying, the shell shows "Room not found"
+      closedByUs = true;
+      return setConnection("missing");
+    }
     if (!opened && mode === "solo") return goLocal();
     setConnection("lost");
     const delay = Math.min(8000, 500 * 2 ** retry++);
@@ -78,6 +87,7 @@ export function send(msg: ClientMsg) {
 
 export function disconnect() {
   closedByUs = true;
+  everOnline = false;
   ws?.close();
   ws = null;
   local = null;

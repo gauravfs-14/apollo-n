@@ -12,7 +12,7 @@ type Listener = (msg: Extract<ServerMsg, { type: "event" } | { type: "pos" }>) =
 interface Store {
   state: GameState | null;
   meId: string;
-  connection: "idle" | "connecting" | "online" | "local" | "lost";
+  connection: "idle" | "connecting" | "online" | "local" | "lost" | "missing";
   lastError: string | null;
   quality: Quality;
   qualityMode: QualityMode;
