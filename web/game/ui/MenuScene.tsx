@@ -43,7 +43,7 @@ function Content() {
       <Starfield brightness={1.1} rotation={[0.4, 2.2, 0.1]} />
       <directionalLight position={[SUN.x * 600, SUN.y * 600, SUN.z * 600]} intensity={4.2} />
       <ambientLight intensity={0.015} />
-      <Moon radius={100} position={[0, -96, -30]} rotation={[0.25, 0, 1.15]} rotationSpeed={0.004} quality={q.tier === "high" ? "medium" : q.tier} relief={1.5} />
+      <Moon radius={100} position={[0, -96, -30]} rotation={[0.25, 0, 1.15]} rotationSpeed={0.004} quality={q.tier} relief={0} bump={0.3} />
       <Earth position={[85, 62, -400]} radius={52} sun={SUN_ARR} spin={0.012} lite={q.tier === "low"} />
       <Effects bloom={0.55} ao={false} />
       <PerfProbe phase="menu" />
