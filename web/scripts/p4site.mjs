@@ -8,7 +8,7 @@ const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 await page.addInitScript((q) => localStorage.setItem("apollo.quality", q), flags.quality ?? "high");
-await page.goto(`${base}/play/DEV-SITE?mode=solo&phase=site&perf`, { waitUntil: "load" });
+await page.goto(`${base}/play/DEV-SITE?mode=solo&phase=site&perf&p4info`, { waitUntil: "load" });
 await page.waitForTimeout(7000);
 const q = flags.quality ?? "high";
 await page.screenshot({ path: `/tmp/p4s_${q}_1.png` });
@@ -27,5 +27,6 @@ const perf = await page.evaluate(() => {
   const avg = (k) => +(l.reduce((a, b) => a + b[k], 0) / (l.length || 1)).toFixed(1);
   return { fps: avg("fps"), p95: avg("frameMsP95"), heap: l.at(-1)?.heapMB, quality: l.at(-1)?.quality };
 });
-console.log(JSON.stringify({ perf, errors: errors.slice(0, 8) }, null, 1));
+const info = await page.evaluate(() => window.__p4info);
+console.log(JSON.stringify({ info, perf, errors: errors.slice(0, 8) }, null, 1));
 await browser.close();

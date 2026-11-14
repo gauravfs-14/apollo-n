@@ -10,7 +10,8 @@ import { useQuality } from "../../core/perf";
 import type { TerrainData } from "./loadTerrain";
 import { lunarUniformsFor, patchLunar } from "./lunarShader";
 
-const FILES = ["/models/rock_moon_a.glb", "/models/rock_moon_b.glb", "/models/rock_moon_c.glb"];
+// low-poly rocks (~450 tris each); rock_moon_a (5k tris) is reserved for single hero rocks
+const FILES = ["/models/rock_moon_b.glb", "/models/rock_moon_c.glb"];
 FILES.forEach((f) => useGLTF.preload(f));
 
 function mulberry32(a: number) {
@@ -56,7 +57,7 @@ export function scatterBoulders(data: TerrainData, cx: number, cz: number, radiu
 export function Boulders({
   data,
   focus = [0, 0],
-  radius = 260,
+  radius = 220,
   seed = 1,
   shadows = false,
 }: {
@@ -102,15 +103,15 @@ export function Boulders({
   );
 
   const placed = useMemo(() => {
-    const list = scatterBoulders(data, focus[0], focus[1], radius, seed + (data.siteId.charCodeAt(5) ?? 0) * 977, Math.round(3200 * q.instances));
-    const buckets: THREE.Matrix4[][] = [[], [], []];
+    const list = scatterBoulders(data, focus[0], focus[1], radius, seed + (data.siteId.charCodeAt(5) ?? 0) * 977, Math.round(1000 * q.instances));
+    const buckets: THREE.Matrix4[][] = FILES.flatMap(() => [[], []]); // [rock0 small, rock0 big, rock1 small, rock1 big]
     const rnd = mulberry32(seed * 31 + 7);
     const n = new THREE.Vector3();
     const qt = new THREE.Quaternion();
     const qy = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
     for (const b of list) {
-      const k = Math.floor(rnd() * 3);
+      const k = Math.floor(rnd() * FILES.length);
       const y = data.heightAt(b.x, b.z);
       data.normalAt(b.x, b.z, n);
       qt.setFromUnitVectors(up, n.lerp(up, 0.5).normalize());
@@ -119,16 +120,17 @@ export function Boulders({
       const sx = b.size * (0.8 + rnd() * 0.5);
       const sy = b.size * (0.55 + rnd() * 0.5);
       const sz = b.size * (0.8 + rnd() * 0.5);
-      buckets[k].push(new THREE.Matrix4().compose(new THREE.Vector3(b.x, y, b.z), qt.clone(), new THREE.Vector3(sx, sy, sz)));
+      buckets[k * 2 + (b.size > 0.4 ? 1 : 0)].push(new THREE.Matrix4().compose(new THREE.Vector3(b.x, y, b.z), qt.clone(), new THREE.Vector3(sx, sy, sz)));
     }
     return buckets;
   }, [data, focus, radius, seed, q.instances]);
 
   return (
     <group>
-      {rocks.map((r, k) => (
-        <InstancedBucket key={`${k}-${placed[k].length}`} geo={r.geo} mat={r.mat} mats={placed[k]} shadows={shadows} />
-      ))}
+      {rocks.flatMap((r, k) => [
+        <InstancedBucket key={`${k}s-${placed[k * 2].length}`} geo={r.geo} mat={r.mat} mats={placed[k * 2]} shadows={false} />,
+        <InstancedBucket key={`${k}b-${placed[k * 2 + 1].length}`} geo={r.geo} mat={r.mat} mats={placed[k * 2 + 1]} shadows={shadows} />,
+      ])}
     </group>
   );
 }

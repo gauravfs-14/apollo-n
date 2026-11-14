@@ -51,6 +51,8 @@ export interface TerrainProps {
   onClick?: (e: ThreeEvent<MouseEvent>) => void;
   /** brightness of the faint Earthshine/bounce fill (default 0.03) */
   fill?: number;
+  /** cap the base mesh segments (the fine patch covers the near field in the landing view) */
+  maxSegments?: number;
 }
 
 const DETAIL_HALF = 150;
@@ -69,7 +71,7 @@ function planeGeo(data: TerrainData, cx: number, cz: number, half: number, seg: 
   return g;
 }
 
-export function Terrain({ data, sky, overlay = "none", focus, detail = false, shadows = false, edgeFade = false, fill = 0.03, ...events }: TerrainProps) {
+export function Terrain({ data, sky, overlay = "none", focus, detail = false, shadows = false, edgeFade = false, fill = 0.03, maxSegments, ...events }: TerrainProps) {
   const q = useQuality();
   const gl = useThree((s) => s.gl);
   const [diff, nor] = useTexture([REGOLITH_DIFF, REGOLITH_NOR]);
@@ -130,7 +132,7 @@ export function Terrain({ data, sky, overlay = "none", focus, detail = false, sh
   }, [uniforms]);
   useEffect(() => () => patchMat.dispose(), [patchMat]);
 
-  const seg = q.terrainSegments;
+  const seg = Math.min(q.terrainSegments, maxSegments ?? 9999);
   const base = useMemo(() => planeGeo(data, 0, 0, data.size / 2, seg), [data, seg]);
   useEffect(() => () => base.dispose(), [base]);
 

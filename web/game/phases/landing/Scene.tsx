@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { Effects } from "../../core/Effects";
 import { speak, sfx, stopVoice } from "../../core/audio";
 import { useGame, usePhaseData } from "../../core/useGame";
-import { Boulders, LunarSky, SunLight, Terrain, missionTime, skyAt, useTerrainData, type TerrainData } from "../../three/terrain";
+import { Boulders, LunarSky, RenderInfo, SunLight, Terrain, missionTime, skyAt, useTerrainData, type TerrainData } from "../../three/terrain";
 import { Lander, getDefaultParts } from "../../three/ship/Lander";
 import { legFootX } from "../../three/ship/builders";
 import { landerFromBuild, type SimOut } from "../site/api";
@@ -63,7 +63,7 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
   const lights = useRef<THREE.Group>(null);
   const { camera } = useThree();
   const cam = camera as THREE.PerspectiveCamera;
-  const t = useRef(0);
+  const t = useRef(typeof location !== "undefined" ? Number(new URLSearchParams(location.search).get("t")) || 0 : 0); // ?t= jumps the timeline (dev)
   const flags = useRef({ started: false, contact: false, ended: false, lastUi: 0 });
   const q0 = useMemo(() => new THREE.Quaternion(), []);
   const q1 = useMemo(() => new THREE.Quaternion(), []);
@@ -168,14 +168,14 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
     if (s < 0.3) {
       // chase cam above and beside the lander: the real site spreads out below
       fov = 40;
-      compass(camAz, v2).multiplyScalar(70);
-      cam.position.set(g!.position.x + v2.x, g!.position.y + 80, g!.position.z + v2.z);
+      compass(camAz, v2).multiplyScalar(75);
+      cam.position.set(g!.position.x + v2.x, g!.position.y + 85, g!.position.z + v2.z);
       cam.lookAt(g!.position);
     } else if (s < 0.62) {
-      fov = 40;
-      compass(camAz, v2).multiplyScalar(300);
+      fov = 38;
+      compass(camAz, v2).multiplyScalar(190);
       cam.position.set(gx + v2.x, data.heightAt(gx + v2.x, gz + v2.z) + 18, gz + v2.z);
-      v1.set(gx, gy + 12, gz).lerp(g!.position, 0.4); // keep both the lander and the ground in frame
+      v1.set(gx, gy + 12, gz).lerp(g!.position, 0.92); // keep both the lander and the ground in frame
       cam.lookAt(v1);
     } else if (s < 0.93) {
       fov = 42;
@@ -312,9 +312,10 @@ export function Scene() {
     <>
       <SunLight sky={sky} shadows focus={[outcome.x, focusY, outcome.z]} radius={95} />
       <LunarSky sky={sky} stars={0.85} />
-      <Terrain data={data} sky={sky} detail shadows focus={[outcome.x, outcome.z]} fill={0.13} />
+      <Terrain data={data} sky={sky} detail shadows focus={[outcome.x, outcome.z]} fill={0.13} maxSegments={300} edgeFade />
       <Boulders data={data} focus={[outcome.x, outcome.z]} shadows seed={plan?.seed ?? 1} />
       <Descent data={data} outcome={outcome} parts={parts} sky={sky} footR={lander.leg_span_m / 2} siteRock={outcome.reason === "boulder"} />
+      <RenderInfo />
       <Effects bloom={0.8} ao={false} />
     </>
   );
