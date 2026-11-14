@@ -35,7 +35,8 @@ export default function Home() {
   useApplyVolume();
 
   useEffect(() => {
-    setName(localStorage.getItem("apollo.name") ?? ""); // eslint-disable-line react-hooks/set-state-in-effect -- localStorage is client-only
+    // never overwrite what the player already typed while the page was hydrating
+    setName((typed) => typed || (localStorage.getItem("apollo.name") ?? "")); // eslint-disable-line react-hooks/set-state-in-effect -- localStorage is client-only
   }, []);
 
   const cleanName = () => {

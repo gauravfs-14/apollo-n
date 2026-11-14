@@ -14,6 +14,7 @@ const newPlayer = async (tag, name) => {
   const page = await ctx.newPage();
   record(page, tag, log);
   await page.goto(`${BASE}/`, { waitUntil: "load" });
+  await page.waitForTimeout(2500); // let the menu hydrate
   await page.getByPlaceholder("Astronaut").fill(name);
   return { ctx, page, tag, name };
 };
