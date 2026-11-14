@@ -3,7 +3,7 @@
 GET  /missions/options?difficulty=normal[&refresh=true]  3 ready mission cards, always instant (pool + fallbacks)
 POST /missions {difficulty, seed?}                       one plan (from the pool; with a seed it is generated live)
 POST /missions/{id}/chosen                               the crew picked this one: retire it, refill the pool
-GET  /missions/fallback | /missions/{id}                 a hand-checked plan | a plan by id
+GET  /missions/fallback | /missions/{id}[/card]                 a hand-checked plan | a plan by id
 GET  /missions/pool                                      pool status (debug)
 """
 
@@ -88,6 +88,14 @@ async def fallback_mission() -> dict:
     import json
 
     return json.loads(files[0].read_text())
+
+
+@router.get("/missions/{plan_id}/card")
+async def get_card(plan_id: str) -> dict:
+    e = planner.lookup(plan_id)
+    if not e:
+        raise HTTPException(404, "Unknown mission")
+    return _card(e)
 
 
 @router.get("/missions/{plan_id}")

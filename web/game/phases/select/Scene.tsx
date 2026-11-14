@@ -8,7 +8,7 @@ import { Moon } from "../../three/Moon";
 import { Starfield } from "../../three/Starfield";
 
 const MOON_R = 100;
-const MOON_POS: [number, number, number] = [50, 10, 0];
+const MOON_POS: [number, number, number] = [30, 52, 0];
 
 export function SelectScene() {
   const target = useMemo(() => new THREE.Vector3(...MOON_POS).add(new THREE.Vector3(-22, -4, 0)), []);

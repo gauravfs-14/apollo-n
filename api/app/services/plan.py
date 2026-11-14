@@ -193,6 +193,7 @@ You turn REAL recent news into a playable Mission Plan. Rules:
 - Facts: use ONLY information that appears in the provided sources. Each fact must paraphrase or quote one source and cite it by its id (s1, s2...). Never add numbers, dates, names or claims that are not in that source. If a source is thin, write a shorter fact.
 - Everything the player must DO has to be solvable without space knowledge: plain words, one clear idea per item, no jargon without explanation.
 - Voice lines are spoken by mission control: calm, short (under 30 words), professional, no exclamation marks.
+- goal.why is the real-world reason the topic matters (for example water for future crews), never a sentence about the game itself. Never mention source ids (s1, s2) outside the "source" fields, and never say "this mission follows the news".
 - No emoji. No markdown. English only.
 - Output exactly ONE JSON object in the shape described. No commentary."""
 
@@ -249,6 +250,20 @@ Output JSON in this shape:
 
 
 # ---------------------------------------------------------------- assemble + validate
+
+
+_SRC_REF = re.compile(r"\s*[\(\[]\s*s\d+(?:\s*[,;&]\s*s\d+)*\s*[\)\]]|\bsources?\s+s\d+\b|\bs\d\b")
+
+
+def _scrub(o: Any) -> Any:
+    """Remove leaked source ids like "(s2)" from every string the model wrote."""
+    if isinstance(o, str):
+        return re.sub(r"\s{2,}", " ", _SRC_REF.sub("", o)).strip() if not o.startswith("http") else o
+    if isinstance(o, list):
+        return [_scrub(x) for x in o]
+    if isinstance(o, dict):
+        return {k: _scrub(v) for k, v in o.items()}
+    return o
 
 
 def assemble(raw: dict, number: int, difficulty: str, seed: int, sources: list[dict]) -> tuple[dict | None, list[str]]:
@@ -377,6 +392,7 @@ def assemble(raw: dict, number: int, difficulty: str, seed: int, sources: list[d
                 break
             if g["type"] not in used:
                 plan["cruise"].append(copy.deepcopy(g))
+    plan = _scrub(plan)
     return plan, validation_errors(plan)
 
 

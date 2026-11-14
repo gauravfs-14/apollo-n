@@ -12,7 +12,7 @@
 // no depth writes, rendered first.
 import { useTexture } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import * as THREE from "three";
 
 export const STAR_TEXTURE = "/textures/stars/starmap_4k.webp";
@@ -26,13 +26,12 @@ export function Starfield({
   brightness?: number;
   rotation?: [number, number, number];
 }) {
-  const tex = useTexture(STAR_TEXTURE);
+  const tex = useTexture(STAR_TEXTURE, (t) => {
+    const x = Array.isArray(t) ? t[0] : t;
+    x.colorSpace = THREE.SRGBColorSpace;
+    x.anisotropy = 4;
+  });
   const ref = useRef<THREE.Mesh>(null);
-  useLayoutEffect(() => {
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
-    tex.needsUpdate = true;
-  }, [tex]);
   const color = useMemo(() => new THREE.Color(), []);
   color.setScalar(brightness);
   useFrame(({ camera }) => ref.current?.position.copy(camera.position));

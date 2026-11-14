@@ -50,16 +50,14 @@ export function Moon({ radius = 100, rotationSpeed = 0, quality, relief = 3, bum
   const tier = quality ?? q.tier;
   const t = MOON_TEXTURES[tier];
   const spin = useRef<THREE.Group>(null);
-  const [color, normal, disp] = useTexture([t.color, t.normal, DISP]);
-
-  useLayoutEffect(() => {
-    color.colorSpace = THREE.SRGBColorSpace;
-    for (const tex of [color, normal, disp]) {
+  const [color, normal, disp] = useTexture([t.color, t.normal, DISP], (loaded) => {
+    const list = Array.isArray(loaded) ? loaded : [loaded];
+    list.forEach((tex, i) => {
       tex.anisotropy = 8;
       tex.wrapS = THREE.RepeatWrapping;
-      tex.needsUpdate = true;
-    }
-  }, [color, normal, disp]);
+      if (i === 0) tex.colorSpace = THREE.SRGBColorSpace;
+    });
+  });
 
   const geo = useMemo(() => new THREE.SphereGeometry(1, t.segments, t.segments / 2), [t.segments]);
   useLayoutEffect(() => () => geo.dispose(), [geo]);
