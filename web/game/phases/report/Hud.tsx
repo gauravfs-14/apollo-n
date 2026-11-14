@@ -171,7 +171,7 @@ export function ReportHud() {
               const isAi = crew?.ai?.includes(r) ?? !human;
               return (
                 <li key={r} className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-white/90">{human?.name ?? name ?? ROLE_INFO[r].label}</span>
+                  <span className="truncate text-white/90">{human?.name ?? name ?? "Astronaut"}</span>
                   <span className="shrink-0 text-[11px] text-dim">
                     {ROLE_INFO[r].label}
                     {multi && isAi ? " · AI" : ""}
