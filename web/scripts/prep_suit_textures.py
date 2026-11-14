@@ -41,6 +41,11 @@ sat = c.max(-1) - c.min(-1)
 dirt = smooth(0.07, 0.22, lum) * (1 - smooth(0.62, 0.86, lum)) * (1 - smooth(0.12, 0.3, sat))
 clean = np.array([0.90, 0.89, 0.86], dtype=np.float32)
 c2 = c * (1 - 0.85 * dirt[..., None]) + clean * (0.85 * dirt[..., None]) * (0.6 + 0.4 * lum[..., None] / 0.85)
+# big stains (knees, thighs): dark patches whose neighbourhood is mostly clean fabric; boots/gloves are dark islands, kept
+lum2 = 0.3 * c2[..., 0] + 0.59 * c2[..., 1] + 0.11 * c2[..., 2]
+near = np.asarray(Image.fromarray((np.clip(cc.mean(-1), 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(28))).astype(np.float32) / 255
+stain = smooth(0.25, 0.45, near) * (1 - smooth(0.5, 0.85, lum2)) * (1 - smooth(0.25, 0.5, sat))
+c2 = c2 * (1 - 0.75 * stain[..., None]) + clean * 0.75 * stain[..., None] * (0.7 + 0.3 * lum2[..., None])
 c2 = np.clip(c2 * 1.04, 0, 1)
 # neutralise accent pixels so the shader tint reads clean
 c2 = c2 * (1 - accent[..., None]) + (lum[..., None] * 0.9 + 0.1) * accent[..., None]
