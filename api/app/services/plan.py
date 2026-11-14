@@ -22,6 +22,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from app.services.feasible import make_feasible
 from app.models import HURDLE_RANGE, LOCKED_SITES, ROLES, MissionPlan, validation_errors
 from app.services import cache, llm, nasa, serp
 
@@ -127,6 +128,7 @@ def fallback_entry(difficulty: str, avoid: set[str] | None = None, rng: random.R
     for v in plan["voice_lines"]:
         v["text"] = re.sub(rf"\bApollo {old}\b", f"Apollo {n}", v["text"])
     fit_difficulty(plan, difficulty)
+    plan["ship"]["constraints"] = make_feasible(plan["ship"]["constraints"])
     errs = validation_errors(plan)
     if errs:  # a broken hand-written fallback is a bug worth surfacing
         raise RuntimeError(f"fallback plan invalid: {errs}")
@@ -219,7 +221,7 @@ def _user_prompt(number: int, difficulty: str, style: str, topic: tuple, sources
         "site_why": ["why site_a suits this mission", "why site_b suits this mission", "why site_c suits this mission"],
         "ship": {
             "max_mass_kg": 1500, "min_battery_hours": 50, "min_delta_v": 2400,
-            "required_payload": ["one or two of: drill, science_instruments, camera, rover, relay_antenna, sample_container"],
+            "required_payload": ["one or two of: drill, sample, spectrometer, camera, relay"],
             "rationale": "why these limits, linked to the mission story, one or two sentences",
         },
         "checklist": {"style": style, "items": [{"prompt": "...", "answer": "...", "options": ["quiz only"], "fact_id": "optional f1"}]},
@@ -393,6 +395,7 @@ def assemble(raw: dict, number: int, difficulty: str, seed: int, sources: list[d
             if g["type"] not in used:
                 plan["cruise"].append(copy.deepcopy(g))
     plan = _scrub(plan)
+    plan["ship"]["constraints"] = make_feasible(plan["ship"]["constraints"])
     return plan, validation_errors(plan)
 
 
@@ -444,6 +447,12 @@ class Pool:
 
     def __init__(self) -> None:
         self.ready: dict[str, list[dict]] = {d: list(cache.get("pool", d) or []) for d in DIFFICULTIES}
+        for lst in self.ready.values():  # plans saved before a catalog change must stay winnable
+            for e in lst:
+                e["plan"]["ship"]["constraints"] = make_feasible(e["plan"]["ship"]["constraints"])
+                locked = {x["id"]: x for x in LOCKED_SITES}
+                for site in e["plan"]["destination"]["candidate_sites"]:
+                    site.update({k: locked[site["id"]][k] for k in ("name", "lat", "lon")} if site["id"] in locked else {})
         self._task: asyncio.Task | None = None
         self.fallbacks: dict[str, list[dict]] = {d: [] for d in DIFFICULTIES}  # stable until chosen/refreshed
         self.busy: dict[str, int] = {d: 0 for d in DIFFICULTIES}

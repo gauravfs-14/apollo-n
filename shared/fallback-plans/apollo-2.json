@@ -45,22 +45,22 @@
       {
         "id": "site_a",
         "name": "Shackleton Rim",
-        "lat": -89.45,
-        "lon": -137.0,
+        "lat": -89.773,
+        "lon": -157.4,
         "why": "Sunlight for most of the day keeps the lander warm and powered"
       },
       {
         "id": "site_b",
         "name": "Connecting Ridge",
-        "lat": -89.4,
-        "lon": -152.0,
+        "lat": -89.463,
+        "lon": -138.01,
         "why": "A high ridge with an open sky for radio links"
       },
       {
         "id": "site_c",
         "name": "de Gerlache Rim",
-        "lat": -88.6,
-        "lon": -67.0,
+        "lat": -88.663,
+        "lon": -67.3,
         "why": "Flatter ground makes touchdown easier"
       }
     ]
@@ -74,11 +74,11 @@
       "comms"
     ],
     "constraints": {
-      "max_mass_kg": 1200,
+      "max_mass_kg": 1250,
       "min_battery_hours": 40,
       "min_delta_v": 2300,
       "required_payload": [
-        "science_instruments"
+        "spectrometer"
       ]
     },
     "rationale": "A small commercial lander has little spare mass, so every part must earn its place and the instruments must stay powered."

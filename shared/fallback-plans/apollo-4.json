@@ -45,22 +45,22 @@
       {
         "id": "site_a",
         "name": "Shackleton Rim",
-        "lat": -89.45,
-        "lon": -137.0,
+        "lat": -89.773,
+        "lon": -157.4,
         "why": "Good sunlight and a long view of Earth"
       },
       {
         "id": "site_b",
         "name": "Connecting Ridge",
-        "lat": -89.4,
-        "lon": -152.0,
+        "lat": -89.463,
+        "lon": -138.01,
         "why": "A ridge that keeps the lander above the dark"
       },
       {
         "id": "site_c",
         "name": "de Gerlache Rim",
-        "lat": -88.6,
-        "lon": -67.0,
+        "lat": -88.663,
+        "lon": -67.3,
         "why": "Gentle ground, a short walk from the pole"
       }
     ]
@@ -78,7 +78,7 @@
       "min_battery_hours": 45,
       "min_delta_v": 2400,
       "required_payload": [
-        "science_instruments"
+        "spectrometer"
       ]
     },
     "rationale": "A short, careful mission: enough battery to last through the shadows and instruments that read the soil."

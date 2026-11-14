@@ -25,9 +25,9 @@ REQUIRED_VOICE_LINES = ("brief_1", "launch_1", "landing_1", "success_1")
 
 # Terrain for these three is built by P4: ids/names/coords are fixed in code, the AI only writes "why".
 LOCKED_SITES: list[dict] = [
-    {"id": "site_a", "name": "Shackleton Rim", "lat": -89.45, "lon": -137.0},
-    {"id": "site_b", "name": "Connecting Ridge", "lat": -89.4, "lon": -152.0},
-    {"id": "site_c", "name": "de Gerlache Rim", "lat": -88.6, "lon": -67.0},
+    {"id": "site_a", "name": "Shackleton Rim", "lat": -89.773, "lon": -157.4},
+    {"id": "site_b", "name": "Connecting Ridge", "lat": -89.463, "lon": -138.01},
+    {"id": "site_c", "name": "de Gerlache Rim", "lat": -88.663, "lon": -67.3},
 ]
 HURDLE_RANGE: dict[str, tuple[int, int]] = {"easy": (2, 2), "normal": (3, 3), "hard": (4, 5)}
 
