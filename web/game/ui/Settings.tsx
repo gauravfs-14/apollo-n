@@ -1,7 +1,7 @@
 "use client";
 // Quality / volume / perf-overlay controls. Used by the main menu and the in-game pause menu.
 import { useEffect } from "react";
-import { setMasterVolume } from "../core/audio";
+import { setMasterVolume, speak } from "../core/audio";
 import { useStore, type QualityMode } from "../core/store";
 
 const MODES: { id: QualityMode; label: string }[] = [
@@ -63,6 +63,12 @@ export function SettingsPanel() {
           onChange={(e) => setVolume(Number(e.target.value) / 100)}
           className="pointer-events-auto h-1.5 w-full cursor-pointer accent-amber"
         />
+        <button
+          onClick={() => void speak("Houston here. Voice check, loud and clear.", "voice_check")}
+          className="pointer-events-auto mt-2 rounded-md border border-line bg-white/5 px-3 py-1.5 text-xs text-white hover:bg-white/10"
+        >
+          Test voice
+        </button>
       </div>
 
       <label className="pointer-events-auto flex cursor-pointer items-center justify-between text-white">
