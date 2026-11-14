@@ -1,0 +1,192 @@
+{
+  "id": "apollo-3",
+  "number": 3,
+  "seed": 70411,
+  "difficulty": "normal",
+  "title": "Apollo 3: The Rover That Chases Ice",
+  "tagline": "Carry a one-meter drill to the Moon's coldest places.",
+  "goal": {
+    "text": "Drive near a permanently shadowed crater and drill for ice",
+    "why": "Knowing where the ice is tells us where future crews can get water"
+  },
+  "inspired_by": {
+    "name": "NASA VIPER rover",
+    "source_url": "https://science.nasa.gov/mission/viper/",
+    "date": "2025"
+  },
+  "facts": [
+    {
+      "id": "f1",
+      "text": "NASA's VIPER rover was designed to explore the Moon in search of ice and other resources, on a planned 100-day mission at the South Pole.",
+      "source_url": "https://science.nasa.gov/mission/viper/",
+      "source_name": "NASA Science: VIPER",
+      "verified": true
+    },
+    {
+      "id": "f2",
+      "text": "VIPER is designed to use three instruments and a 3.28-foot (1-meter) drill to analyze lunar soil at a range of depths and temperatures.",
+      "source_url": "https://science.nasa.gov/mission/viper/",
+      "source_name": "NASA Science: VIPER",
+      "verified": true
+    },
+    {
+      "id": "f3",
+      "text": "Permanently shadowed craters are some of the coldest spots in the solar system, where ice reserves have endured for billions of years.",
+      "source_url": "https://science.nasa.gov/mission/viper/",
+      "source_name": "NASA Science: VIPER",
+      "verified": true
+    },
+    {
+      "id": "f4",
+      "text": "On September 19, 2025, NASA announced that VIPER will be delivered to Mons Mouton by a Blue Origin Blue Moon MK-1 lander.",
+      "source_url": "https://science.nasa.gov/mission/viper/",
+      "source_name": "NASA Science: VIPER",
+      "verified": true
+    }
+  ],
+  "destination": {
+    "body": "moon",
+    "region": "south_pole",
+    "region_name": "Lunar South Pole",
+    "candidate_sites": [
+      {
+        "id": "site_a",
+        "name": "Shackleton Rim",
+        "lat": -89.45,
+        "lon": -137.0,
+        "why": "Sun on the rim gives power while the rover drives into the cold"
+      },
+      {
+        "id": "site_b",
+        "name": "Connecting Ridge",
+        "lat": -89.4,
+        "lon": -152.0,
+        "why": "A ridge with a long view for planning the drive"
+      },
+      {
+        "id": "site_c",
+        "name": "de Gerlache Rim",
+        "lat": -88.6,
+        "lon": -67.0,
+        "why": "Easy driving, but further from the shadows"
+      }
+    ]
+  },
+  "ship": {
+    "slots": [
+      "engine",
+      "power",
+      "payload",
+      "legs",
+      "comms"
+    ],
+    "constraints": {
+      "max_mass_kg": 1800,
+      "min_battery_hours": 60,
+      "min_delta_v": 2500,
+      "required_payload": [
+        "drill"
+      ]
+    },
+    "rationale": "The rover must survive long dark stretches and carry a drill, so batteries and payload mass matter most."
+  },
+  "crew": {
+    "min": 1,
+    "max": 4,
+    "roles": [
+      "commander",
+      "pilot",
+      "engineer",
+      "scientist"
+    ]
+  },
+  "checklist": {
+    "style": "switch_panel",
+    "items": [
+      {
+        "prompt": "Switch the heaters ON",
+        "answer": "on"
+      },
+      {
+        "prompt": "Switch the drill motor OFF until landing",
+        "answer": "off"
+      },
+      {
+        "prompt": "Switch the radio ON",
+        "answer": "on"
+      },
+      {
+        "prompt": "Switch the cameras ON",
+        "answer": "on"
+      }
+    ]
+  },
+  "cruise": [
+    {
+      "type": "engine_fault",
+      "role": "engineer",
+      "difficulty": 1,
+      "story": "Pressure is dropping in a fuel line. Reconnect the pipes.",
+      "fact_id": "f3"
+    },
+    {
+      "type": "solar_storm",
+      "role": "commander",
+      "difficulty": 1,
+      "story": "Charged particles are on the way. Move the crew behind the shield."
+    },
+    {
+      "type": "nav_correction",
+      "role": "pilot",
+      "difficulty": 1,
+      "story": "A small course nudge is needed. Align the rings.",
+      "fact_id": "f1"
+    }
+  ],
+  "surface": {
+    "tasks": [
+      {
+        "id": "t1",
+        "role": "pilot",
+        "type": "navigate_to",
+        "title": "Drive to the shadow's edge",
+        "hint": "Stay on the pale, sunlit ground",
+        "unlocks": "t2"
+      },
+      {
+        "id": "t2",
+        "role": "engineer",
+        "type": "repair",
+        "title": "Free the stuck wheel",
+        "hint": "Rotate the tiles until the line connects",
+        "unlocks": "t3"
+      },
+      {
+        "id": "t3",
+        "role": "scientist",
+        "type": "collect_sample",
+        "title": "Drill and collect a sample",
+        "hint": "Follow the beeps: they speed up near the cold spot"
+      }
+    ],
+    "final": "t3"
+  },
+  "voice_lines": [
+    {
+      "id": "brief_1",
+      "text": "Apollo 3, Houston. Your rover carries a one-meter drill. We want to know what is hiding in the cold dark."
+    },
+    {
+      "id": "launch_1",
+      "text": "Apollo 3, go for launch. Good luck out there."
+    },
+    {
+      "id": "landing_1",
+      "text": "Apollo 3, drive-ready ground is flat ground. Choose with care."
+    },
+    {
+      "id": "success_1",
+      "text": "Apollo 3, sample secured. The ice will tell us a lot. Good work."
+    }
+  ]
+}

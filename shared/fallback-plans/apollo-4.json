@@ -1,0 +1,185 @@
+{
+  "id": "apollo-4",
+  "number": 4,
+  "seed": 91002,
+  "difficulty": "normal",
+  "title": "Apollo 4: Southern Landing",
+  "tagline": "Follow in the wheel tracks of a south pole landing.",
+  "goal": {
+    "text": "Touch down near the pole and run experiments on the soil",
+    "why": "Studying the ground near the pole shows what its soil is made of"
+  },
+  "inspired_by": {
+    "name": "ISRO Chandrayaan-3",
+    "source_url": "https://www.isro.gov.in/Chandrayaan3.html",
+    "date": "2023"
+  },
+  "facts": [
+    {
+      "id": "f1",
+      "text": "Chandrayaan-3's rover ramped down from the lander on August 24, 2023, and India took a walk on the Moon.",
+      "source_url": "https://www.isro.gov.in/Chandrayaan3.html",
+      "source_name": "ISRO: Chandrayaan-3",
+      "verified": true
+    },
+    {
+      "id": "f2",
+      "text": "On August 28, 2023, the LIBS instrument on the Chandrayaan-3 rover confirmed the presence of sulphur on the lunar surface through in-situ measurements.",
+      "source_url": "https://www.isro.gov.in/Chandrayaan3.html",
+      "source_name": "ISRO: Chandrayaan-3",
+      "verified": true
+    },
+    {
+      "id": "f3",
+      "text": "The Chandrayaan-3 ChaSTE payload on the Vikram lander made the first temperature observations of the lunar soil, reported August 27, 2023.",
+      "source_url": "https://www.isro.gov.in/Chandrayaan3.html",
+      "source_name": "ISRO: Chandrayaan-3",
+      "verified": true
+    }
+  ],
+  "destination": {
+    "body": "moon",
+    "region": "south_pole",
+    "region_name": "Lunar South Pole",
+    "candidate_sites": [
+      {
+        "id": "site_a",
+        "name": "Shackleton Rim",
+        "lat": -89.45,
+        "lon": -137.0,
+        "why": "Good sunlight and a long view of Earth"
+      },
+      {
+        "id": "site_b",
+        "name": "Connecting Ridge",
+        "lat": -89.4,
+        "lon": -152.0,
+        "why": "A ridge that keeps the lander above the dark"
+      },
+      {
+        "id": "site_c",
+        "name": "de Gerlache Rim",
+        "lat": -88.6,
+        "lon": -67.0,
+        "why": "Gentle ground, a short walk from the pole"
+      }
+    ]
+  },
+  "ship": {
+    "slots": [
+      "engine",
+      "power",
+      "payload",
+      "legs",
+      "comms"
+    ],
+    "constraints": {
+      "max_mass_kg": 1400,
+      "min_battery_hours": 45,
+      "min_delta_v": 2400,
+      "required_payload": [
+        "science_instruments"
+      ]
+    },
+    "rationale": "A short, careful mission: enough battery to last through the shadows and instruments that read the soil."
+  },
+  "crew": {
+    "min": 1,
+    "max": 4,
+    "roles": [
+      "commander",
+      "pilot",
+      "engineer",
+      "scientist"
+    ]
+  },
+  "checklist": {
+    "style": "memory_match",
+    "items": [
+      {
+        "prompt": "Rover",
+        "answer": "Drives and explores"
+      },
+      {
+        "prompt": "Lander",
+        "answer": "Touches down softly"
+      },
+      {
+        "prompt": "Antenna",
+        "answer": "Talks to Earth"
+      },
+      {
+        "prompt": "Battery",
+        "answer": "Stores power"
+      }
+    ]
+  },
+  "cruise": [
+    {
+      "type": "debris_field",
+      "role": "pilot",
+      "difficulty": 1,
+      "story": "Debris on radar. Steer through the gaps.",
+      "fact_id": "f1"
+    },
+    {
+      "type": "comms_blackout",
+      "role": "commander",
+      "difficulty": 1,
+      "story": "Lost the radio link. Re-align the antenna to reconnect.",
+      "fact_id": "f2"
+    },
+    {
+      "type": "engine_fault",
+      "role": "engineer",
+      "difficulty": 1,
+      "story": "A fuel line is leaking pressure. Reroute the pipes."
+    }
+  ],
+  "surface": {
+    "tasks": [
+      {
+        "id": "t1",
+        "role": "commander",
+        "type": "navigate_to",
+        "title": "Walk to the test spot",
+        "hint": "Follow the pale path away from the lander",
+        "unlocks": "t2"
+      },
+      {
+        "id": "t2",
+        "role": "engineer",
+        "type": "deploy_relay",
+        "title": "Place the radio relay",
+        "hint": "It must see Earth",
+        "unlocks": "t3"
+      },
+      {
+        "id": "t3",
+        "role": "scientist",
+        "type": "scan",
+        "title": "Read the soil",
+        "hint": "Hold the scanner over the dark patch"
+      }
+    ],
+    "final": "t3"
+  },
+  "voice_lines": [
+    {
+      "id": "brief_1",
+      "text": "Apollo 4, Houston. Your job is a careful landing and a careful look at the ground. Take your time."
+    },
+    {
+      "id": "launch_1",
+      "text": "Apollo 4, all stations go for launch."
+    },
+    {
+      "id": "landing_1",
+      "text": "Apollo 4, steady and slow. Pick a gentle spot to land."
+    },
+    {
+      "id": "success_1",
+      "text": "Apollo 4, the soil data is coming in. Great work, crew."
+    }
+  ]
+}

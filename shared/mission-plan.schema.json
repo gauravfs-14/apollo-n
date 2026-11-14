@@ -1,0 +1,609 @@
+{
+  "$defs": {
+    "CandidateSite": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "lat": {
+          "title": "Lat",
+          "type": "number"
+        },
+        "lon": {
+          "title": "Lon",
+          "type": "number"
+        },
+        "why": {
+          "minLength": 5,
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "lat",
+        "lon",
+        "why"
+      ],
+      "title": "CandidateSite",
+      "type": "object"
+    },
+    "Checklist": {
+      "additionalProperties": false,
+      "properties": {
+        "style": {
+          "enum": [
+            "quiz",
+            "order_steps",
+            "memory_match",
+            "switch_panel"
+          ],
+          "title": "Style",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/ChecklistItem"
+          },
+          "maxItems": 8,
+          "minItems": 3,
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "style",
+        "items"
+      ],
+      "title": "Checklist",
+      "type": "object"
+    },
+    "ChecklistItem": {
+      "additionalProperties": false,
+      "properties": {
+        "prompt": {
+          "minLength": 3,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "answer": {
+          "title": "Answer",
+          "type": "string"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Options"
+        },
+        "fact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fact Id"
+        }
+      },
+      "required": [
+        "prompt",
+        "answer"
+      ],
+      "title": "ChecklistItem",
+      "type": "object"
+    },
+    "Constraints": {
+      "additionalProperties": false,
+      "properties": {
+        "max_mass_kg": {
+          "exclusiveMinimum": 0,
+          "title": "Max Mass Kg",
+          "type": "number"
+        },
+        "min_battery_hours": {
+          "exclusiveMinimum": 0,
+          "title": "Min Battery Hours",
+          "type": "number"
+        },
+        "min_delta_v": {
+          "exclusiveMinimum": 0,
+          "title": "Min Delta V",
+          "type": "number"
+        },
+        "required_payload": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Payload",
+          "type": "array"
+        }
+      },
+      "required": [
+        "max_mass_kg",
+        "min_battery_hours",
+        "min_delta_v",
+        "required_payload"
+      ],
+      "title": "Constraints",
+      "type": "object"
+    },
+    "Crew": {
+      "additionalProperties": false,
+      "properties": {
+        "min": {
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Min",
+          "type": "integer"
+        },
+        "max": {
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Max",
+          "type": "integer"
+        },
+        "roles": {
+          "items": {
+            "enum": [
+              "commander",
+              "pilot",
+              "engineer",
+              "scientist"
+            ],
+            "type": "string"
+          },
+          "title": "Roles",
+          "type": "array"
+        }
+      },
+      "required": [
+        "min",
+        "max",
+        "roles"
+      ],
+      "title": "Crew",
+      "type": "object"
+    },
+    "CruiseHurdle": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "debris_field",
+            "solar_storm",
+            "engine_fault",
+            "nav_correction",
+            "comms_blackout"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "commander",
+            "pilot",
+            "engineer",
+            "scientist"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "difficulty": {
+          "enum": [
+            1,
+            2,
+            3
+          ],
+          "title": "Difficulty",
+          "type": "integer"
+        },
+        "story": {
+          "minLength": 10,
+          "title": "Story",
+          "type": "string"
+        },
+        "fact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fact Id"
+        }
+      },
+      "required": [
+        "type",
+        "role",
+        "difficulty",
+        "story"
+      ],
+      "title": "CruiseHurdle",
+      "type": "object"
+    },
+    "Destination": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "const": "moon",
+          "title": "Body",
+          "type": "string"
+        },
+        "region": {
+          "title": "Region",
+          "type": "string"
+        },
+        "region_name": {
+          "title": "Region Name",
+          "type": "string"
+        },
+        "candidate_sites": {
+          "items": {
+            "$ref": "#/$defs/CandidateSite"
+          },
+          "title": "Candidate Sites",
+          "type": "array"
+        }
+      },
+      "required": [
+        "body",
+        "region",
+        "region_name",
+        "candidate_sites"
+      ],
+      "title": "Destination",
+      "type": "object"
+    },
+    "Fact": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 10,
+          "title": "Text",
+          "type": "string"
+        },
+        "source_url": {
+          "pattern": "^https?://",
+          "title": "Source Url",
+          "type": "string"
+        },
+        "source_name": {
+          "minLength": 2,
+          "title": "Source Name",
+          "type": "string"
+        },
+        "verified": {
+          "title": "Verified",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "source_url",
+        "source_name",
+        "verified"
+      ],
+      "title": "Fact",
+      "type": "object"
+    },
+    "Goal": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "minLength": 10,
+          "title": "Text",
+          "type": "string"
+        },
+        "why": {
+          "minLength": 10,
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "why"
+      ],
+      "title": "Goal",
+      "type": "object"
+    },
+    "InspiredBy": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 2,
+          "title": "Name",
+          "type": "string"
+        },
+        "source_url": {
+          "pattern": "^https?://",
+          "title": "Source Url",
+          "type": "string"
+        },
+        "date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Date"
+        }
+      },
+      "required": [
+        "name",
+        "source_url"
+      ],
+      "title": "InspiredBy",
+      "type": "object"
+    },
+    "Ship": {
+      "additionalProperties": false,
+      "properties": {
+        "slots": {
+          "items": {
+            "enum": [
+              "engine",
+              "power",
+              "payload",
+              "legs",
+              "comms"
+            ],
+            "type": "string"
+          },
+          "title": "Slots",
+          "type": "array"
+        },
+        "constraints": {
+          "$ref": "#/$defs/Constraints"
+        },
+        "rationale": {
+          "minLength": 10,
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slots",
+        "constraints",
+        "rationale"
+      ],
+      "title": "Ship",
+      "type": "object"
+    },
+    "Surface": {
+      "additionalProperties": false,
+      "properties": {
+        "tasks": {
+          "items": {
+            "$ref": "#/$defs/SurfaceTask"
+          },
+          "maxItems": 5,
+          "minItems": 2,
+          "title": "Tasks",
+          "type": "array"
+        },
+        "final": {
+          "title": "Final",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tasks",
+        "final"
+      ],
+      "title": "Surface",
+      "type": "object"
+    },
+    "SurfaceTask": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "commander",
+            "pilot",
+            "engineer",
+            "scientist"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "scan",
+            "collect_sample",
+            "deploy_relay",
+            "repair",
+            "navigate_to"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 3,
+          "title": "Title",
+          "type": "string"
+        },
+        "hint": {
+          "minLength": 3,
+          "title": "Hint",
+          "type": "string"
+        },
+        "unlocks": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unlocks"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "type",
+        "title",
+        "hint"
+      ],
+      "title": "SurfaceTask",
+      "type": "object"
+    },
+    "VoiceLine": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 400,
+          "minLength": 3,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text"
+      ],
+      "title": "VoiceLine",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "number": {
+      "minimum": 1,
+      "title": "Number",
+      "type": "integer"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "difficulty": {
+      "enum": [
+        "easy",
+        "normal",
+        "hard"
+      ],
+      "title": "Difficulty",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "tagline": {
+      "minLength": 5,
+      "title": "Tagline",
+      "type": "string"
+    },
+    "goal": {
+      "$ref": "#/$defs/Goal"
+    },
+    "inspired_by": {
+      "$ref": "#/$defs/InspiredBy"
+    },
+    "facts": {
+      "items": {
+        "$ref": "#/$defs/Fact"
+      },
+      "minItems": 2,
+      "title": "Facts",
+      "type": "array"
+    },
+    "destination": {
+      "$ref": "#/$defs/Destination"
+    },
+    "ship": {
+      "$ref": "#/$defs/Ship"
+    },
+    "crew": {
+      "$ref": "#/$defs/Crew"
+    },
+    "checklist": {
+      "$ref": "#/$defs/Checklist"
+    },
+    "cruise": {
+      "items": {
+        "$ref": "#/$defs/CruiseHurdle"
+      },
+      "title": "Cruise",
+      "type": "array"
+    },
+    "surface": {
+      "$ref": "#/$defs/Surface"
+    },
+    "voice_lines": {
+      "items": {
+        "$ref": "#/$defs/VoiceLine"
+      },
+      "title": "Voice Lines",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "number",
+    "seed",
+    "difficulty",
+    "title",
+    "tagline",
+    "goal",
+    "inspired_by",
+    "facts",
+    "destination",
+    "ship",
+    "crew",
+    "checklist",
+    "cruise",
+    "surface",
+    "voice_lines"
+  ],
+  "title": "MissionPlan",
+  "type": "object"
+}

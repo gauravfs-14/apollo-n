@@ -1,0 +1,210 @@
+{
+  "id": "apollo-2",
+  "number": 2,
+  "seed": 22117,
+  "difficulty": "normal",
+  "title": "Apollo 2: Delivery Service",
+  "tagline": "Prove that a small lander can carry real science to the Moon.",
+  "goal": {
+    "text": "Deliver a science payload to the south pole and switch it on",
+    "why": "Commercial deliveries let NASA put instruments on the Moon faster and more often"
+  },
+  "inspired_by": {
+    "name": "NASA Commercial Lunar Payload Services",
+    "source_url": "https://www.nasa.gov/missions/artemis/clps/",
+    "date": "2026"
+  },
+  "facts": [
+    {
+      "id": "f1",
+      "text": "Through Commercial Lunar Payload Services (CLPS), NASA works with American companies to deliver scientific, exploration and technology payloads to the Moon's surface and orbit.",
+      "source_url": "https://www.nasa.gov/missions/artemis/clps/",
+      "source_name": "NASA: CLPS",
+      "verified": true
+    },
+    {
+      "id": "f2",
+      "text": "NASA describes the Moon Base as humanity's first lunar outpost, a place where astronauts will live, work and explore near the Moon's South Pole.",
+      "source_url": "https://www.nasa.gov/humans-in-space/artemis/",
+      "source_name": "NASA Artemis",
+      "verified": true
+    },
+    {
+      "id": "f3",
+      "text": "LRO has been studying the Moon from up close since 2009, making it the longest-lived lunar orbiting mission ever.",
+      "source_url": "https://science.nasa.gov/mission/lro/",
+      "source_name": "NASA Science: LRO",
+      "verified": true
+    }
+  ],
+  "destination": {
+    "body": "moon",
+    "region": "south_pole",
+    "region_name": "Lunar South Pole",
+    "candidate_sites": [
+      {
+        "id": "site_a",
+        "name": "Shackleton Rim",
+        "lat": -89.45,
+        "lon": -137.0,
+        "why": "Sunlight for most of the day keeps the lander warm and powered"
+      },
+      {
+        "id": "site_b",
+        "name": "Connecting Ridge",
+        "lat": -89.4,
+        "lon": -152.0,
+        "why": "A high ridge with an open sky for radio links"
+      },
+      {
+        "id": "site_c",
+        "name": "de Gerlache Rim",
+        "lat": -88.6,
+        "lon": -67.0,
+        "why": "Flatter ground makes touchdown easier"
+      }
+    ]
+  },
+  "ship": {
+    "slots": [
+      "engine",
+      "power",
+      "payload",
+      "legs",
+      "comms"
+    ],
+    "constraints": {
+      "max_mass_kg": 1200,
+      "min_battery_hours": 40,
+      "min_delta_v": 2300,
+      "required_payload": [
+        "science_instruments"
+      ]
+    },
+    "rationale": "A small commercial lander has little spare mass, so every part must earn its place and the instruments must stay powered."
+  },
+  "crew": {
+    "min": 1,
+    "max": 4,
+    "roles": [
+      "commander",
+      "pilot",
+      "engineer",
+      "scientist"
+    ]
+  },
+  "checklist": {
+    "style": "quiz",
+    "items": [
+      {
+        "prompt": "Which part keeps the lander's computers running in the dark?",
+        "answer": "Battery",
+        "options": [
+          "Battery",
+          "Landing leg",
+          "Antenna",
+          "Window"
+        ]
+      },
+      {
+        "prompt": "What does the antenna do?",
+        "answer": "Talks to Earth",
+        "options": [
+          "Talks to Earth",
+          "Cools the engine",
+          "Holds the fuel",
+          "Steers the ship"
+        ],
+        "fact_id": "f1"
+      },
+      {
+        "prompt": "What are landing legs for?",
+        "answer": "Soft touchdown",
+        "options": [
+          "Soft touchdown",
+          "Making power",
+          "Taking photos",
+          "Measuring speed"
+        ]
+      },
+      {
+        "prompt": "Where is the Moon Base planned?",
+        "answer": "Near the south pole",
+        "options": [
+          "Near the south pole",
+          "On the far side only",
+          "In orbit around Mars",
+          "At the equator"
+        ],
+        "fact_id": "f2"
+      }
+    ]
+  },
+  "cruise": [
+    {
+      "type": "comms_blackout",
+      "role": "commander",
+      "difficulty": 1,
+      "story": "The radio link to Earth dropped. Line the antenna back up with the signal.",
+      "fact_id": "f1"
+    },
+    {
+      "type": "nav_correction",
+      "role": "pilot",
+      "difficulty": 1,
+      "story": "We drifted off course. Line up the rings to correct our path."
+    },
+    {
+      "type": "debris_field",
+      "role": "engineer",
+      "difficulty": 1,
+      "story": "Small debris ahead. Steer the ship through the gaps."
+    }
+  ],
+  "surface": {
+    "tasks": [
+      {
+        "id": "t1",
+        "role": "pilot",
+        "type": "navigate_to",
+        "title": "Walk to the instrument spot",
+        "hint": "Follow the flat, bright ground away from the lander",
+        "unlocks": "t2"
+      },
+      {
+        "id": "t2",
+        "role": "engineer",
+        "type": "deploy_relay",
+        "title": "Set up the radio relay",
+        "hint": "Pick a spot with a clear view of Earth",
+        "unlocks": "t3"
+      },
+      {
+        "id": "t3",
+        "role": "scientist",
+        "type": "scan",
+        "title": "Switch on the instruments",
+        "hint": "Sweep the scanner until the signal locks"
+      }
+    ],
+    "final": "t3"
+  },
+  "voice_lines": [
+    {
+      "id": "brief_1",
+      "text": "Apollo 2, Houston. This is a delivery mission: get the instruments to the pole safely and switch them on."
+    },
+    {
+      "id": "launch_1",
+      "text": "Apollo 2, all systems go. Launch when ready."
+    },
+    {
+      "id": "landing_1",
+      "text": "Apollo 2, choose a flat spot. A gentle landing keeps the science safe."
+    },
+    {
+      "id": "success_1",
+      "text": "Apollo 2, the instruments are alive and talking to Earth. Nicely done."
+    }
+  ]
+}

@@ -9,55 +9,187 @@
     "text": "Find signs of water ice inside a permanently shadowed crater near the lunar south pole",
     "why": "Water can become drinking water, breathable oxygen and rocket fuel for future crews"
   },
-  "inspired_by": { "name": "NASA Artemis III south-pole landing region", "source_url": "https://www.nasa.gov/humans-in-space/artemis/", "date": "2026" },
+  "inspired_by": {
+    "name": "NASA LCROSS mission",
+    "source_url": "https://science.nasa.gov/mission/lcross/",
+    "date": "2009"
+  },
   "facts": [
-    { "id": "f1", "text": "In 2009 NASA's LCROSS mission crashed a rocket stage into Cabeus crater near the south pole and detected water in the debris plume.", "source_url": "https://www.nasa.gov/mission/lcross/", "source_name": "NASA LCROSS", "verified": true },
-    { "id": "f2", "text": "Some craters near the lunar poles never see direct sunlight, so they stay cold enough to trap water ice for billions of years.", "source_url": "https://science.nasa.gov/moon/", "source_name": "NASA Science: Moon", "verified": true },
-    { "id": "f3", "text": "NASA's Artemis program plans to land astronauts near the lunar south pole.", "source_url": "https://www.nasa.gov/humans-in-space/artemis/", "source_name": "NASA Artemis", "verified": true },
-    { "id": "f4", "text": "Shackleton crater sits almost exactly on the lunar south pole and is about 21 km wide.", "source_url": "https://science.nasa.gov/moon/", "source_name": "NASA Science: Moon", "verified": true }
+    {
+      "id": "f1",
+      "text": "LCROSS and its Centaur rocket stage impacted the Moon on Oct. 9, 2009, and the impact threw up a plume of material that might not have seen direct sunlight for billions of years.",
+      "source_url": "https://science.nasa.gov/mission/lcross/",
+      "source_name": "NASA Science: LCROSS",
+      "verified": true
+    },
+    {
+      "id": "f2",
+      "text": "LCROSS scientists confirmed that in some places the water at the Moon's south pole is in the form of pure ice crystals.",
+      "source_url": "https://science.nasa.gov/mission/lcross/",
+      "source_name": "NASA Science: LCROSS",
+      "verified": true
+    },
+    {
+      "id": "f3",
+      "text": "The Moon has ancient ice hidden deep in permanently shadowed craters.",
+      "source_url": "https://science.nasa.gov/moon/",
+      "source_name": "NASA Science: Earth's Moon",
+      "verified": true
+    },
+    {
+      "id": "f4",
+      "text": "Data from NASA's Lunar Reconnaissance Orbiter helps identify areas near the Moon's South Pole with water and extended sunlight.",
+      "source_url": "https://science.nasa.gov/mission/lro/",
+      "source_name": "NASA Science: LRO",
+      "verified": true
+    }
   ],
   "destination": {
     "body": "moon",
     "region": "south_pole",
     "region_name": "Lunar South Pole",
     "candidate_sites": [
-      { "id": "site_a", "name": "Shackleton Rim", "lat": -89.45, "lon": -137.0, "why": "Long hours of sunlight on the rim, next to a shadowed crater" },
-      { "id": "site_b", "name": "Connecting Ridge", "lat": -89.4, "lon": -152.0, "why": "High ridge with good views of Earth for radio" },
-      { "id": "site_c", "name": "de Gerlache Rim", "lat": -88.6, "lon": -67.0, "why": "Gentler slopes, a little further from the ice" }
+      {
+        "id": "site_a",
+        "name": "Shackleton Rim",
+        "lat": -89.45,
+        "lon": -137.0,
+        "why": "Long hours of sunlight on the rim, next to a shadowed crater"
+      },
+      {
+        "id": "site_b",
+        "name": "Connecting Ridge",
+        "lat": -89.4,
+        "lon": -152.0,
+        "why": "High ridge with good views of Earth for radio"
+      },
+      {
+        "id": "site_c",
+        "name": "de Gerlache Rim",
+        "lat": -88.6,
+        "lon": -67.0,
+        "why": "Gentler slopes, a little further from the ice"
+      }
     ]
   },
   "ship": {
-    "slots": ["engine", "power", "payload", "legs", "comms"],
-    "constraints": { "max_mass_kg": 1500, "min_battery_hours": 50, "min_delta_v": 2400, "required_payload": ["drill"] },
-    "rationale": "The crater floor is in permanent shadow, so the lander needs batteries for about 50 hours of darkness and a drill to reach buried ice."
+    "slots": [
+      "engine",
+      "power",
+      "payload",
+      "legs",
+      "comms"
+    ],
+    "constraints": {
+      "max_mass_kg": 1500,
+      "min_battery_hours": 50,
+      "min_delta_v": 2400,
+      "required_payload": [
+        "drill"
+      ]
+    },
+    "rationale": "The crater floor is in permanent shadow, so the lander needs batteries for the dark hours and a drill to reach buried ice."
   },
-  "crew": { "min": 1, "max": 4, "roles": ["commander", "pilot", "engineer", "scientist"] },
+  "crew": {
+    "min": 1,
+    "max": 4,
+    "roles": [
+      "commander",
+      "pilot",
+      "engineer",
+      "scientist"
+    ]
+  },
   "checklist": {
     "style": "order_steps",
     "items": [
-      { "prompt": "Close the crew hatch", "answer": "1" },
-      { "prompt": "Pressurize fuel tanks", "answer": "2" },
-      { "prompt": "Switch to internal power", "answer": "3" },
-      { "prompt": "Arm the launch abort system", "answer": "4" },
-      { "prompt": "Mission control: GO for launch", "answer": "5" }
+      {
+        "prompt": "Close the crew hatch",
+        "answer": "1"
+      },
+      {
+        "prompt": "Pressurize fuel tanks",
+        "answer": "2"
+      },
+      {
+        "prompt": "Switch to internal power",
+        "answer": "3"
+      },
+      {
+        "prompt": "Arm the launch abort system",
+        "answer": "4"
+      },
+      {
+        "prompt": "Mission control: GO for launch",
+        "answer": "5"
+      }
     ]
   },
   "cruise": [
-    { "type": "solar_storm", "role": "commander", "difficulty": 1, "story": "A burst of solar particles is heading our way. Get the crew behind the water shielding.", "fact_id": "f2" },
-    { "type": "debris_field", "role": "pilot", "difficulty": 1, "story": "Radar shows a field of small debris ahead. Steer through the gaps." },
-    { "type": "engine_fault", "role": "engineer", "difficulty": 1, "story": "Fuel pressure dropped in line B. Reroute the pipes before the next burn." }
+    {
+      "type": "solar_storm",
+      "role": "commander",
+      "difficulty": 1,
+      "story": "A burst of solar particles is heading our way. Get the crew behind the water shielding.",
+      "fact_id": "f3"
+    },
+    {
+      "type": "debris_field",
+      "role": "pilot",
+      "difficulty": 1,
+      "story": "Radar shows a field of small debris ahead. Steer through the gaps."
+    },
+    {
+      "type": "engine_fault",
+      "role": "engineer",
+      "difficulty": 1,
+      "story": "Fuel pressure dropped in line B. Reroute the pipes before the next burn."
+    }
   ],
   "surface": {
     "tasks": [
-      { "id": "t1", "role": "commander", "type": "navigate_to", "title": "Reach the crater rim", "hint": "Head toward the edge of the long shadow", "unlocks": "t2" },
-      { "id": "t2", "role": "engineer", "type": "deploy_relay", "title": "Deploy the radio relay", "hint": "It needs a clear view of Earth, low on the horizon", "unlocks": "t3" },
-      { "id": "t3", "role": "scientist", "type": "scan", "title": "Find the ice signal", "hint": "Follow the coldest ground: beeps get faster near ice" }
+      {
+        "id": "t1",
+        "role": "commander",
+        "type": "navigate_to",
+        "title": "Reach the crater rim",
+        "hint": "Head toward the edge of the long shadow",
+        "unlocks": "t2"
+      },
+      {
+        "id": "t2",
+        "role": "engineer",
+        "type": "deploy_relay",
+        "title": "Deploy the radio relay",
+        "hint": "It needs a clear view of Earth, low on the horizon",
+        "unlocks": "t3"
+      },
+      {
+        "id": "t3",
+        "role": "scientist",
+        "type": "scan",
+        "title": "Find the ice signal",
+        "hint": "Follow the coldest ground: beeps get faster near ice"
+      }
     ],
     "final": "t3"
   },
   "voice_lines": [
-    { "id": "brief_1", "text": "Apollo 1, this is Houston. Your target is the lunar south pole, where sunlight barely reaches and ice may hide in the dark. Build us a ship that can survive the night." },
-    { "id": "launch_1", "text": "All stations report go. Apollo 1, you are clear for launch." },
-    { "id": "landing_1", "text": "Apollo 1, pick your landing site carefully. The slopes at the pole are steep." }
+    {
+      "id": "brief_1",
+      "text": "Apollo 1, this is Houston. Your target is the lunar south pole, where sunlight barely reaches and ice may hide in the dark. Build us a ship that can survive the night."
+    },
+    {
+      "id": "launch_1",
+      "text": "All stations report go. Apollo 1, you are clear for launch."
+    },
+    {
+      "id": "landing_1",
+      "text": "Apollo 1, pick your landing site carefully. The slopes at the pole are steep."
+    },
+    {
+      "id": "success_1",
+      "text": "Apollo 1, Houston. Touchdown confirmed. Great work, crew."
+    }
   ]
 }
