@@ -29,7 +29,7 @@ const RS = 0.9; // rocket scale
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const sm = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 const SUN = new THREE.Vector3(-0.75, 0.32, 0.5).normalize();
-const SPACE_SUN: [number, number, number] = [1, 0.35, 0.5];
+const SPACE_SUN: [number, number, number] = [-0.5, 0.5, 0.7]; // behind-left of the camera so the Moon ahead shows a lit gibbous face and the Earth below its day side
 
 /** Altitude above the pad (m) t seconds after liftoff. */
 const altitude = (tp: number) => (tp <= 0 ? 0 : 0.5 * 3.2 * tp * tp + 0.045 * tp * tp * tp);
@@ -61,6 +61,11 @@ export function LaunchScene() {
     s2p: new THREE.Vector3(), s2v: new THREE.Vector3(), s1spin: 0, s2spin: 0, camLook: new THREE.Vector3(0, 60, 0), tmp: new THREE.Vector3(), tmp2: new THREE.Vector3(),
   }), []);
   const spec = useMemo<EmitSpec>(() => ({ pos: [0, 0, 0], posJitter: [0, 0, 0], vel: [0, 0, 0], velJitter: [0, 0, 0], life: 1, size0: 1, size1: 1 }), []);
+
+  // the pad haze must not wash out the Moon and Earth (thousands of metres away) once we are in space
+  useEffect(() => {
+    if (space) scene.fog = null;
+  }, [space, scene]);
 
   // camera setup / restore (the Canvas camera is shared by all phases)
   useEffect(() => {
