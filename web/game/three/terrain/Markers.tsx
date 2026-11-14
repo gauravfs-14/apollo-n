@@ -35,12 +35,12 @@ export function Beacon({
   return (
     <group position={position}>
       <mesh position={[0, height / 2, 0]}>
-        <cylinderGeometry args={[size * 0.025, size * 0.025, height, 6, 1, true]} />
+        <cylinderGeometry args={[size * 0.07, size * 0.07, height, 8, 1, true]} />
         <meshBasicMaterial color={c} toneMapped={false} transparent opacity={0.8} depthWrite={false} />
       </mesh>
       {[ring, ring2].map((r, i) => (
         <mesh key={i} ref={r} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.3, 0]}>
-          <ringGeometry args={[size * 0.92, size, 48]} />
+          <ringGeometry args={[size * 0.86, size, 48]} />
           <meshBasicMaterial color={c} toneMapped={false} transparent opacity={0.8} depthWrite={false} side={THREE.DoubleSide} />
         </mesh>
       ))}

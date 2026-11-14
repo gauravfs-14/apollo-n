@@ -1,10 +1,16 @@
 "use client";
-import { StubHud } from "../../ui/StubPhase";
 import type { PhaseModule } from "../../types";
+import { SiteHud } from "./Hud";
 import { Scene } from "./Scene";
 
-function Hud() {
-  return <StubHud id="site" title="Find the landing site" />;
-}
-
-export const phase: PhaseModule = { id: "site", Scene, Hud };
+export const phase: PhaseModule = {
+  id: "site",
+  Scene,
+  Hud: SiteHud,
+  preload: [
+    "/textures/regolith/moon_dusted_03_diff_1k.jpg",
+    "/textures/regolith/moon_dusted_03_nor_gl_1k.jpg",
+    "/terrain/site_a/height_1025.bin",
+    "/terrain/ephemeris.json",
+  ],
+};

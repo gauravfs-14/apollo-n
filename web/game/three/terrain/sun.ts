@@ -93,10 +93,10 @@ function directions(e: Ephemeris, lat: number, lon: number, t: number) {
 }
 
 /** Sun/Earth for time t; if the Sun is under ~0.6 deg (polar night season) advance day by day. */
-export function skyAt(e: Ephemeris, lat: number, lon: number, t = DEFAULT_T): SkyState {
+export function skyAt(e: Ephemeris, lat: number, lon: number, t = DEFAULT_T, minEl = MIN_SUN_EL): SkyState {
   let d = directions(e, lat, lon, t);
   let shifted = 0;
-  while (d.sunElDeg < MIN_SUN_EL && shifted < 400) {
+  while (d.sunElDeg < minEl && shifted < 400) {
     t += 86400;
     shifted++;
     d = directions(e, lat, lon, t);
