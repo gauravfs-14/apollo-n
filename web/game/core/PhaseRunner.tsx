@@ -45,14 +45,19 @@ export function PhaseRunner() {
   const Scene = mod?.id === phaseId ? mod.Scene : undefined;
   const Hud = mod?.id === phaseId ? mod.Hud : undefined;
   const q = QUALITY[quality];
+  // Toggling shadows needs a fresh renderer (Canvas key). An automatic tier change must never restart a running
+  // cinematic, so with quality "auto" the shadow setting only changes at a phase boundary; a pinned choice applies at once.
+  const auto = useStore((s) => s.qualityMode) === "auto";
+  const [applied, setApplied] = useState({ phase: phaseId, shadows: q.shadows });
+  if (applied.phase !== phaseId || (!auto && applied.shadows !== q.shadows)) setApplied({ phase: phaseId, shadows: q.shadows });
 
   return (
     <div className="fixed inset-0 bg-black">
       <Canvas
-        key={quality === "low" ? "lo" : "hi" /* shadows toggle needs a fresh renderer */}
+        key={applied.shadows ? "hi" : "lo"}
         className="!fixed inset-0"
         dpr={[1, q.maxDpr]}
-        shadows={q.shadows ? "soft" : false}
+        shadows={applied.shadows ? "soft" : false}
         frameloop={mod?.frameloop ?? "always"}
         gl={{ antialias: false, powerPreference: "high-performance", stencil: false, alpha: false }}
         camera={{ fov: 45, near: 0.1, far: 20000, position: [0, 2, 8] }}

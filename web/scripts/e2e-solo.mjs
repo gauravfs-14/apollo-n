@@ -51,6 +51,14 @@ async function enter(ph, from, timeout = 30000, settle = 2500) {
   await page.waitForTimeout(settle);
   await shot(ph);
   await memSnap(ph);
+  if (flags.burst === ph) {
+    // debugging aid: --burst=<phase> takes a screenshot every 2 s for 20 s on entering that phase, then exits
+    for (let i = 0; i < 10; i++) {
+      await page.waitForTimeout(2000);
+      await shot(ph, `-burst${i}`);
+    }
+    process.exit(0);
+  }
 }
 
 let phaseNow = "menu";
