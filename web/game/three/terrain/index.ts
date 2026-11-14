@@ -8,3 +8,4 @@ export { Beacon } from "./Markers";
 export { loadEphemeris, skyAt, missionTime, missionDateIso, DEFAULT_T } from "./sun";
 export type { SkyState, Ephemeris } from "./sun";
 export type { OverlayMode } from "./lunarShader";
+export { RenderInfo } from "./RenderInfo";

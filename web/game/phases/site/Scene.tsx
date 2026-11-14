@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { Effects } from "../../core/Effects";
 import {
-  Beacon, LunarSky, SunLight, Terrain, missionTime, skyAt, useTerrainData, type TerrainData,
+  Beacon, LunarSky, RenderInfo, SunLight, Terrain, missionTime, skyAt, useTerrainData, type TerrainData,
 } from "../../three/terrain";
 import { useSiteActions, useSiteState } from "./actions";
 import type { Landing } from "./api";
@@ -299,7 +299,7 @@ export function Scene() {
   );
   useEffect(() => {
     useSiteUi.getState().set({ loaded: !!data });
-    return () => useSiteUi.getState().set({ loaded: false });
+    return () => useSiteUi.getState().set({ loaded: false, flyTo: null, hover: null, hint: null });
   }, [data]);
   if (!data || !sky) return null;
   return (
@@ -313,6 +313,7 @@ export function Scene() {
       {sd.probe && sd.sim && <Ellipse data={data} probe={sd.probe} r={sd.sim.ellipse.radius95_m} />}
       {sd.probe && sd.sim && <Ghosts data={data} probe={sd.probe} landings={sd.sim.landings} />}
       {hint && <Beacon position={[hint.x, data.heightAt(hint.x, hint.z), hint.z]} color="#6fd3ff" size={60} height={260} />}
+      <RenderInfo />
       <Effects bloom={0.55} ao={false} />
     </>
   );
