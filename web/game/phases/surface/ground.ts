@@ -7,21 +7,33 @@ import * as THREE from "three";
 
 export const AREA = 320; // inner detailed mesh size (m)
 export const PLAY_RADIUS = 135; // soft boundary
-export const SUN_ELEV = (2.4 * Math.PI) / 180;
-export const SUN_AZ = 2.35; // radians, direction TO the sun in the x/z plane: (sin, cos)
-export const EARTH_ELEV = (6.5 * Math.PI) / 180;
-export const EARTH_AZ = SUN_AZ + 2.25;
+// Sun / Earth directions. These are live bindings: the defaults below are used until SurfaceScene calls setSurfaceSky()
+// with the real ephemeris direction for the landing site and mission date (before the ground is built).
+export let SUN_ELEV = (2.4 * Math.PI) / 180;
+export let SUN_AZ = 2.35; // radians, direction TO the sun in the x/z plane: (sin, cos)
+export let EARTH_ELEV = (6.5 * Math.PI) / 180;
+export let EARTH_AZ = SUN_AZ + 2.25;
 
-export const SUN_DIR = new THREE.Vector3(
-  Math.sin(SUN_AZ) * Math.cos(SUN_ELEV),
-  Math.sin(SUN_ELEV),
-  Math.cos(SUN_AZ) * Math.cos(SUN_ELEV),
-).normalize();
-export const EARTH_DIR = new THREE.Vector3(
-  Math.sin(EARTH_AZ) * Math.cos(EARTH_ELEV),
-  Math.sin(EARTH_ELEV),
-  Math.cos(EARTH_AZ) * Math.cos(EARTH_ELEV),
-).normalize();
+export const SUN_DIR = new THREE.Vector3();
+export const EARTH_DIR = new THREE.Vector3();
+const D2R = Math.PI / 180;
+const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+function refreshDirs() {
+  SUN_DIR.set(Math.sin(SUN_AZ) * Math.cos(SUN_ELEV), Math.sin(SUN_ELEV), Math.cos(SUN_AZ) * Math.cos(SUN_ELEV)).normalize();
+  EARTH_DIR.set(Math.sin(EARTH_AZ) * Math.cos(EARTH_ELEV), Math.sin(EARTH_ELEV), Math.cos(EARTH_AZ) * Math.cos(EARTH_ELEV)).normalize();
+}
+refreshDirs();
+
+/** Real sun/earth unit vectors (tile frame, y up) from three/terrain/sun.ts. Azimuths are kept; elevations are clamped
+ *  so the game stays playable (a sun under 0.8 deg gives km-long shadows, an Earth under the horizon makes radio tasks impossible). */
+export function setSurfaceSky(sunDir: [number, number, number], earthDir: [number, number, number]) {
+  SUN_AZ = Math.atan2(sunDir[0], sunDir[2]);
+  SUN_ELEV = clamp(Math.asin(clamp(sunDir[1], -1, 1)), 0.8 * D2R, 8 * D2R);
+  EARTH_AZ = Math.atan2(earthDir[0], earthDir[2]);
+  EARTH_ELEV = clamp(Math.asin(clamp(earthDir[1], -1, 1)), 3 * D2R, 9 * D2R);
+  refreshDirs();
+  if (typeof window !== "undefined") (window as unknown as { __surfaceSky: unknown }).__surfaceSky = { sunElDeg: SUN_ELEV / D2R, sunAzDeg: SUN_AZ / D2R, earthElDeg: EARTH_ELEV / D2R, earthAzDeg: EARTH_AZ / D2R, raw: { sunDir, earthDir } };
+}
 
 export function mulberry32(a: number) {
   return () => {

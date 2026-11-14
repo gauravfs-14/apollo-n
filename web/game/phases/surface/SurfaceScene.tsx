@@ -6,8 +6,8 @@ import { Effects } from "../../core/Effects";
 import { useGame } from "../../core/useGame";
 import { Lander, getDefaultParts, type LanderParts } from "../../three/ship/Lander";
 import { Crew } from "./Crew";
-import { loadTerrain } from "../../three/terrain";
-import { createGround, hashStr, type DemSource } from "./ground";
+import { loadEphemeris, loadTerrain, missionTime, skyAt } from "../../three/terrain";
+import { createGround, hashStr, setSurfaceSky, type DemSource } from "./ground";
 import { surfaceUniforms } from "./materials";
 import { Player } from "./Player";
 import { Rocks } from "./Rocks";
@@ -36,7 +36,36 @@ export function SurfaceScene() {
       clearTimeout(fail);
     };
   }, [siteId, siteXZ?.x, siteXZ?.z]);
-  const ground = useMemo(() => (dem === undefined ? null : createGround(seed, dem ?? undefined)), [seed, dem]);
+  // Sun and Earth from P4's ephemeris for this site and mission date (same call as the site phase uses), applied before the ground is built
+  const report = (site as { report?: { lat?: number; lon?: number } } | undefined)?.report;
+  const [skyFor, setSkyFor] = useState<string | null>(null);
+  const skyKey = `${siteId}|${plan?.seed ?? 0}|${report?.lat ?? ""}|${report?.lon ?? ""}`;
+  useEffect(() => {
+    let alive = true;
+    const done = () => alive && setSkyFor(skyKey);
+    const fail = setTimeout(done, 4000); // never block the surface on the sky: defaults are fine
+    (async () => {
+      const [eph, meta] = await Promise.all([loadEphemeris(), report?.lat != null ? null : fetch(`/terrain/${siteId}/meta.json`).then((r) => r.json())]);
+      const lat = report?.lat ?? meta.center.lat;
+      const lon = report?.lon ?? meta.center.lon;
+      const s = skyAt(eph, lat, lon, missionTime(plan));
+      setSurfaceSky(s.sunDir, s.earthDir);
+    })()
+      .catch(() => {})
+      .finally(() => {
+        clearTimeout(fail);
+        done();
+      });
+    return () => {
+      alive = false;
+      clearTimeout(fail);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- skyKey captures siteId, plan seed and the probe lat/lon
+  }, [skyKey]);
+  const ground = useMemo(
+    () => (dem === undefined || skyFor !== skyKey ? null : createGround(seed, dem ?? undefined)),
+    [seed, dem, skyFor, skyKey],
+  );
   const parts = (state?.phaseData.build as { parts?: Partial<LanderParts> } | undefined)?.parts;
   const landerParts = useMemo(() => ({ ...getDefaultParts(), ...(parts ?? {}) }), [parts]);
 
