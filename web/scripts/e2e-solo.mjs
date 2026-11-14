@@ -12,6 +12,20 @@ const PHASES = ["select", "build", "drop", "crew", "board", "checklist", "launch
 const browser = await launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 await ctx.addInitScript(GPU_PROBE);
+// hitch logger: frames > 150 ms, with the phase and whether the black veil (PhaseRunner SceneGate) was up at that moment
+await ctx.addInitScript(() => {
+  window.__hitches = [];
+  let last = performance.now();
+  const tick = (now) => {
+    if (now - last > 150 && last > 0) {
+      const veil = [...document.querySelectorAll("div.fixed.inset-0.bg-black")].find((d) => d.className.includes("z-[5]"));
+      window.__hitches.push({ ms: Math.round(now - last), phase: window.__apolloStore?.getState().state?.phase ?? "menu", veil: veil ? +getComputedStyle(veil).opacity : null });
+    }
+    last = now;
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+});
 if (flags.quality) await ctx.addInitScript((q) => localStorage.setItem("apollo.quality", q), flags.quality);
 const page = await ctx.newPage();
 const log = { phases: [], mem: [], forced: [], failed: [], fps: {} };
@@ -210,7 +224,7 @@ await step("site", async () => {
   await page.waitForTimeout(2500);
   await shot("site", "-probe");
   await click(page.getByRole("button", { name: /Run 300 test landings/ }));
-  await page.getByText("Safe landings").waitFor({ timeout: 30000 });
+  await page.getByText("Safe landings").first().waitFor({ timeout: 30000 });
   await page.waitForTimeout(1500);
   await shot("site", "-sim");
   await click(page.getByRole("button", { name: "Confirm landing site" }));
@@ -264,6 +278,16 @@ await step("memory-final", async () => {
   console.log("LEAK vs menu baseline", JSON.stringify(log.leak));
 });
 
+log.sustained = await page.evaluate(() =>
+  Object.fromEntries(
+    Object.entries(window.__apolloPerf.byPhase).map(([ph, a]) => [ph, { n: a.length, avgFps: +(a.reduce((x, y) => x + y.fps, 0) / a.length).toFixed(1), minFps: Math.min(...a.map((x) => x.fps)), worstP95: Math.max(...a.map((x) => x.frameMsP95)), worstFrame: Math.max(...a.map((x) => x.frameMsMax ?? 0)) }]),
+  ),
+);
+console.log("== sustained per phase (1 sample/s)");
+for (const [ph, v] of Object.entries(log.sustained)) console.log(`  ${ph.padEnd(10)} avg ${String(v.avgFps).padStart(5)} fps  min ${String(v.minFps).padStart(3)}  worst p95 ${v.worstP95} ms  worst frame ${v.worstFrame} ms  (${v.n} samples)`);
+log.hitches = await page.evaluate(() => window.__hitches);
+console.log("== hitches > 150 ms (veil = black cover opacity at that moment, 1 = hidden)");
+for (const h of log.hitches) console.log(`  ${h.phase.padEnd(10)} ${String(h.ms).padStart(5)} ms  veil ${h.veil}`);
 log.totalS = Math.round((Date.now() - T0) / 1000);
 log.reached = await getPhase(page);
 fs.writeFileSync(`${OUT}/solo${flags.tag ?? ""}.json`, JSON.stringify(log, null, 1));
