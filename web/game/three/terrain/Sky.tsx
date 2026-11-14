@@ -2,6 +2,7 @@
  
 // Black lunar sky with the real star map, the Sun (hard, ~2 deg above the horizon at the pole) and the real Earth
 // (phase from the true Sun direction) when it is above the horizon. Plus the Sun's key light.
+import { Environment, Lightformer } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -106,6 +107,28 @@ export function SunLight({
       <primitive object={target} />
       <directionalLight ref={light} color="#fff4e6" intensity={intensity} castShadow={shadows && q.shadows} />
       {earthUp && <directionalLight position={sky.earthDir.map((v) => v * 100) as [number, number, number]} color="#9db8ff" intensity={0.05} />}
+    </>
+  );
+}
+
+/**
+ * Sunlight bounced off the bright regolith, for lit hardware that would otherwise be a black silhouette (the Sun sits
+ * ~1.5 deg above the horizon, so most of a lander faces away from it). Two parts: a hemisphere light whose "sky" half is
+ * pure black (the lunar sky gives nothing) and whose "ground" half is regolith grey, and a tiny generated environment map
+ * (dark sky, bright floor, a hard Sun spot) so foil and metal reflect the ground and Sun. The upper hemisphere of both is
+ * black, so flat ground and ground shadows are not lifted.
+ */
+export function GroundBounce({ sky, strength = 1, envIntensity = 1 }: { sky: SkyState; strength?: number; envIntensity?: number }) {
+  const sun = useMemo(() => new THREE.Vector3(...sky.sunDir).multiplyScalar(30), [sky]);
+  return (
+    <>
+      <hemisphereLight args={["#000000", "#a39b8e", 1.6 * strength]} />
+      <Environment resolution={64} frames={1} environmentIntensity={envIntensity}>
+        <color attach="background" args={["#000000"]} />
+        <Lightformer form="rect" intensity={0.9} color="#b4aa9a" position={[0, -6, 0]} rotation-x={-Math.PI / 2} scale={[60, 60, 1]} />
+        <Lightformer form="rect" intensity={0.5} color="#a89f90" position={[0, -2, -14]} scale={[40, 3, 1]} />
+        <Lightformer form="circle" intensity={40} color="#fff4e6" position={[sun.x, sun.y, sun.z]} scale={3} target={[0, 0, 0]} />
+      </Environment>
     </>
   );
 }
