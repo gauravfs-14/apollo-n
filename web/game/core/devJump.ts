@@ -10,10 +10,17 @@ import { useStore } from "./store";
 export function devJump(target: string | null) {
   if (!target || !PHASE_ORDER.includes(target as PhaseId)) return () => {};
   let done = false;
+  let until = 0;
   return useStore.subscribe(async (s) => {
+    // Dev jumps race with the phase's own first messages (sent for the old phase): hide that toast.
+    if (until && Date.now() < until && s.lastError?.startsWith("Not in phase")) {
+      s.setError(null);
+      return;
+    }
     const me = s.state?.players.find((p) => p.id === s.meId);
     if (done || !s.state || !me?.isHost) return;
     done = true;
+    until = Date.now() + 8000;
     if (!s.state.plan) {
       let plan = fallback as unknown as MissionPlan;
       try {
