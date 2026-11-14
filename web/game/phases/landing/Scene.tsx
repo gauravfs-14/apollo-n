@@ -18,8 +18,8 @@ import { pickOutcome, type Outcome } from "./outcome";
 import { Plume } from "./Plume";
 import { DESCENT, TOTAL, useLanding } from "./store";
 
-const A0 = 700; // start altitude above the touchdown point (m)
-const H0 = 380; // start horizontal distance (m)
+const A0 = 450; // start altitude above the touchdown point (m)
+const H0 = 300; // start horizontal distance (m)
 const D2R = Math.PI / 180;
 const ss = (a: number, b: number, v: number) => {
   const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
@@ -165,17 +165,26 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
     // cameras
     cam.near = 0.3;
     let fov = 45;
-    if (s < 0.3) {
-      // chase cam above and beside the lander: the real site spreads out below
-      fov = 40;
-      compass(camAz, v2).multiplyScalar(75);
-      cam.position.set(g!.position.x + v2.x, g!.position.y + 85, g!.position.z + v2.z);
-      cam.lookAt(g!.position);
-    } else if (s < 0.62) {
-      fov = 38;
-      compass(camAz, v2).multiplyScalar(190);
-      cam.position.set(gx + v2.x, data.heightAt(gx + v2.x, gz + v2.z) + 18, gz + v2.z);
-      v1.set(gx, gy + 12, gz).lerp(g!.position, 0.92); // keep both the lander and the ground in frame
+    if (s < 0.45) {
+      // chase cam above and beside the lander, tilted down so the real ground and horizon stay in frame
+      const gp = g!.position;
+      const u = Math.min(70, Math.max(14, lift * 0.3));
+      const d = Math.min(62, Math.max(42, 40 + lift * 0.1));
+      fov = 46;
+      compass(camAz, v2).multiplyScalar(d);
+      const cx = gp.x + v2.x;
+      const cz = gp.z + v2.z;
+      cam.position.set(cx, Math.max(gp.y + u, data.heightAt(cx, cz) + 6), cz);
+      // aim a little below the lander so it sits in the upper part of the frame with terrain beneath
+      const dep = Math.min(Math.atan2(cam.position.y - gp.y, d) + 13 * D2R, 82 * D2R);
+      v1.set(-v2.x, 0, -v2.z).normalize().multiplyScalar(Math.cos(dep)).setY(-Math.sin(dep));
+      cam.lookAt(tmp.copy(cam.position).addScaledVector(v1, 100));
+    } else if (s < 0.75) {
+      // low ground-level shot as it settles: horizon behind, lander large
+      fov = 50;
+      compass(camAz, v2).multiplyScalar(72);
+      cam.position.set(gx + v2.x, data.heightAt(gx + v2.x, gz + v2.z) + 3.5, gz + v2.z);
+      v1.set(gx, gy + (g!.position.y - gy) * 0.8 + 2, gz);
       cam.lookAt(v1);
     } else if (s < 0.93) {
       fov = 42;
