@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+.env
+.env.local
+.env*.local
+__pycache__/
+*.pyc
+.venv/
+api/data/cache/
+api/data/media/
+.DS_Store
+*.blend1
+assets-src/downloads/
+web/next-env.d.ts
