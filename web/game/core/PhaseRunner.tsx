@@ -63,9 +63,9 @@ export function PhaseRunner() {
       >
         <PerformanceMonitor
           flipflops={3}
-          onDecline={() => setQuality(DOWN[useStore.getState().quality])}
-          onIncline={() => setQuality(UP[useStore.getState().quality])}
-          onFallback={() => setQuality("low")}
+          onDecline={() => useStore.getState().qualityMode === "auto" && setQuality(DOWN[useStore.getState().quality])}
+          onIncline={() => useStore.getState().qualityMode === "auto" && setQuality(UP[useStore.getState().quality])}
+          onFallback={() => useStore.getState().qualityMode === "auto" && setQuality("low")}
         />
         <AdaptiveDpr pixelated={false} />
         <color attach="background" args={["#000"]} />
