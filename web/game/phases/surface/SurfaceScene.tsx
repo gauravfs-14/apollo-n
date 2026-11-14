@@ -3,6 +3,7 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Effects } from "../../core/Effects";
+import { perfStats } from "../../core/perf";
 import { useGame } from "../../core/useGame";
 import { Lander, getDefaultParts, type LanderParts } from "../../three/ship/Lander";
 import { Crew } from "./Crew";
@@ -90,21 +91,15 @@ export function SurfaceScene() {
     return () => window.removeEventListener("blur", fn);
   }, []);
 
-  // dev measurement (?calls): accumulate renderer stats across all passes (shadow + scene + post)
-  const gl = useThree((s) => s.gl);
-  useEffect(() => {
-    if (!new URLSearchParams(location.search).has("calls")) return;
-    gl.info.autoReset = false;
-    return () => {
-      gl.info.autoReset = true;
-    };
-  }, [gl]);
+  // dev measurement (?calls): mirror the whole-frame stats that PerfProbe accumulates (it owns gl.info.reset)
+  const wantCalls = useMemo(() => new URLSearchParams(location.search).has("calls"), []);
   useFrame(() => {
-    if (!gl.info.autoReset) {
-      const w = window as unknown as { __surface: Record<string, unknown> };
-      w.__surface.calls = gl.info.render.calls;
-      w.__surface.tris = gl.info.render.triangles;
-      gl.info.reset();
+    if (wantCalls) {
+      const w = window as unknown as { __surface?: Record<string, unknown> };
+      if (w.__surface && perfStats.latest) {
+        w.__surface.calls = perfStats.latest.drawCalls;
+        w.__surface.tris = perfStats.latest.triangles;
+      }
     }
     surfaceUniforms.uPlayer.value.copy(rt.pos);
   });
