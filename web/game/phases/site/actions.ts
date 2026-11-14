@@ -12,7 +12,10 @@ import { useSiteUi } from "./ui";
 export interface SiteData {
   site_id: string;
   probe: { x: number; z: number; id: number } | null;
-  score: ScoreOut | null;
+  /** probe measurements (object). `score` (number) is written on confirm for the other phases. */
+  report: ScoreOut | null;
+  score?: number;
+  safe_pct?: number;
   sim: SimOut | null;
   director: string | null;
   confirmed: boolean;
@@ -47,7 +50,7 @@ export function useSiteActions() {
       if (!isPilot) return;
       token++;
       ui.getState().set({ hint: null, busy: null, error: null });
-      patch("site", { site_id: id, probe: null, score: null, sim: null, director: null, confirmed: false });
+      patch("site", { site_id: id, probe: null, report: null, sim: null, director: null, confirmed: false });
       ui.getState().set({ flyTo: { x: 0, z: 0, dist: 5200, id: Date.now() } });
     },
     [isPilot, patch, ui],
@@ -60,7 +63,7 @@ export function useSiteActions() {
       const d = await terrain();
       if (!d.inside(x, z, 40)) return;
       ui.getState().set({ busy: "score", error: null, drops: ui.getState().drops + 1, hint: null });
-      patch("site", { site_id: siteId, probe: { x: Math.round(x), z: Math.round(z), id: my }, score: null, sim: null, director: null, confirmed: false });
+      patch("site", { site_id: siteId, probe: { x: Math.round(x), z: Math.round(z), id: my }, report: null, sim: null, director: null, confirmed: false });
       ui.getState().set({ flyTo: { x, z, dist: 900, id: my } });
       let score: ScoreOut;
       try {
@@ -70,7 +73,7 @@ export function useSiteActions() {
         ui.getState().set({ error: "Mission computer offline: using on-board estimates." });
       }
       if (my !== token) return;
-      patch("site", { score });
+      patch("site", { report: score });
       ui.getState().set({ busy: null });
       const text = await fetchDirector({
         phase: "landing site probe", spot_score: score.score, slope_degrees: score.slope_deg, sunlight_percent: Math.round(score.sun_pct),
@@ -104,13 +107,13 @@ export function useSiteActions() {
 
   const confirm = useCallback(async () => {
     const p = sd.probe;
-    const score = sd.score;
+    const score = sd.report;
     if (!isPilot || !p || !score) return;
     const sim = sd.sim ?? (await runSim(300));
     if (!sim) return;
     patch("site", { site_id: siteId, x: p.x, z: p.z, score: score.score, safe_pct: sim.safe_pct, sim, confirmed: true });
     complete("site", Math.round((score.score * sim.safe_pct) / 100));
-  }, [sd.probe, sd.score, sd.sim, isPilot, runSim, patch, complete, siteId]);
+  }, [sd.probe, sd.report, sd.sim, isPilot, runSim, patch, complete, siteId]);
 
   /** Host fallback so nobody is ever stuck: drop on the best-looking spot and confirm. */
   const autoPick = useCallback(async () => {
@@ -128,7 +131,7 @@ export function useSiteActions() {
     } catch {
       sim = localSim(d, s.x, s.z, lander, difficulty, perks, seed, 300);
     }
-    patch("site", { site_id: siteId, probe: { x: s.x, z: s.z, id: ++token }, score: sc, sim, x: s.x, z: s.z, safe_pct: sim.safe_pct, confirmed: true });
+    patch("site", { site_id: siteId, probe: { x: s.x, z: s.z, id: ++token }, report: sc, score: sc.score, sim, x: s.x, z: s.z, safe_pct: sim.safe_pct, confirmed: true });
     complete("site", Math.round((sc.score * sim.safe_pct) / 100));
   }, [terrain, lander, siteId, date, plan?.seed, difficulty, perks, patch, complete]);
 

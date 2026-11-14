@@ -67,7 +67,8 @@ export interface SimOut {
   offline?: boolean;
 }
 
-const LEG_SPAN: Record<string, number> = { a: 9, b: 12, c: 6 };
+// foot-to-foot span of the 3D lander legs (three/ship/builders.ts: hinge radius 2.02 m + foot reach 1.45 / 2.1 / 1.05 m)
+const LEG_SPAN: Record<string, number> = { a: 6.9, b: 8.2, c: 6.2 };
 
 /** Lander numbers from the ship the crew built (P2 parts catalog). */
 export function landerFromBuild(parts: Record<string, string> | undefined): LanderSpec {

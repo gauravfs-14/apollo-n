@@ -120,7 +120,7 @@ function Report() {
   const busy = useSiteUi((s) => s.busy);
   const error = useSiteUi((s) => s.error);
   const { plan } = useGame();
-  const sc = sd.score;
+  const sc = sd.report;
   const sim = sd.sim;
   const tone = !sc ? "default" : sc.score >= 70 ? "go" : sc.score >= 45 ? "default" : "nogo";
   if (!sd.probe)
