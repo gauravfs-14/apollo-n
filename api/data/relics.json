@@ -1,0 +1,14 @@
+{
+ "note": "Real human hardware on/near the lunar south polar region. lat/lon planetocentric, east-positive longitude as -180..180. Source column: Wikipedia 'List of artificial objects on the Moon' (which cites LROC/NASA) unless noted.",
+ "list_url": "https://en.wikipedia.org/wiki/List_of_artificial_objects_on_the_Moon",
+ "relics": [
+  {"name": "Chandrayaan-1 Moon Impact Probe (2008)", "lat": -89.76, "lon": -39.40, "kind": "impactor", "approx": false, "source": "https://en.wikipedia.org/wiki/List_of_artificial_objects_on_the_Moon (cites ISRO / UNOOSA)"},
+  {"name": "LCROSS Centaur impact, Cabeus (2009)", "lat": -84.678, "lon": -48.6926, "kind": "impactor", "approx": false, "source": "https://en.wikipedia.org/wiki/List_of_artificial_objects_on_the_Moon ; https://science.nasa.gov/mission/lcross/"},
+  {"name": "LCROSS shepherding spacecraft impact (2009)", "lat": -84.729, "lon": -49.36, "kind": "impactor", "approx": false, "source": "https://en.wikipedia.org/wiki/List_of_artificial_objects_on_the_Moon"},
+  {"name": "Athena (IM-2) lander (2025)", "lat": -84.79, "lon": 29.2, "kind": "lander", "approx": true, "source": "https://en.wikipedia.org/wiki/IM-2 (approximate, Mons Mouton plateau)"},
+  {"name": "Odysseus (IM-1) lander (2024)", "lat": -80.13, "lon": 1.44, "kind": "lander", "approx": false, "source": "https://www.nasa.gov/image-article/lro-spots-odysseus/ (LROC)"},
+  {"name": "Chandrayaan-2 Vikram crash site (2019)", "lat": -70.88, "lon": 22.78, "kind": "crash", "approx": false, "source": "https://www.nasa.gov/image-article/nasa-lro-spots-chandrayaan-2-vikram-crash-site/ (LROC)"},
+  {"name": "Chandrayaan-3 Vikram lander (2023)", "lat": -69.373, "lon": 32.319, "kind": "lander", "approx": false, "source": "https://en.wikipedia.org/wiki/Chandrayaan-3 (LROC confirmed)"},
+  {"name": "Luna 25 crash site (2023)", "lat": -57.865, "lon": 61.36, "kind": "crash", "approx": false, "source": "https://en.wikipedia.org/wiki/List_of_artificial_objects_on_the_Moon (cites LROC)"}
+ ]
+}
