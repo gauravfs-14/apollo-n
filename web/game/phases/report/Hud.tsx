@@ -6,6 +6,9 @@ import { useGame } from "../../core/useGame";
 import { Button, Meter } from "../../ui/kit";
 import { RANK_COLOR, computeResult, type Result } from "./score";
 import { renderShareCard } from "./shareCard";
+import { ROLES } from "../../types";
+import { ROLE_INFO, type CrewData } from "../crew/data";
+import { phaseLabel } from "../../ui/phaseLabel";
 
 function host(url: string) {
   try {
@@ -57,6 +60,8 @@ export function ReportHud() {
   }, [plan]);
 
   if (!plan || !state) return null;
+  const crew = state.phaseData.crew as Partial<CrewData> | undefined;
+  const multi = state.mode === "multi";
   const color = RANK_COLOR[result.rank];
 
   const download = async () => {
@@ -80,7 +85,7 @@ export function ReportHud() {
 
       {/* left: result */}
       <div className="pointer-events-auto absolute bottom-20 left-6 top-5 w-[min(25rem,calc(100vw-3rem))] overflow-y-auto pr-1">
-        <div className="num text-[11px] text-amber">APOLLO {plan.number} / MISSION REPORT</div>
+        <div className="num text-[11px] text-amber">{phaseLabel("report")} · Apollo {plan.number}</div>
         <h2 className="text-2xl font-semibold leading-tight">{plan.title.replace(/^Apollo \d+:\s*/, "")}</h2>
         <div className="mt-3 flex items-end gap-4">
           <div className="text-5xl font-bold leading-none" style={{ color }}>
@@ -160,12 +165,20 @@ export function ReportHud() {
         <section className="rounded-xl border border-line bg-panel p-4 backdrop-blur-md">
           <h3 className="text-sm font-semibold">Crew</h3>
           <ul className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-[13px]">
-            {state.players.map((p) => (
-              <li key={p.id} className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-white/90">{p.name}</span>
-                <span className="text-[11px] text-dim">{p.role ?? "crew"}</span>
-              </li>
-            ))}
+            {ROLES.map((r) => {
+              const name = crew?.names?.[r];
+              const human = state.players.find((p) => p.role === r);
+              const isAi = crew?.ai?.includes(r) ?? !human;
+              return (
+                <li key={r} className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-white/90">{human?.name ?? name ?? ROLE_INFO[r].label}</span>
+                  <span className="shrink-0 text-[11px] text-dim">
+                    {ROLE_INFO[r].label}
+                    {multi && isAi ? " · AI" : ""}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </section>
       </div>
