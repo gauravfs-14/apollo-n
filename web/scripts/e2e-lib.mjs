@@ -84,35 +84,52 @@ export async function solveMemory(page, items) {
   const n = await cards.count();
   const known = new Map(); // card index -> pair
   const done = new Set(); // card indices matched
-  const read = async (i) => {
-    const t = await cards.nth(i).getAttribute("aria-label");
-    return pairOf.get(t);
+  const finished = async () => (await page.getByText("CHECKLIST COMPLETE").count()) > 0;
+  const labels = () => cards.evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
+  // wait until no un-matched card is face up (the game locks input while a mismatch flips back)
+  const settle = async () => {
+    for (let i = 0; i < 40; i++) {
+      const l = await labels();
+      if (l.every((t, k) => t === "Hidden card" || done.has(k))) return;
+      await page.waitForTimeout(150);
+    }
   };
   const flip = async (i) => {
-    await cards.nth(i).click({ timeout: 3000 });
-    await page.waitForTimeout(120);
+    await settle();
+    for (let tries = 0; tries < 3; tries++) {
+      await cards.nth(i).click({ timeout: 4000 });
+      await page.waitForTimeout(150);
+      const t = (await labels())[i];
+      if (t !== "Hidden card") return t;
+    }
+    return null;
   };
-  for (let guard = 0; guard < 80 && done.size < n; guard++) {
-    // a pair already seen?
+  const flipPair = async (x, y) => {
+    await settle();
+    await cards.nth(x).click({ timeout: 4000 });
+    await page.waitForTimeout(120);
+    await cards.nth(y).click({ timeout: 4000 });
+    await page.waitForTimeout(700);
+    done.add(x);
+    done.add(y);
+  };
+  for (let guard = 0; guard < 80 && done.size < n && !(await finished()); guard++) {
     const byPair = new Map();
     for (const [i, p] of known) if (!done.has(i)) byPair.set(p, [...(byPair.get(p) ?? []), i]);
     const seen = [...byPair.values()].find((v) => v.length >= 2);
     if (seen) {
-      await flip(seen[0]);
-      await flip(seen[1]);
-      await page.waitForTimeout(700);
-      done.add(seen[0]);
-      done.add(seen[1]);
+      await flipPair(seen[0], seen[1]);
       continue;
     }
     const unseen = [...Array(n).keys()].filter((i) => !known.has(i) && !done.has(i));
     if (!unseen.length) break;
     const a = unseen[0];
-    await flip(a);
-    known.set(a, await read(a));
+    const ta = await flip(a);
+    if (ta === null) continue;
+    known.set(a, pairOf.get(ta));
     const partner = [...known].find(([i, p]) => i !== a && !done.has(i) && p === known.get(a));
     if (partner) {
-      await flip(partner[0]);
+      await cards.nth(partner[0]).click({ timeout: 4000 });
       await page.waitForTimeout(700);
       done.add(a);
       done.add(partner[0]);
@@ -120,15 +137,16 @@ export async function solveMemory(page, items) {
     }
     const b = unseen[1];
     if (b === undefined) break;
-    await flip(b);
-    known.set(b, await read(b));
+    await settle();
+    await cards.nth(b).click({ timeout: 4000 });
+    await page.waitForTimeout(150);
+    const tb = (await labels())[b];
+    known.set(b, pairOf.get(tb));
     if (known.get(a) === known.get(b)) {
       done.add(a);
       done.add(b);
       await page.waitForTimeout(700);
-      continue;
     }
-    await page.waitForTimeout(1100); // mismatch cards flip back
   }
 }
 
