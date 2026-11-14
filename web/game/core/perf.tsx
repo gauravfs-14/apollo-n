@@ -53,8 +53,10 @@ export function PerfProbe({ phase }: { phase: string }) {
   // sees only the last pass (1 call, 1 triangle). Accumulate over the whole frame: read the previous frame, then reset.
   const frameInfo = useRef({ calls: 0, triangles: 0 });
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- renderer stats config
     gl.info.autoReset = false;
     return () => {
+      // eslint-disable-next-line react-hooks/immutability
       gl.info.autoReset = true;
     };
   }, [gl]);
