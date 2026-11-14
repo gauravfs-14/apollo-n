@@ -141,3 +141,61 @@ export async function solveSwitches(page, items) {
     await page.waitForTimeout(700);
   }
 }
+
+/** Init script: tracks live GPU texture + buffer bytes by wrapping WebGL2 calls. Read with window.__gpu(). */
+export const GPU_PROBE = () => {
+  const P = WebGL2RenderingContext.prototype;
+  const tex = new Map(); // WebGLTexture -> bytes
+  const buf = new Map();
+  const bound = { b: new Map() };
+  const rawBind = P.bindTexture;
+  const cur = new WeakMap(); // gl -> {target: tex}
+  const bytesOf = (w, h, internal, gl) => {
+    const bpp = internal === gl.RGBA16F || internal === gl.RGBA32F ? (internal === gl.RGBA32F ? 16 : 8) : internal === gl.R8 ? 1 : internal === gl.RG8 ? 2 : 4;
+    return w * h * bpp * 1.34;
+  };
+  P.bindTexture = function (t, o) {
+    let m = cur.get(this);
+    if (!m) cur.set(this, (m = {}));
+    m[t] = o;
+    return rawBind.call(this, t, o);
+  };
+  const wrap = (name, fn) => {
+    const raw = P[name];
+    P[name] = function (...a) {
+      try {
+        fn.call(this, a);
+      } catch {}
+      return raw.apply(this, a);
+    };
+  };
+  const set = (gl, target, bytes, add) => {
+    const t = cur.get(gl)?.[target];
+    if (!t) return;
+    const prev = tex.get(t) ?? 0;
+    tex.set(t, add ? prev + bytes : Math.max(prev, bytes));
+  };
+  wrap("texImage2D", function (a) {
+    if (a[1] === 0 && typeof a[3] === "number") set(this, a[0], bytesOf(a[3], a[4], a[2], this), a[0] !== this.TEXTURE_2D);
+    else if (a[1] === 0 && a.length <= 6) {
+      const src = a[5];
+      const w = src?.width ?? src?.videoWidth ?? 0, h = src?.height ?? src?.videoHeight ?? 0;
+      set(this, a[0], bytesOf(w, h, a[2], this), a[0] !== this.TEXTURE_2D);
+    }
+  });
+  wrap("texStorage2D", function (a) {
+    set(this, a[0], bytesOf(a[3], a[4], a[2], this), false);
+  });
+  wrap("compressedTexImage2D", function (a) {
+    if (a[1] === 0) set(this, a[0], a[6]?.byteLength ?? 0, false);
+  });
+  wrap("deleteTexture", function (a) {
+    tex.delete(a[0]);
+  });
+  const rawBufData = P.bufferData;
+  P.bufferData = function (target, data, usage, ...r) {
+    return rawBufData.call(this, target, data, usage, ...r);
+  };
+  void buf; void bound;
+  window.__gpu = () => ({ texMB: +([...tex.values()].reduce((x, y) => x + y, 0) / 1048576).toFixed(1), textures: tex.size });
+};

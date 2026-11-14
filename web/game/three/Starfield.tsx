@@ -12,7 +12,7 @@
 // no depth writes, rendered first.
 import { useTexture } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
 export const STAR_TEXTURE = "/textures/stars/starmap_4k.webp";
@@ -31,6 +31,7 @@ export function Starfield({
     x.colorSpace = THREE.SRGBColorSpace;
     x.anisotropy = 4;
   });
+  useEffect(() => () => tex.dispose(), [tex]); // cached by drei; free the 4K GPU copy when the scene goes away
   const ref = useRef<THREE.Mesh>(null);
   const color = useMemo(() => new THREE.Color(), []);
   color.setScalar(brightness);

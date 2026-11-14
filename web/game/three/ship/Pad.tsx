@@ -88,6 +88,8 @@ export function LaunchPad({ shadows = true }: { shadows?: boolean }) {
     for (const t of [gD, gN, gA]) t.repeat.set(220, 220);
   }, [cD, cN, cA, gD, gN, gA]);
 
+  // cached by drei; free the GPU copies when the pad goes away (re-uploaded on the next mount)
+  useEffect(() => () => [cD, cN, cA, gD, gN, gA].forEach((t) => t.dispose()), [cD, cN, cA, gD, gN, gA]);
   const parts = useMemo(() => buildPad().merged(), []);
   const mats = useMemo(
     () => ({

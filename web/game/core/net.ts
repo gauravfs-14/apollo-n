@@ -94,3 +94,6 @@ export function disconnect() {
   current = null;
   useStore.getState().setConnection("idle");
 }
+
+// QA hook: scripts/leaks.mjs jumps phases through this.
+if (typeof window !== "undefined") (window as unknown as { __apolloSend: typeof send }).__apolloSend = send;

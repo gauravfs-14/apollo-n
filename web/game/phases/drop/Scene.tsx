@@ -260,6 +260,7 @@ export function DropScene() {
     (Array.isArray(t) ? t : [t]).forEach((x) => { x.wrapS = x.wrapT = THREE.RepeatWrapping; x.repeat.set(10, 10); x.anisotropy = 8; });
   });
   useMemo(() => { diff.colorSpace = THREE.SRGBColorSpace; }, [diff]);
+  useEffect(() => () => [diff, nor, arm].forEach((t) => t.dispose()), [diff, nor, arm]); // drei-cached: free the GPU copies
   return (
     <>
       <Suspense fallback={null}>

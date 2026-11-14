@@ -87,6 +87,24 @@ export function Terrain({ data, sky, overlay = "none", focus, detail = false, sh
     diff.colorSpace = THREE.SRGBColorSpace;
     nor.colorSpace = THREE.NoColorSpace;
   }, [diff, nor]);
+  useEffect(
+    () => () => {
+      // the loadTerrain cache keeps `data` for later phases; free its GPU textures (re-uploaded when a Terrain mounts again)
+      const t = data.tex;
+      t.height.dispose();
+      t.grad.dispose();
+      t.ovA.dispose();
+      t.ovB.dispose();
+    },
+    [data],
+  );
+  useEffect(
+    () => () => {
+      diff.dispose(); // cached by drei; free the GPU copies when the terrain goes away
+      nor.dispose();
+    },
+    [diff, nor],
+  );
 
   // static uniforms
   useEffect(() => {
