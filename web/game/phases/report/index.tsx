@@ -1,9 +1,13 @@
 "use client";
-import { StubHud } from "../../ui/StubPhase";
 import type { PhaseModule } from "../../types";
+import { moonTexturePaths } from "../../three/Moon";
+import { STAR_TEXTURE } from "../../three/Starfield";
+import { ReportHud } from "./Hud";
+import { ReportScene } from "./Scene";
 
-function Hud() {
-  return <StubHud id="report" title="Mission report" />;
-}
-
-export const phase: PhaseModule = { id: "report", Hud };
+export const phase: PhaseModule = {
+  id: "report",
+  Scene: ReportScene,
+  Hud: ReportHud,
+  preload: [...moonTexturePaths("high"), STAR_TEXTURE],
+};
