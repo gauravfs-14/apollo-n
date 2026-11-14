@@ -215,7 +215,7 @@ export function shipMaterials(): Mats {
     gold: std({ map: goldBlanket(), color: "#ffffff", metalness: 1, roughness: 0.32, normalMap: foilN, normalScale: new THREE.Vector2(1.1, 1.1) }),
     silver: std({ color: "#d8dde3", metalness: 1, roughness: 0.28, normalMap: foilN, normalScale: new THREE.Vector2(0.8, 0.8) }),
     alu: std({ color: "#c4c8cc", metalness: 1, roughness: 1, roughnessMap: brushed }),
-    white: std({ color: "#e9ebec", metalness: 0.1, roughness: 0.55 }),
+    white: std({ color: "#c9ccce", metalness: 0.1, roughness: 0.5 }),
     dark: std({ color: "#23262b", metalness: 0.7, roughness: 0.5, roughnessMap: brushed }),
     steel: std({ color: "#8d949b", metalness: 1, roughness: 1, roughnessMap: brushed }),
     glass: std({ color: "#05080c", metalness: 0.9, roughness: 0.06 }),

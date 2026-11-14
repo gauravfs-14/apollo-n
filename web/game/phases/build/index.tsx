@@ -1,9 +1,12 @@
 "use client";
-import { StubHud } from "../../ui/StubPhase";
 import type { PhaseModule } from "../../types";
+import { BuildHud } from "./Hud";
+import { BuildScene } from "./Scene";
+import { HANGAR_HDRI, HANGAR_TEX } from "./Hangar";
 
-function Hud() {
-  return <StubHud id="build" title="Build the ship" />;
-}
-
-export const phase: PhaseModule = { id: "build", Hud };
+export const phase: PhaseModule = {
+  id: "build",
+  Scene: BuildScene,
+  Hud: BuildHud,
+  preload: [HANGAR_HDRI, ...HANGAR_TEX],
+};

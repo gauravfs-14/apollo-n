@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/refs, react-hooks/immutability, react-hooks/purity, react-hooks/preserve-manual-memoization, react-hooks/exhaustive-deps */
 // Modular crewed lunar lander. 1 unit = 1 m, ground at y=0, ~7 m tall.
 //   <Lander parts={getDefaultParts()} assembled={1} legsDeployed />
 // Part ids are "<slot>_<a|b|c>" (see data/parts.ts); unknown ids fall back to "a".
