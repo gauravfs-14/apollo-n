@@ -39,52 +39,129 @@ export function setMasterVolume(v: number) {
 }
 
 // ---- Voice ----
+// Browsers only allow speech after a user gesture, and Chrome/Safari have a few
+// speechSynthesis quirks we work around here:
+// - unlock: speak a silent utterance inside the first click/keypress (Safari needs this)
+// - no network round trip before speaking when the API uses the system voice
+//   (an await can lose the gesture); the provider is fetched once and cached
+// - utterances are kept referenced (Chrome drops GC'd ones) and split into
+//   sentences (Chrome cuts off utterances longer than ~15 s)
+// - cancel() then speak() in the same tick is sometimes swallowed by Chrome
 let voiceHowl: Howl | null = null;
 let preferredVoice: SpeechSynthesisVoice | null = null;
+let provider: "system" | "remote" | null = null;
+let providerReq: Promise<void> | null = null;
+let unlocked = false;
+let token = 0;
+const live = new Set<SpeechSynthesisUtterance>();
+const hasTTS = () => typeof window !== "undefined" && "speechSynthesis" in window;
 
 function pickSystemVoice() {
-  if (preferredVoice || typeof speechSynthesis === "undefined") return preferredVoice;
+  if (preferredVoice || !hasTTS()) return preferredVoice;
   const voices = speechSynthesis.getVoices();
+  const en = voices.filter((v) => v.lang.toLowerCase().startsWith("en"));
   preferredVoice =
-    voices.find((v) => /Samantha|Daniel|Alex|Google US English/i.test(v.name) && v.lang.startsWith("en")) ??
-    voices.find((v) => v.lang.startsWith("en")) ??
+    en.find((v) => /Samantha|Daniel|Alex|Google US English/i.test(v.name)) ??
+    en.find((v) => v.localService) ??
+    en[0] ??
     null;
   return preferredVoice;
 }
 
-function speakSystem(text: string): Promise<void> {
+function loadProvider() {
+  providerReq ??= api<{ voice?: string }>("/health")
+    .then((h) => void (provider = h.voice === "elevenlabs" ? "remote" : "system"))
+    .catch(() => void (provider = "system"));
+  return providerReq;
+}
+
+if (typeof window !== "undefined") {
+  loadProvider();
+  if (hasTTS()) {
+    pickSystemVoice();
+    speechSynthesis.addEventListener?.("voiceschanged", () => {
+      preferredVoice = null;
+      pickSystemVoice();
+    });
+  }
+  const unlock = () => {
+    if (unlocked) return;
+    unlocked = true;
+    if (hasTTS()) {
+      const u = new SpeechSynthesisUtterance(" ");
+      u.volume = 0;
+      speechSynthesis.speak(u);
+    }
+    window.removeEventListener("pointerdown", unlock, true);
+    window.removeEventListener("keydown", unlock, true);
+  };
+  window.addEventListener("pointerdown", unlock, true);
+  window.addEventListener("keydown", unlock, true);
+}
+
+function sentences(text: string): string[] {
+  const parts = text.match(/[^.!?]+[.!?]*\s*/g)?.map((s) => s.trim()).filter(Boolean) ?? [text];
+  return parts.length ? parts : [text];
+}
+
+function speakSystem(text: string, my: number): Promise<void> {
   return new Promise((resolve) => {
-    if (typeof speechSynthesis === "undefined") return resolve();
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    const v = pickSystemVoice();
-    if (v) u.voice = v;
-    u.rate = 1.02;
-    u.pitch = 0.95;
-    u.onend = () => resolve();
-    u.onerror = () => resolve();
-    speechSynthesis.speak(u);
+    if (!hasTTS() || !text.trim()) return resolve();
+    const busy = speechSynthesis.speaking || speechSynthesis.pending;
+    if (busy) speechSynthesis.cancel();
+    const start = () => {
+      if (my !== token) return resolve();
+      speechSynthesis.resume(); // Chrome can get stuck paused
+      const chunks = sentences(text);
+      const volume = Howler.volume();
+      chunks.forEach((chunk, i) => {
+        const u = new SpeechSynthesisUtterance(chunk);
+        const v = pickSystemVoice();
+        if (v) u.voice = v;
+        u.lang = v?.lang ?? "en-US";
+        u.rate = 1.02;
+        u.pitch = 0.95;
+        u.volume = volume;
+        live.add(u);
+        const done = () => {
+          live.delete(u);
+          if (i === chunks.length - 1) resolve();
+        };
+        u.onend = done;
+        u.onerror = done;
+        speechSynthesis.speak(u);
+      });
+    };
+    if (busy) setTimeout(start, 60);
+    else start();
   });
 }
 
 /** Speak a mission-control line. Resolves when finished. */
 export async function speak(text: string, lineId?: string): Promise<void> {
+  const my = ++token;
   voiceHowl?.stop();
-  try {
-    const { url } = await api<{ url: string | null }>("/voice", { line_id: lineId ?? null, text });
-    if (url) {
-      return new Promise((resolve) => {
-        voiceHowl = new Howl({ src: [url], html5: true, volume: 1, onend: () => resolve(), onloaderror: () => resolve() });
-        voiceHowl.play();
-      });
+  if (provider === null) await loadProvider();
+  if (my !== token) return;
+  if (provider === "remote") {
+    try {
+      const { url } = await api<{ url: string | null }>("/voice", { line_id: lineId ?? null, text });
+      if (my !== token) return;
+      if (url) {
+        return new Promise((resolve) => {
+          voiceHowl = new Howl({ src: [url], html5: true, volume: 1, onend: () => resolve(), onloaderror: () => resolve() });
+          voiceHowl.play();
+        });
+      }
+    } catch {
+      /* fall through to the system voice */
     }
-  } catch {
-    /* API down → system voice */
   }
-  return speakSystem(text);
+  return speakSystem(text, my);
 }
 
 export function stopVoice() {
+  token++;
   voiceHowl?.stop();
-  if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
+  if (hasTTS() && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel();
 }
