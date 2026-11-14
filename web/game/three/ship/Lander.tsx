@@ -75,7 +75,8 @@ export interface LanderProps {
 }
 
 export function Lander({ parts, assembled = 1, legsDeployed = false, animateChanges = false, heat = 0, onSnap, ...tf }: LanderProps) {
-  const ids: LanderParts = { ...getDefaultParts(), ...parts };
+  // parts omitted entirely => default build; a partial object => unchosen slots stay empty
+  const ids: Partial<LanderParts> = parts ?? getDefaultParts();
   const v = {
     engine: variantOf(ids.engine), power: variantOf(ids.power), payload: variantOf(ids.payload),
     legs: variantOf(ids.legs), comms: variantOf(ids.comms),
@@ -98,15 +99,17 @@ export function Lander({ parts, assembled = 1, legsDeployed = false, animateChan
   const wingRefs = useRef<(THREE.Group | null)[]>([]);
   const slotT = useRef<Record<ShipSlot, number>>({ engine: 1, power: 1, legs: 1, payload: 1, comms: 1 });
   const lastP = useRef<Record<ShipSlot, number>>({ engine: 0, power: 0, legs: 0, payload: 0, comms: 0 });
-  const prevIds = useRef<LanderParts>(ids);
+  const prevIds = useRef<Partial<LanderParts>>(ids);
   const dep = useRef(legsDeployed ? 1 : 0);
+  const idsRef = useRef(ids);
+  idsRef.current = ids;
   const snap = useRef(onSnap);
   snap.current = onSnap;
-  const key = SLOT_ORDER.map((s) => ids[s]).join("|");
+  const key = SLOT_ORDER.map((s) => ids[s] ?? "-").join("|");
 
   useEffect(() => {
     const cur = prevIds.current;
-    const next: LanderParts = { ...getDefaultParts(), ...parts };
+    const next: Partial<LanderParts> = parts ?? getDefaultParts();
     if (animateChanges) for (const s of SLOT_ORDER) if (cur[s] !== next[s]) slotT.current[s] = 0;
     prevIds.current = next;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -119,7 +122,7 @@ export function Lander({ parts, assembled = 1, legsDeployed = false, animateChan
       if (!g) return;
       slotT.current[s] = Math.min(1, slotT.current[s] + d / 1.0);
       const pa = clamp01((assembled - i * 0.14) / 0.44);
-      const pr = Math.min(pa, slotT.current[s]);
+      const pr = idsRef.current[s] ? Math.min(pa, slotT.current[s]) : 0;
       const k = 1 - ease(pr);
       g.position.set(OFFSETS[s][0] * k, OFFSETS[s][1] * k, OFFSETS[s][2] * k);
       g.visible = pr > 0.002;
