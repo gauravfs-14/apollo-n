@@ -1,9 +1,6 @@
 "use client";
-import { StubHud } from "../../ui/StubPhase";
 import type { PhaseModule } from "../../types";
+import { ChecklistHud } from "./Hud";
+import { CHECKLIST_HDRI, ChecklistScene } from "./Scene";
 
-function Hud() {
-  return <StubHud id="checklist" title="Pre-launch checklist" />;
-}
-
-export const phase: PhaseModule = { id: "checklist", Hud };
+export const phase: PhaseModule = { id: "checklist", Scene: ChecklistScene, Hud: ChecklistHud, preload: [CHECKLIST_HDRI] };

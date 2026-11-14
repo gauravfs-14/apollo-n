@@ -8,7 +8,7 @@ const errs = [];
 p.on("pageerror", (e) => errs.push(String(e)));
 p.on("console", (m) => m.type() === "error" && errs.push(m.text()));
 await p.addInitScript((q) => localStorage.setItem("apollo.quality", q), quality);
-await p.goto(`http://localhost:3000/play/DEV-${phase.toUpperCase()}?mode=solo&phase=${phase}&perf`);
+await p.goto(`http://localhost:3000/play/DEV-${phase.toUpperCase()}?mode=solo&phase=${phase}&perf${process.env.EXTRA ?? ""}`);
 for (let i = 0; i < 4; i++) {
   await p.waitForTimeout(4000);
   const cur = await p.evaluate(() => window.__apolloPerf?.latest?.phase);
@@ -20,7 +20,8 @@ const click = async (t) => { await p.getByText(t, { exact: false }).first().clic
 if (phase === "build") {
   for (const [slot, part] of [["Engine", "Hydrolox bell"], ["Power", "RTG + battery"], ["Payload", "Ice drill"], ["Landing legs", "Wide splayed"], ["Radio", "High-gain dish"]]) { await click(slot); await click(part); }
 }
-await p.waitForTimeout(3500);
+if (phase === "drop") { await p.waitForTimeout(5500); await click("Open crate"); await p.waitForTimeout(Number(process.env.DROPWAIT ?? 4500)); }
+await p.waitForTimeout(500);
 await p.screenshot({ path: out });
 console.log(JSON.stringify({ perf: await p.evaluate(() => { const s = window.__apolloPerf.latest; return s; }), errs: errs.slice(0, 5) }));
 await b.close();
