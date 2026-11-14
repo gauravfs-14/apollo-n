@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { Effects } from "../../core/Effects";
 import { speak, sfx, stopVoice } from "../../core/audio";
 import { useGame, usePhaseData } from "../../core/useGame";
-import { Boulders, LunarSky, RenderInfo, SunLight, Terrain, missionTime, skyAt, useTerrainData, type TerrainData } from "../../three/terrain";
+import { Boulders, GroundBounce, LunarSky, RenderInfo, SunLight, Terrain, missionTime, skyAt, useTerrainData, type TerrainData } from "../../three/terrain";
 import { Lander, getDefaultParts } from "../../three/ship/Lander";
 import { legFootX } from "../../three/ship/builders";
 import { landerFromBuild, type SimOut } from "../site/api";
@@ -311,6 +311,7 @@ export function Scene() {
   return (
     <>
       <SunLight sky={sky} shadows focus={[outcome.x, focusY, outcome.z]} radius={95} />
+      <GroundBounce sky={sky} />
       <LunarSky sky={sky} stars={0.85} />
       <Terrain data={data} sky={sky} detail shadows focus={[outcome.x, outcome.z]} fill={0.13} maxSegments={300} edgeFade />
       <Boulders data={data} focus={[outcome.x, outcome.z]} shadows seed={plan?.seed ?? 1} />
