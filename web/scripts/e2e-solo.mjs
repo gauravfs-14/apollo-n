@@ -3,7 +3,7 @@
 // Esc-menu "Skip this phase (host)" is used ONLY where a phase can't be scripted (cruise hurdles, surface tasks) and is logged as "forced".
 // Writes /tmp/e2e/<nn>-<phase>.png and /tmp/e2e/solo.json (errors, timings, perf + memory per phase).
 import fs from "node:fs";
-import { BASE, OUT, getPhase, getState, launch, record, solveOrder, solveQuiz, waitPhase } from "./e2e-lib.mjs";
+import { BASE, OUT, getPhase, getState, launch, record, solveMemory, solveOrder, solveQuiz, solveSwitches, waitPhase } from "./e2e-lib.mjs";
 
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith("--")).map((a) => a.slice(2).split("=")));
 const parts = await import("../game/data/parts.ts");
@@ -159,11 +159,14 @@ await step("checklist", async () => {
   log.checklistStyle = style;
   if (style === "order_steps") await solveOrder(page, plan.checklist.items);
   else if (style === "quiz") await solveQuiz(page, plan.checklist.items);
+  else if (style === "memory_match") await solveMemory(page, plan.checklist.items);
+  else if (style === "switch_panel") await solveSwitches(page, plan.checklist.items);
   else {
     await forceSkip("checklist", `style ${style} has no scripted solver`);
     return;
   }
-  await page.waitForTimeout(900);
+  await page.getByText("CHECKLIST COMPLETE").waitFor({ timeout: 30000 });
+  await page.waitForTimeout(500);
   await shot("checklist", "-done");
   await click(page.getByRole("button", { name: /Continue to launch/ }));
 });
@@ -188,9 +191,20 @@ await step("site", async () => {
   await enter("site", "cruise", 20000, 7000);
   await click(page.getByText("Overall", { exact: true }));
   await page.waitForTimeout(1200);
-  await page.mouse.click(720, 470);
-  await page.getByText("Spot score").waitFor({ timeout: 20000 });
-  await page.waitForTimeout(3500);
+  // probe a few spots (a real player would use the overlays) and keep the best one
+  const spots = [[720, 470], [560, 560], [900, 560], [720, 660], [480, 450], [980, 470]];
+  let bestSpot = null;
+  for (const [x, y] of spots) {
+    await page.mouse.click(x, y);
+    await page.getByText("Measuring the ground...").waitFor({ timeout: 8000 }).catch(() => {});
+    await page.getByText("Measuring the ground...").waitFor({ state: "detached", timeout: 20000 });
+    const sc = Number(await page.getByText("Spot score").locator("xpath=following-sibling::div").first().innerText());
+    if (!bestSpot || sc > bestSpot.sc) bestSpot = { x, y, sc };
+  }
+  log.siteBestSpot = bestSpot;
+  await page.mouse.click(bestSpot.x, bestSpot.y);
+  await page.getByText("Measuring the ground...").waitFor({ state: "detached", timeout: 20000 });
+  await page.waitForTimeout(2500);
   await shot("site", "-probe");
   await click(page.getByRole("button", { name: /Run 300 test landings/ }));
   await page.getByText("Safe landings").waitFor({ timeout: 30000 });
@@ -212,7 +226,10 @@ await step("landing", async () => {
 
 await step("surface", async () => {
   await enter("surface", "landing", 20000, 4000);
-  await page.keyboard.press("Space"); // skip ladder
+  const ladder = page.getByRole("button", { name: /Skip ladder/ });
+  await ladder.waitFor({ timeout: 30000 }); // appears once the terrain curtain lifts
+  await shot("surface", "-ladder");
+  await ladder.click();
   await page.waitForTimeout(2500);
   const p0 = await page.evaluate(() => window.__surfacePos?.());
   await page.keyboard.down("KeyW");

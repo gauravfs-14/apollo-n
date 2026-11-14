@@ -70,3 +70,68 @@ export async function solveQuiz(page, items) {
     await page.waitForTimeout(200);
   }
 }
+
+const answerLabel = (it) => (/^\d+$/.test(it.answer.trim()) ? `Step ${it.answer.trim()}` : it.answer);
+
+/** Memory match: flip cards, read their text from aria-label while open, pair them up from what has been seen. */
+export async function solveMemory(page, items) {
+  const pairOf = new Map();
+  items.forEach((it, i) => {
+    pairOf.set(it.prompt, i);
+    pairOf.set(answerLabel(it), i);
+  });
+  const cards = page.locator("div.grid > button");
+  const n = await cards.count();
+  const known = new Map(); // card index -> pair
+  const done = new Set(); // card indices matched
+  const read = async (i) => {
+    const t = await cards.nth(i).getAttribute("aria-label");
+    return pairOf.get(t);
+  };
+  const flip = async (i) => {
+    await cards.nth(i).click();
+    await page.waitForTimeout(120);
+  };
+  for (let guard = 0; guard < 80 && done.size < n; guard++) {
+    // a pair already seen?
+    const byPair = new Map();
+    for (const [i, p] of known) if (!done.has(i)) byPair.set(p, [...(byPair.get(p) ?? []), i]);
+    const seen = [...byPair.values()].find((v) => v.length >= 2);
+    if (seen) {
+      await flip(seen[0]);
+      await flip(seen[1]);
+      await page.waitForTimeout(700);
+      done.add(seen[0]);
+      done.add(seen[1]);
+      continue;
+    }
+    const unseen = [...Array(n).keys()].filter((i) => !known.has(i) && !done.has(i));
+    if (!unseen.length) break;
+    const a = unseen[0];
+    await flip(a);
+    known.set(a, await read(a));
+    const partner = [...known].find(([i, p]) => i !== a && !done.has(i) && p === known.get(a));
+    if (partner) {
+      await flip(partner[0]);
+      await page.waitForTimeout(700);
+      done.add(a);
+      done.add(partner[0]);
+      continue;
+    }
+    const b = unseen[1];
+    if (b === undefined) break;
+    await flip(b);
+    known.set(b, await read(b));
+    await page.waitForTimeout(1100); // mismatch cards flip back
+  }
+}
+
+export async function solveSwitches(page, items) {
+  const order = [...items.keys()].sort((a, b) => (parseInt(items[a].answer) || a + 1) - (parseInt(items[b].answer) || b + 1));
+  for (const idx of order) {
+    const label = items[idx].prompt;
+    const re = new RegExp("^\\s*" + label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*$", "i");
+    await page.locator("button[aria-pressed]").filter({ has: page.locator("span", { hasText: re }) }).first().click();
+    await page.waitForTimeout(700);
+  }
+}
