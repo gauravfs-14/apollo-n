@@ -23,7 +23,7 @@ const WALK_Y = ACCESS_ARM_Y + 1.3;
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const sm = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 const SUN = new THREE.Vector3(-0.75, 0.32, 0.5).normalize();
-const T_ELEV0 = 4.5, T_ELEV1 = 9, T_ARM1 = 11.0, T_HATCH = 10.2;
+const T_ELEV0 = 4.5, T_ELEV1 = 9, T_HATCH = 10.2;
 
 export function BoardScene() {
   const q = useQuality();
