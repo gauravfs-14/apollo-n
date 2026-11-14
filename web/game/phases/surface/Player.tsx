@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { send } from "../../core/net";
 import type { Role } from "../../types";
 import { Avatar, type AvatarPose } from "./Avatar";
-import { PLAY_RADIUS, type Ground } from "./ground";
+import { PLAY_RADIUS, SUN_AZ, SUN_ELEV, type Ground } from "./ground";
 import { rt, useSurface } from "./store";
 import { thud, unlockAudio } from "./synth";
 import { addDust, addFootprint } from "./Trail";
@@ -32,8 +32,9 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
   const { gl, camera } = useThree();
   const [pose, setPose] = useState<AvatarPose>("idle");
   const poseRef = useRef<AvatarPose>("idle");
+  const lamp = useRef<THREE.PointLight>(null);
   const pivot = useMemo(() => new THREE.Vector3(), []);
-  const state = useRef({ air: 0, ground: 0, sendT: 0, boundaryT: 0, hudT: 0, camInit: false, lastX: 0, lastZ: 0, exitSayed: false });
+  const state = useRef({ air: 0, ground: 0, sendT: 0, boundaryT: 0, hudT: 0, camInit: false, shadeT: 0, shade: 0, lastX: 0, lastZ: 0, exitSayed: false });
 
   // input
   useEffect(() => {
@@ -47,8 +48,8 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
       rt.keys[e.code] = true;
       if (e.code === "KeyE") rt.interact = true;
       if (e.code === "Space") {
-        rt.jumpPressed = true;
         if (rt.exiting) rt.skipExit = true;
+        else rt.jumpPressed = true;
       }
       if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault();
     };
@@ -118,7 +119,7 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
 
     if (rt.exiting) {
       if (rt.skipExit) rt.exitT = Math.max(rt.exitT, EXIT_DUR - 0.01);
-      rt.exitT += dt;
+      if (hud.ready || rt.skipExit) rt.exitT += dt;
       const t = rt.exitT;
       // porch -> ladder top -> down the ladder -> step off
       if (t < 0.9) {
@@ -141,7 +142,7 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
         const y = ground.heightAt(0, 4.1);
         rt.pos.set(0, y, 4.1);
         rt.rotY = 0;
-        rt.camYaw = -2.5;
+        rt.camYaw = -2.0;
         rt.camPitch = 0.2;
         rt.camDist = 6.5;
         rt.grounded = true;
@@ -159,6 +160,25 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
 
     // pose
     if (!rt.exiting) setPoseOnce(rt.speed > 0.35 ? "walk" : useSurface.getState().finale ? "wave" : "idle");
+
+    // helmet lamp: fades in when the Sun is blocked by terrain (crater floors)
+    s.shadeT -= dt;
+    if (s.shadeT <= 0) {
+      s.shadeT = 0.25;
+      const sx = Math.sin(SUN_AZ);
+      const sz = Math.cos(SUN_AZ);
+      const t = Math.tan(SUN_ELEV);
+      const y0 = rt.pos.y + 1.0;
+      let blocked = 0;
+      for (let d = 4; d < 260; d += d < 40 ? 4 : 10) {
+        if (ground.heightAt(rt.pos.x + sx * d, rt.pos.z + sz * d) > y0 + d * t) {
+          blocked = 1;
+          break;
+        }
+      }
+      s.shade = blocked;
+    }
+    if (lamp.current) lamp.current.intensity += (s.shade * 14 - lamp.current.intensity) * Math.min(1, dt * 3);
 
     // camera
     followCamera(camera, ground, dt, pivot, s);
@@ -179,6 +199,7 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
   return (
     <group ref={group}>
       <Avatar role={role ?? "commander"} pose={pose} speed={pose === "walk" ? 1.15 : 1} />
+      <pointLight ref={lamp} position={[0, 1.85, 0.45]} intensity={0} distance={22} decay={2} color="#fff0d8" />
     </group>
   );
 }
@@ -232,7 +253,7 @@ function stepPhysics(
       rt.vel.y = 2.7;
       rt.grounded = false;
     } else if (hs > 0.5 && s.ground > 0.05) {
-      rt.vel.y = 0.55 + 0.09 * hs;
+      rt.vel.y = 0.34 + 0.055 * hs;
       rt.grounded = false;
       addDust(rt.pos.x, rt.pos.y, rt.pos.z, 3, 0.5);
     }

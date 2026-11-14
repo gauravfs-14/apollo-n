@@ -64,6 +64,10 @@ export function Tasks({ ground }: { ground: Ground }) {
   const spots = useMemo(() => (plan ? layoutTasks(plan, ground) : {}), [plan, ground]);
   const active = useMemo(() => (plan ? activeTasks(plan, done) : []), [plan, done]);
   const fin = !!plan && finished(plan, done);
+  useEffect(() => {
+    const w = window as unknown as { __surface?: Record<string, unknown> };
+    if (w.__surface) Object.assign(w.__surface, { spots, done: [...done] });
+  }, [spots, done]);
   const mistakes = useSurface((s) => s.mistakes);
 
   const prog = useRef({
@@ -122,7 +126,7 @@ export function Tasks({ ground }: { ground: Ground }) {
     rt.focus = null;
     p.flagPos.set(rt.pos.x + Math.sin(rt.rotY) * 3.2, 0, rt.pos.z + Math.cos(rt.rotY) * 3.2);
     p.flagPos.y = ground.heightAt(p.flagPos.x, p.flagPos.z);
-    useSurface.getState().set({ finale: true, prompt: null, progress: null });
+    useSurface.getState().set({ finale: true, prompt: null, progress: null, signal: null, bars: null, guides: [] });
     speak("Houston: mission goal achieved. The whole world is watching. Well done, crew.", "surface_finale");
     chirp(440, 1320, 0.8, 0.12);
   }, [fin, plan, ground]);
@@ -407,7 +411,7 @@ function Beacon({ x, z, ground, color, height, label, dim, thin }: { x: number; 
       <mesh ref={ring} material={mat} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.1, 0]}>
         <ringGeometry args={[1.9, 2.2, 40]} />
       </mesh>
-      <Label text={label} color={color} position={[0, Math.min(height, 6) + 1, 0]} dim={dim} />
+      <Label text={label} color={color} position={[0, Math.min(height, 6) + 1, 0]} dim={dim} scale={0.024} />
     </group>
   );
 }

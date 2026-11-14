@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { useQuality } from "../../core/perf";
 import { AREA, type Ground } from "./ground";
 import { makeRegolith, surfaceUniforms } from "./materials";
+import { useSurface } from "./store";
 
 export function Terrain({ ground }: { ground: Ground }) {
   const q = useQuality();
@@ -86,6 +87,14 @@ export function Terrain({ ground }: { ground: Ground }) {
       surfaceUniforms.uSunVis.value = null;
     };
   }, [ground]);
+  useEffect(() => {
+    // terrain geometry is built; let the HUD drop its curtain and the ladder exit start
+    const t = setTimeout(() => useSurface.getState().set({ ready: true }), 400);
+    return () => {
+      clearTimeout(t);
+      useSurface.getState().set({ ready: false });
+    };
+  }, [inner]);
   useEffect(() => () => material.dispose(), [material]);
   useEffect(() => () => ringMat.dispose(), [ringMat]);
   useEffect(() => () => inner.dispose(), [inner]);

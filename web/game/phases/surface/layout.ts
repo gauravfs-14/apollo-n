@@ -73,8 +73,9 @@ export function layoutTasks(plan: MissionPlan, ground: Ground): Record<string, T
           const z = Math.cos(a) * r;
           if (Math.hypot(x - c.x, z - c.z) < c.r * 1.1) continue;
           if (flat(ground, x, z) < 0.93) continue;
-          const m = Math.min(ground.earthMargin(x, z, 50), 14);
+          const m = Math.min(ground.earthMargin(x, z, 60), 8);
           const score = m * 3 - r * 0.05;
+          if (m < 3) continue;
           if (score > bestScore) {
             bestScore = score;
             best = { x, z };
@@ -91,4 +92,4 @@ export function layoutTasks(plan: MissionPlan, ground: Ground): Record<string, T
   return out;
 }
 
-export const barsFromMargin = (m: number) => (m < 0 ? 0 : m < 1.5 ? 1 : m < 4 ? 2 : m < 8 ? 3 : 4);
+export const barsFromMargin = (m: number) => (m < 0 ? 0 : m < 0.6 ? 1 : m < 1.6 ? 2 : m < 2.6 ? 3 : 4);

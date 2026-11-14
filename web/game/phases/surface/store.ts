@@ -49,6 +49,7 @@ export interface SurfaceHud {
   finale: boolean;
   repair: null | { angle: number; aligned: number };
   boundary: boolean;
+  ready: boolean;
   set: (p: Partial<SurfaceHud>) => void;
   say: (text: string) => void;
   reset: () => void;
@@ -74,6 +75,7 @@ const initial = {
 
 export const useSurface = create<SurfaceHud>((set) => ({
   ...initial,
+  ready: false,
   set: (p) => set(p),
   say: (text) => set((s) => ({ message: text, messageId: s.messageId + 1 })),
   reset: () => set({ ...initial }),
@@ -106,4 +108,11 @@ export function resetRuntime() {
   rt.stepEvent = 0;
   rt.skipExit = false;
   rt.jumpPressed = false;
+}
+
+if (typeof window !== "undefined") {
+  // dev/test hooks used by scripts/surface-*.mjs
+  const w = window as unknown as { __surface: Record<string, unknown>; __surfacePos: () => { x: number; y: number; z: number } };
+  w.__surface = { rt, hud: useSurface, spots: {}, done: [] };
+  w.__surfacePos = () => ({ x: rt.pos.x, y: rt.pos.y, z: rt.pos.z });
 }

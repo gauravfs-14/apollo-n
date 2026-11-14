@@ -22,7 +22,9 @@ interface Burst {
 const prints: Print[] = [];
 const bursts: Burst[] = [];
 
+export const trailStats = { prints: 0 };
 export function addFootprint(x: number, z: number, yaw: number) {
+  trailStats.prints++;
   prints.push({ x, z, yaw });
 }
 export function addDust(x: number, y: number, z: number, n = 10, speed = 1) {
@@ -59,7 +61,7 @@ const tmpQ = new THREE.Quaternion();
 const tmpQ2 = new THREE.Quaternion();
 const tmpN = new THREE.Vector3();
 const tmpP = new THREE.Vector3();
-const tmpS = new THREE.Vector3(1, 1, 1);
+const tmpS = new THREE.Vector3(1.2, 1, 1.2);
 const UP = new THREE.Vector3(0, 1, 0);
 
 export function Footprints({ ground }: { ground: Ground }) {
@@ -77,10 +79,10 @@ export function Footprints({ ground }: { ground: Ground }) {
   const mat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: "#050504",
+        color: "#070605",
         alphaMap: tex,
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.9,
         depthWrite: false,
         roughness: 1,
         polygonOffset: true,
@@ -103,6 +105,7 @@ export function Footprints({ ground }: { ground: Ground }) {
   useFrame(() => {
     const m = ref.current;
     if (!m) return;
+    (window as unknown as { __surface: Record<string, unknown> }).__surface.footprints = total.current;
     if (!prints.length) return;
     while (prints.length) {
       const p = prints.shift()!;

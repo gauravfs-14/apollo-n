@@ -135,7 +135,7 @@ export function Crew({ ground }: { ground: Ground }) {
   const others = (state?.players ?? []).filter((p) => p.id !== me?.id && p.connected);
   const npcRoles: Role[] =
     state?.mode === "solo"
-      ? ((plan?.crew.roles ?? ["commander", "pilot", "engineer", "scientist"]) as Role[]).filter((r) => r !== me?.role).slice(0, 2)
+      ? ((plan?.crew.roles ?? ["commander", "pilot", "engineer", "scientist"]) as Role[]).filter((r) => r !== (me?.role ?? plan?.crew.roles[0])).slice(0, 2)
       : [];
   return (
     <>

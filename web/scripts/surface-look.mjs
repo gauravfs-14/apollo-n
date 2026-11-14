@@ -1,0 +1,20 @@
+// Screenshots: mid-ladder exit, then footprints looking back after a walk. Usage: node scripts/surface-look.mjs [prefix]
+import { chromium } from "playwright";
+const prefix = process.argv[2] ?? "/tmp/surface-look";
+const browser = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+await page.addInitScript(() => localStorage.setItem("apollo.quality", "high"));
+await page.goto(`http://localhost:3000/play/DEV-L${Date.now() % 1000000}?mode=solo&phase=surface&perf`, { waitUntil: "load" });
+await page.waitForFunction(() => window.__apolloPerf?.latest?.phase === "surface" && window.__surface?.rt && !window.__surface.rt.exitT === false, null, { timeout: 60000 });
+await page.waitForFunction(() => window.__surface.rt.exitT > 2.6, null, { timeout: 30000 });
+await page.screenshot({ path: `${prefix}-ladder.png` });
+await page.waitForFunction(() => !window.__surface.rt.exiting, null, { timeout: 30000 });
+await page.evaluate(() => { window.__surface.rt.camYaw = -1.3; });
+await page.keyboard.down("KeyW"); await page.keyboard.down("ShiftLeft");
+await page.waitForTimeout(3500);
+await page.keyboard.up("KeyW"); await page.keyboard.up("ShiftLeft");
+await page.evaluate(() => { window.__surface.rt.camYaw += Math.PI; window.__surface.rt.camPitch = 0.35; window.__surface.rt.camDist = 5; });
+await page.waitForTimeout(1200);
+console.log('footprints', await page.evaluate(() => window.__surface.footprints));
+await page.screenshot({ path: `${prefix}-prints.png` });
+await browser.close();

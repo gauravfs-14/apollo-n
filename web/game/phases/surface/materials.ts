@@ -83,7 +83,7 @@ export function makeRegolith(opts: { color: string; roughness?: number; rock?: b
           vec3 o0 = vn(vWPos.xz*0.9), o1 = vn(vWPos.xz*2.9+3.), o2 = vn(vWPos.xz*9.+11.), o3 = vn(vWPos.xz*28.+5.);
           float w0 = 1.-smoothstep(0.3*s/0.9, s/0.9, dn), w1 = 1.-smoothstep(0.3*s/2.9, s/2.9, dn);
           float w2 = 1.-smoothstep(0.3*s/9., s/9., dn), w3 = 1.-smoothstep(0.3*s/28., s/28., dn);
-          vec2 g = o0.yz*0.07*0.9*w0 + o1.yz*0.02*2.9*w1 + o2.yz*0.0065*9.*w2 + o3.yz*0.0022*28.*w3;
+          vec2 g = o0.yz*0.06*0.9*w0 + o1.yz*0.016*2.9*w1 + o2.yz*0.005*9.*w2 + o3.yz*0.0016*28.*w3;
           pw = vec3(g.x, 0., g.y);`
           }
           vec3 vw = (viewMatrix * vec4(pw, 0.)).xyz;

@@ -66,6 +66,8 @@ export function SunLight() {
     <>
       <directionalLight ref={light} color="#fff4e6" intensity={24} castShadow={q.shadows} />
       <primitive object={target} />
+      {/* regolith bounce: a low, grazing fill from the anti-Sun side lights vertical suit/lander faces but barely touches flat ground, so ground shadows stay black */}
+      <directionalLight color="#c9c2b6" intensity={2.6} position={[-SUN_DIR.x * 100, 9, -SUN_DIR.z * 100]} />
       {/* faint earthshine so shadowed suits are not pure black; the sky itself gives no light */}
       <directionalLight color="#9db8ff" intensity={0.05} position={EARTH_DIR.toArray().map((v) => v * 100) as [number, number, number]} />
       <ambientLight intensity={0.006} color="#b0b4c0" />

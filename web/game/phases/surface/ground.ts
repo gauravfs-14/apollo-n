@@ -94,7 +94,16 @@ export interface Ground {
 export const VIS_SIZE = 1800;
 const VIS_N = 384;
 
-export function createGround(seed: number): Ground {
+export interface DemSource {
+  /** real-terrain height (m) at tile coordinates */
+  heightAt(x: number, z: number): number;
+  /** where the lander sits in tile coordinates */
+  ox: number;
+  oz: number;
+}
+
+export function createGround(seed: number, dem?: DemSource): Ground {
+  const dem0 = dem ? dem.heightAt(dem.ox, dem.oz) : 0;
   const s0 = seed & 0xffff;
   const rnd = mulberry32(seed);
   // The named crater: ~100 m from the lander, off to the side of the Sun axis so its floor is in shadow.
@@ -113,13 +122,15 @@ export function createGround(seed: number): Ground {
     // broad undulation (gentle toward the Sun so the lander is not eclipsed by a swell)
     const dirSun = r > 1 ? (x * sunAx + z * sunAz) / r : 0;
     const swell = 1 - 0.7 * Math.max(0, dirSun);
-    let h = (vnoise(x / 240 + 7, z / 240 + 3, s0) * 2 - 1) * 4.2 * swell;
+    let h = dem
+      ? Math.max(-250, Math.min(250, dem.heightAt(dem.ox + x, dem.oz + z) - dem0)) * 0.6 * swell
+      : (vnoise(x / 240 + 7, z / 240 + 3, s0) * 2 - 1) * 4.2 * swell;
     h += (vnoise(x / 80, z / 80, s0 + 1) * 2 - 1) * 1.2;
     h += (vnoise(x / 26, z / 26, s0 + 2) * 2 - 1) * 0.32;
     h += (vnoise(x / 9, z / 9, s0 + 9) * 2 - 1) * 0.07;
     // far horizon: low rolling highlands (kept down toward the Sun and Earth so both rise above the skyline)
     const far = smooth(260, 1900, r);
-    if (far > 0) {
+    if (far > 0 && !dem) {
       const dirEarth = r > 1 ? (x * earthAx + z * earthAz) / r : 0;
       const keep = (1 - 0.85 * Math.max(0, dirSun)) * (1 - 0.7 * Math.max(0, dirEarth));
       const ridge = 0.35 + vnoise(x / 520, z / 520, s0 + 4) * 0.9 + vnoise(x / 190, z / 190, s0 + 5) * 0.3;

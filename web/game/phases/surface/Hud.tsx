@@ -64,6 +64,12 @@ export function Hud() {
 
   return (
     <div className="absolute inset-0">
+      <div className={`pointer-events-none absolute inset-0 z-20 grid place-items-center bg-black transition-opacity duration-1000 ${h.ready ? "opacity-0" : "opacity-100"}`}>
+        <div className="text-center">
+          <div className="num text-[11px] text-amber">TOUCHDOWN CONFIRMED</div>
+          <div className="mt-1 text-lg">Preparing the surface</div>
+        </div>
+      </div>
       <PhaseTitle step="PHASE 9 - SURFACE" title={plan.title} subtitle={plan.goal.text} />
       <Compass />
 
@@ -121,7 +127,7 @@ export function Hud() {
       )}
 
       {/* scanner gauge */}
-      {h.signal !== null && !h.exiting && (
+      {h.signal !== null && !h.exiting && !h.finale && (
         <div className="absolute bottom-6 right-5 w-60">
           <Panel>
             <div className="flex items-baseline justify-between">
@@ -171,7 +177,7 @@ export function Hud() {
       {h.finale && (
         <div className="absolute inset-x-0 bottom-20 flex flex-col items-center gap-1 text-center">
           <div className="text-xs tracking-widest text-amber">MISSION GOAL REACHED</div>
-          <div className="text-3xl font-semibold">{plan.goal.text}</div>
+          <div className="max-w-2xl text-2xl font-semibold">{plan.goal.text}</div>
           <div className="mt-1 max-w-xl text-sm text-dim">{plan.goal.why}</div>
         </div>
       )}
