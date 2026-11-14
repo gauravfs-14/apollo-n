@@ -43,9 +43,9 @@ export function SunLight() {
     l.shadow.mapSize.set(q.shadowMapSize, q.shadowMapSize);
     l.shadow.map?.dispose();
     l.shadow.map = null;
-    l.shadow.bias = -0.0004;
-    l.shadow.normalBias = 0.06;
-    l.shadow.radius = 2;
+    l.shadow.bias = -0.0008;
+    l.shadow.normalBias = 0.16;
+    l.shadow.radius = 1;
   }, [q.shadowMapSize, target]);
 
   useFrame(() => {

@@ -63,7 +63,15 @@ export function Tasks({ ground }: { ground: Ground }) {
   });
   const spots = useMemo(() => (plan ? layoutTasks(plan, ground) : {}), [plan, ground]);
   const active = useMemo(() => (plan ? activeTasks(plan, done) : []), [plan, done]);
-  const fin = !!plan && finished(plan, done);
+  // dev: ?finale=<seconds> previews the flag finale after a delay (so the player can walk away from the lander first)
+  const [devFinale, setDevFinale] = useState(false);
+  useEffect(() => {
+    const v = new URLSearchParams(location.search).get("finale");
+    if (v === null) return;
+    const id = setTimeout(() => setDevFinale(true), (Number(v) || 5) * 1000);
+    return () => clearTimeout(id);
+  }, []);
+  const fin = !!plan && (devFinale || finished(plan, done));
   useEffect(() => {
     const w = window as unknown as { __surface?: Record<string, unknown> };
     if (w.__surface) Object.assign(w.__surface, { spots, done: [...done] });
@@ -157,7 +165,7 @@ export function Tasks({ ground }: { ground: Ground }) {
     // finale orbit
     if (p.finaleT >= 0) {
       p.finaleT += dt;
-      const a = p.finaleT * 0.18 + 1.2;
+      const a = p.finaleT * 0.11 + 1.2;
       const f = p.flagPos;
       if (!rt.focus) rt.focus = { pos: new THREE.Vector3(), look: new THREE.Vector3() };
       rt.focus.pos.set(f.x + Math.sin(a) * 7, ground.heightAt(f.x + Math.sin(a) * 7, f.z + Math.cos(a) * 7) + 2.0, f.z + Math.cos(a) * 7);
@@ -380,7 +388,7 @@ export function Tasks({ ground }: { ground: Ground }) {
       })}
       {relay && <RelayModel x={relay.x} z={relay.z} ground={ground} placedAt={prog.current.placedAt} />}
       <CarriedRelay />
-      {flag && <Flag pos={flag} />}
+      {flag && <Flag pos={flag} face={1.7} />}
       {plan.surface.tasks
         .filter((t) => t.type === "repair" && !done.has(t.id))
         .map((t) => spots[t.id] && <RepairPanel key={t.id} x={spots[t.id].main.x} z={spots[t.id].main.z} ground={ground} />)}
@@ -587,46 +595,82 @@ function CarriedRelay() {
   );
 }
 
-function Flag({ pos }: { pos: [number, number, number] }) {
-  const cloth = useRef<THREE.Mesh>(null);
-  const tex = useMemo(() => {
-    const c = document.createElement("canvas");
-    c.width = 192;
-    c.height = 128;
-    const g = c.getContext("2d")!;
-    g.fillStyle = "#0b2a5b";
-    g.fillRect(0, 0, 192, 128);
-    g.fillStyle = "#e8edf5";
+/** US flag drawn to a canvas (13 stripes, canton with 50 stars). */
+function flagTexture() {
+  const W = 1024;
+  const H = 540;
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const g = c.getContext("2d")!;
+  const sh = H / 13;
+  for (let i = 0; i < 13; i++) {
+    g.fillStyle = i % 2 === 0 ? "#b31942" : "#f4f4f4";
+    g.fillRect(0, i * sh, W, sh + 1);
+  }
+  const cw = W * 0.4;
+  const ch = sh * 7;
+  g.fillStyle = "#0a3161";
+  g.fillRect(0, 0, cw, ch);
+  g.fillStyle = "#f4f4f4";
+  const star = (x: number, y: number, r: number) => {
     g.beginPath();
-    g.arc(96, 64, 34, 0, Math.PI * 2);
+    for (let k = 0; k < 10; k++) {
+      const a = -Math.PI / 2 + (k * Math.PI) / 5;
+      const rr = k % 2 === 0 ? r : r * 0.4;
+      g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
+    g.closePath();
     g.fill();
-    g.fillStyle = "#0b2a5b";
-    g.beginPath();
-    g.arc(110, 58, 30, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = "#ffb547";
-    g.fillRect(0, 118, 192, 10);
-    const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
+  };
+  for (let row = 0; row < 9; row++) {
+    const n = row % 2 === 0 ? 6 : 5;
+    for (let k = 0; k < n; k++) {
+      const x = (cw / 12) * (row % 2 === 0 ? 1 + 2 * k : 2 + 2 * k);
+      const y = (ch / 10) * (row + 1);
+      star(x, y, 15);
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+/** Apollo-style flag: vertical pole, horizontal rod along the top edge holds the cloth out (no wind on the Moon). */
+function Flag({ pos, face }: { pos: [number, number, number]; face: number }) {
+  const tex = useMemo(() => flagTexture(), []);
+  const geo = useMemo(() => {
+    const gm = new THREE.PlaneGeometry(1.2, 0.63, 24, 4);
+    const p = gm.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i);
+      const y = p.getY(i);
+      // hand-set creases: the cloth sags a little away from the rod
+      p.setZ(i, Math.sin(x * 9) * 0.012 * (0.35 - y) + (0.315 - y) * 0.02);
+    }
+    gm.computeVertexNormals();
+    return gm;
   }, []);
-  useEffect(() => () => tex.dispose(), [tex]);
-  useFrame(() => {
-    if (cloth.current) cloth.current.rotation.y = 0.05; // no wind on the Moon: the flag hangs from a crossbar, stiff
-  });
+  useEffect(
+    () => () => {
+      tex.dispose();
+      geo.dispose();
+    },
+    [tex, geo],
+  );
   return (
-    <group position={pos}>
-      <pointLight position={[0.3, 3.2, 1.2]} intensity={40} distance={26} decay={2} color="#ffe2b8" />
+    <group position={pos} rotation={[0, face, 0]}>
+      <pointLight position={[0.3, 3.2, 1.6]} intensity={22} distance={26} decay={2} color="#ffe2b8" />
       <mesh position={[0, 1.2, 0]} castShadow>
-        <cylinderGeometry args={[0.015, 0.015, 2.4, 6]} />
+        <cylinderGeometry args={[0.018, 0.02, 2.4, 8]} />
         <meshStandardMaterial color="#d0d0d0" metalness={0.6} roughness={0.4} />
       </mesh>
-      <mesh position={[0.5, 2.3, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.012, 0.012, 1.0, 6]} />
+      <mesh position={[0.6, 2.32, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.012, 0.012, 1.24, 8]} />
         <meshStandardMaterial color="#d0d0d0" metalness={0.6} roughness={0.4} />
       </mesh>
-      <mesh ref={cloth} position={[0.5, 1.95, 0]} castShadow>
-        <planeGeometry args={[0.95, 0.63]} />
+      <mesh geometry={geo} position={[0.62, 2.0, 0]} castShadow>
         <meshStandardMaterial map={tex} roughness={0.9} side={THREE.DoubleSide} />
       </mesh>
     </group>
