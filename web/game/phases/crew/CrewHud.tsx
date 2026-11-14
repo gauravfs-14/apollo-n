@@ -5,6 +5,7 @@ import { Button, Panel, PhaseTitle } from "../../ui/kit";
 import { ROLES, type Role } from "../../types";
 import { defaultNames, hashSeed, laterFor, ROLE_INFO, type CrewData } from "./data";
 import { useCrewUi } from "./hover";
+import { phaseLabel } from "../../ui/phaseLabel";
 
 const WAIT_BEFORE_FORCE_MS = 15000;
 
@@ -63,7 +64,7 @@ export function CrewHud() {
   return (
     <>
       <PhaseTitle
-        step="Phase 3 of 11 · Crew"
+        step={phaseLabel("crew")}
         title="Meet your crew"
         subtitle={multi ? "Pick your role. Roles nobody picks are flown by AI crew, run by the host." : "Name your four astronauts. Each one has a job later in the mission."}
       />

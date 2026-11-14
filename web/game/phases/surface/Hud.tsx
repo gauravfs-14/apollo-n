@@ -6,6 +6,7 @@ import { Button, Meter, Panel, PhaseTitle } from "../../ui/kit";
 import type { MissionPlan } from "../../types";
 import { ROLE_COLOR, rt, useSurface } from "./store";
 import { activeTasks, finished, hintLevel, surfaceScore } from "./Tasks";
+import { phaseLabel } from "../../ui/phaseLabel";
 
 const LIMIT: Record<MissionPlan["difficulty"], number> = { easy: 360, normal: 420, hard: 540 };
 
@@ -70,7 +71,7 @@ export function Hud() {
           <div className="mt-1 text-lg">Preparing the surface</div>
         </div>
       </div>
-      <PhaseTitle step="PHASE 9 - SURFACE" title={plan.title} subtitle={plan.goal.text} />
+      <PhaseTitle step={phaseLabel("surface")} title={plan.title} subtitle={plan.goal.text} />
       <Compass />
 
       <div className="absolute right-5 top-5 w-72">

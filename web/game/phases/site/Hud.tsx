@@ -6,6 +6,7 @@ import { Button, Meter, Panel, PhaseTitle, Stat } from "../../ui/kit";
 import { suggestSpot, type Breakdown } from "./api";
 import { useSiteActions, useSiteState } from "./actions";
 import { useSiteUi } from "./ui";
+import { phaseLabel } from "../../ui/phaseLabel";
 
 const MODES: { id: OverlayMode; label: string; text: (tilt: number) => string }[] = [
   { id: "none", label: "Off", text: () => "Natural view. Black areas are in shadow from the low Sun right now." },
@@ -249,7 +250,7 @@ export function SiteHud() {
 
   return (
     <div className="absolute inset-0">
-      <PhaseTitle step="PHASE 7 · LANDING SITE" title="Find a safe landing spot" subtitle="Scan the ground, drop a probe, then test-land 300 times." />
+      <PhaseTitle step={phaseLabel("site")} title="Find a safe landing spot" subtitle="Scan the ground, drop a probe, then test-land 300 times." />
 
       <div className="absolute left-6 top-28 flex w-72 flex-col gap-3">
         <Panel>

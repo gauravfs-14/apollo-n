@@ -7,6 +7,7 @@ import { landerFromBuild } from "../site/api";
 import { pickOutcome, scoreLanding } from "./outcome";
 import { TOTAL, useLanding } from "./store";
 import { loadTerrain } from "../../three/terrain";
+import { phaseLabel } from "../../ui/phaseLabel";
 
 interface SiteData {
   site_id: string;
@@ -68,7 +69,7 @@ export function LandingHud() {
 
   return (
     <div className="absolute inset-0">
-      <PhaseTitle step="PHASE 8 · POWERED DESCENT" title="Touchdown" subtitle={sd.probe ? "Landing on the spot you chose." : undefined} />
+      <PhaseTitle step={phaseLabel("landing")} title="Touchdown" subtitle={sd.probe ? "Landing on the spot you chose." : undefined} />
 
       {!done && ready && (
         <div className="absolute bottom-6 left-6 w-60">

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useGame } from "../../core/useGame";
 import { Button } from "../../ui/kit";
 import { T, captionAt, useLaunchClock } from "./clock";
+import { phaseLabel } from "../../ui/phaseLabel";
 
 export function LaunchHud() {
   const t = useLaunchClock((s) => s.t);
@@ -26,7 +27,7 @@ export function LaunchHud() {
     <div className="absolute inset-0">
       <div className="pointer-events-none absolute inset-0 bg-black" style={{ opacity: black }} />
       <div className="pointer-events-none absolute left-6 top-5 [text-shadow:0_1px_10px_rgba(0,0,0,0.7)]">
-        <div className="num text-[11px] text-amber">STEP 6 · LAUNCH</div>
+        <div className="num text-[11px] text-amber">{phaseLabel("launch")}</div>
         <h2 className="text-2xl font-semibold leading-tight">{plan?.title ?? "Launch"}</h2>
       </div>
       <div className="pointer-events-none absolute left-1/2 top-16 -translate-x-1/2 text-center [text-shadow:0_1px_12px_rgba(0,0,0,0.8)]">

@@ -14,6 +14,7 @@ import { EngineFault } from "./hurdles/EngineFault";
 import { NavCorrection } from "./hurdles/NavCorrection";
 import { SolarStorm } from "./hurdles/SolarStorm";
 import { rt, setDebris } from "./rt";
+import { phaseLabel } from "../../ui/phaseLabel";
 
 const PERK_FOR: Partial<Record<string, PerkId>> = { solar_storm: "water_shield", engine_fault: "spare_parts", comms_blackout: "high_gain_antenna" };
 
@@ -134,7 +135,7 @@ export function CruiseHud() {
   }, [idx, stage]);
 
   if (!plan || !hurdle) {
-    return <PhaseTitle step="Cruise" title="Coasting to the Moon" subtitle="Waiting for the mission plan..." />;
+    return <PhaseTitle step={phaseLabel("cruise")} title="Coasting to the Moon" subtitle="Waiting for the mission plan..." />;
   }
 
   const meta = HURDLE_META[hurdle.type];
@@ -149,7 +150,7 @@ export function CruiseHud() {
 
   return (
     <>
-      <PhaseTitle step={`Phase 8 of 11 · Cruise · Hurdle ${idx + 1} of ${n}`} title={meta.title} subtitle={stage === "play" ? meta.goal : undefined} />
+      <PhaseTitle step={phaseLabel("cruise", `Hurdle ${idx + 1} of ${n}`)} title={meta.title} subtitle={stage === "play" ? meta.goal : undefined} />
 
       {/* journey strip */}
       <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
