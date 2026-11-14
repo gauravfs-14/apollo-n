@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/immutability -- three.js objects/uniforms are mutated by design */
 // Realistic NASA Z-2 spacesuit astronaut (public-domain NASA 3D Resources model, 30k tris, skinned, 2K PBR textures).
 // Props:
 //   role      "commander" | "pilot" | "engineer" | "scientist"  -> accent colour (amber / cyan / green / white)
@@ -91,30 +92,18 @@ export function Astronaut({ role = "commander", accent, pose = "idle", speed = 1
       m.material = mat;
       owned.push(mat);
     });
-    // role bands on both upper arms (always readable from a distance)
-    const bandGeo = new THREE.CylinderGeometry(0.118, 0.118, 0.07, 24, 1, true);
-    const bandMat = new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.05, side: THREE.DoubleSide });
-    owned.push(bandGeo, bandMat);
-    for (const [n, sx] of [["shoulderL", 1], ["shoulderR", -1]] as const) {
-      const band = new THREE.Mesh(bandGeo, bandMat);
-      band.position.set(sx * 0.045, -0.15, 0);
-      band.rotation.z = sx * 0.24;
-      get(n).add(band);
-    }
     const rig: Rig = {
       hips: get("hips"), spine: get("spine"), head: get("head"),
       shL: get("shoulderL"), shR: get("shoulderR"), elL: get("elbowL"), elR: get("elbowR"),
       hipL: get("hipL"), hipR: get("hipR"), kneeL: get("kneeL"), kneeR: get("kneeR"),
       hipsY: get("hips").position.y,
     };
-    (rig as unknown as { band: THREE.MeshStandardMaterial }).band = bandMat;
     return { root, rig, owned, accentColor };
   }, [gltf.scene, mask]);
 
   useEffect(() => {
     accentColor.value.set(color);
-    (rig as unknown as { band: THREE.MeshStandardMaterial }).band.color.set(color);
-  }, [accentColor, rig, color]);
+  }, [accentColor, color]);
   useEffect(() => () => owned.forEach((o) => o.dispose()), [owned]);
 
   // pose blend weights (smoothed so switching poses never pops)

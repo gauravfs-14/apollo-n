@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/immutability -- three.js objects/uniforms are mutated by design */
 // Earth: NASA Blue Marble (topography + bathymetry) day side, NASA Black Marble city lights on the night side,
 // specular ocean glint, procedural animated cloud layer and a Rayleigh-style atmosphere rim.
 // Props:
