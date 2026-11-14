@@ -89,7 +89,7 @@ export async function solveMemory(page, items) {
     return pairOf.get(t);
   };
   const flip = async (i) => {
-    await cards.nth(i).click();
+    await cards.nth(i).click({ timeout: 3000 });
     await page.waitForTimeout(120);
   };
   for (let guard = 0; guard < 80 && done.size < n; guard++) {
@@ -122,6 +122,12 @@ export async function solveMemory(page, items) {
     if (b === undefined) break;
     await flip(b);
     known.set(b, await read(b));
+    if (known.get(a) === known.get(b)) {
+      done.add(a);
+      done.add(b);
+      await page.waitForTimeout(700);
+      continue;
+    }
     await page.waitForTimeout(1100); // mismatch cards flip back
   }
 }
