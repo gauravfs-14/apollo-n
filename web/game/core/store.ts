@@ -106,3 +106,6 @@ export function actsAs(state: GameState | null, me: Player | undefined, role: Ro
   const claimed = state.players.some((p) => p.role === role && p.connected);
   return !claimed && me.isHost;
 }
+
+// QA hook: scripts/e2e-*.mjs read the live state (plan, phase, players) from here.
+if (typeof window !== "undefined") (window as unknown as { __apolloStore: typeof useStore }).__apolloStore = useStore;
