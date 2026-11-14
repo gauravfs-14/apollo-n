@@ -290,13 +290,17 @@ export function LaunchScene() {
     <>
       <Suspense fallback={null}>
         {!space && <Environment files={LAUNCH_HDRI} background backgroundBlurriness={0.01} environmentIntensity={0.5} backgroundIntensity={0.75} backgroundRotation={[0, 5.04, 0]} environmentRotation={[0, 5.04, 0]} />}
-        {space && <Starfield brightness={1.6} />}
+        {/* The space-cut objects are mounted from the start at ~zero scale: their shaders compile and textures upload behind the
+            loading veil instead of freezing the page at the 24 s cut. */}
+        <group scale={space ? 1 : 1e-6}>
+          <Starfield brightness={1.6} />
+        </group>
       </Suspense>
       <directionalLight
         position={space ? SPACE_SUN.map((v) => v * 1000) as [number, number, number] : [SUN.x * 500, SUN.y * 500, SUN.z * 500]}
         intensity={space ? 4.6 : 4.2}
         color={space ? "#fffaf0" : "#ffb98a"}
-        castShadow={q.shadows && !space}
+        castShadow={q.shadows} /* constant: toggling it recompiles every lit material at the cut */
         shadow-mapSize={[q.shadowMapSize, q.shadowMapSize]}
         shadow-camera-left={-170} shadow-camera-right={170} shadow-camera-top={170} shadow-camera-bottom={-80} shadow-camera-near={10} shadow-camera-far={1200}
         shadow-bias={-0.0003} shadow-normalBias={0.4}
@@ -306,12 +310,10 @@ export function LaunchScene() {
 
       {!space && <LaunchPad shadows={q.shadows} />}
 
-      {space && (
-        <>
-          <Earth radius={3500} position={[500, -3750, -300]} sun={SPACE_SUN} lite={q.tier === "low"} spin={0.003} />
-          <Moon radius={320} position={[7500, 900, -2600]} quality={q.tier === "high" ? "medium" : "low"} />
-        </>
-      )}
+      <group scale={space ? 1 : 1e-6}>
+        <Earth radius={3500} position={[500, -3750, -300]} sun={SPACE_SUN} lite={q.tier === "low"} spin={0.003} />
+        <Moon radius={320} position={[7500, 900, -2600]} quality={q.tier === "high" ? "medium" : "low"} />
+      </group>
 
       <Rocket
         ref={rocket}

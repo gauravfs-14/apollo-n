@@ -12,6 +12,8 @@ export interface PerfSnapshot {
   fps: number;
   frameMsAvg: number;
   frameMsP95: number;
+  /** worst single frame in the last ~2 s (hitches: shader compiles, texture uploads) */
+  frameMsMax: number;
   drawCalls: number;
   triangles: number;
   geometries: number;
@@ -74,6 +76,7 @@ export function PerfProbe({ phase }: { phase: string }) {
       fps: Math.round(1000 / (avg || 16.7)),
       frameMsAvg: +avg.toFixed(2),
       frameMsP95: +(arr[Math.floor(arr.length * 0.95)] ?? 0).toFixed(2),
+      frameMsMax: +(arr[arr.length - 1] ?? 0).toFixed(1),
       drawCalls: frameInfo.current.calls,
       triangles: frameInfo.current.triangles,
       geometries: gl.info.memory.geometries,
