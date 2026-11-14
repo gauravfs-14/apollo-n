@@ -52,22 +52,22 @@
       {
         "id": "site_a",
         "name": "Shackleton Rim",
-        "lat": -89.45,
-        "lon": -137.0,
+        "lat": -89.773,
+        "lon": -157.4,
         "why": "Long hours of sunlight on the rim, next to a shadowed crater"
       },
       {
         "id": "site_b",
         "name": "Connecting Ridge",
-        "lat": -89.4,
-        "lon": -152.0,
+        "lat": -89.463,
+        "lon": -138.01,
         "why": "High ridge with good views of Earth for radio"
       },
       {
         "id": "site_c",
         "name": "de Gerlache Rim",
-        "lat": -88.6,
-        "lon": -67.0,
+        "lat": -88.663,
+        "lon": -67.3,
         "why": "Gentler slopes, a little further from the ice"
       }
     ]

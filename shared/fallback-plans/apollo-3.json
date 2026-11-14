@@ -52,22 +52,22 @@
       {
         "id": "site_a",
         "name": "Shackleton Rim",
-        "lat": -89.45,
-        "lon": -137.0,
+        "lat": -89.773,
+        "lon": -157.4,
         "why": "Sun on the rim gives power while the rover drives into the cold"
       },
       {
         "id": "site_b",
         "name": "Connecting Ridge",
-        "lat": -89.4,
-        "lon": -152.0,
+        "lat": -89.463,
+        "lon": -138.01,
         "why": "A ridge with a long view for planning the drive"
       },
       {
         "id": "site_c",
         "name": "de Gerlache Rim",
-        "lat": -88.6,
-        "lon": -67.0,
+        "lat": -88.663,
+        "lon": -67.3,
         "why": "Easy driving, but further from the shadows"
       }
     ]
@@ -82,7 +82,7 @@
     ],
     "constraints": {
       "max_mass_kg": 1800,
-      "min_battery_hours": 60,
+      "min_battery_hours": 55,
       "min_delta_v": 2500,
       "required_payload": [
         "drill"
