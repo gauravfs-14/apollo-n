@@ -1,0 +1,40 @@
+{
+ "site_id": "site_c",
+ "name": "de Gerlache Rim",
+ "size_m": 8192.0,
+ "resolutions": {
+  "1025": {
+   "n": 1025,
+   "spacing_m": 8.0
+  },
+  "513": {
+   "n": 513,
+   "spacing_m": 16.0
+  }
+ },
+ "height_encoding": "uint16 little-endian, row-major, h = min_m + v/65535*(max_m-min_m); row0 = +y edge of polar plane (Z=-size/2)",
+ "min_m": -50.098558358725654,
+ "max_m": 1815.2491598881365,
+ "center": {
+  "lat": -88.6633,
+  "lon": -67.297,
+  "plane_x_m": -37395.0,
+  "plane_y_m": 15645.0
+ },
+ "projection": "south polar stereographic, R=1737.4 km, true scale at pole, lon east (x=r sin lon, y=r cos lon)",
+ "frame": "origin tile centre; +X=plane x; +Z=plane -y; +Y up; heights vs tangent plane at centre",
+ "overlays": {
+  "size": 512,
+  "slope": "slope.png: 0..45 deg, 20 m scale, from 5 m DEM",
+  "rough": "rough.png: 0..2 m RMS residual (35 m window)",
+  "sun": "sun.png: 0..100 % of time Sun disc visible (PGDA 69, 60 m, bicubic upsampled)",
+  "earth": "earth.png: 0..100 % Earth visibility (PGDA 69)",
+  "psr": "psr.png: 255 = permanently shadowed (LPSR 60 m)",
+  "hazard": "hazard.png: 0..1 terrain hazard = 1-(1-ss(7,18deg,slope))(1-ss(0.35,1.2m,rough))"
+ },
+ "source": {
+  "dem": "LOLA Site11 5 m/px, Barker et al. 2021 (PSS 203, 105119), NASA PGDA product 78 https://pgda.gsfc.nasa.gov/products/78",
+  "illumination": "NASA PGDA product 69 (Mazarico et al. 2011, Icarus 211, 1066), AVGVISIB_85S_060M_201608 + _EARTH + LPSR",
+  "note": "PGDA product 78 Site11 'de Gerlache rim' (Mazarico et al. 2011 site 11)"
+ }
+}
