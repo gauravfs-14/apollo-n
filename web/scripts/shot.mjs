@@ -18,7 +18,7 @@ const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 if (flags.quality) await page.addInitScript((q) => localStorage.setItem("apollo.quality", q), flags.quality);
-await page.goto(`${base}/play/DEV-${phase.toUpperCase()}?mode=solo&phase=${phase}&perf`, { waitUntil: "load" });
+await page.goto(`${base}/play/DEV-${phase.toUpperCase()}?mode=solo&phase=${phase}&perf${process.env.SHOT_QS ?? ""}`, { waitUntil: "load" });
 await page.waitForTimeout(Number(wait));
 await page.screenshot({ path: out });
 const perf = await page.evaluate(() => {
