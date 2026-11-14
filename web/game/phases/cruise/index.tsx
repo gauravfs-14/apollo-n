@@ -1,9 +1,14 @@
 "use client";
-import { StubHud } from "../../ui/StubPhase";
+import { EARTH_TEXTURES } from "../../three/Earth";
+import { moonTexturePaths } from "../../three/Moon";
+import { STAR_TEXTURE } from "../../three/Starfield";
 import type { PhaseModule } from "../../types";
+import { CruiseHud } from "./CruiseHud";
+import { CruiseScene } from "./CruiseScene";
 
-function Hud() {
-  return <StubHud id="cruise" title="Cruise" />;
-}
-
-export const phase: PhaseModule = { id: "cruise", Hud };
+export const phase: PhaseModule = {
+  id: "cruise",
+  Scene: CruiseScene,
+  Hud: CruiseHud,
+  preload: [STAR_TEXTURE, ...EARTH_TEXTURES.high, ...moonTexturePaths("medium")],
+};

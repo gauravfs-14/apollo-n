@@ -67,7 +67,7 @@ void main(){
   // ocean: darker, glossy
   col *= mix(1.0, 0.82, ocean);
   vec3 H = normalize(sunDir + V);
-  float spec = pow(max(dot(N, H), 0.0), 90.0) * ocean * 1.6 + pow(max(dot(N, H), 0.0), 14.0) * ocean * 0.12;
+  float spec = pow(max(dot(N, H), 0.0), 220.0) * ocean * 0.9 + pow(max(dot(N, H), 0.0), 24.0) * ocean * 0.06;
   col += sunCol * spec * smoothstep(0.0, 0.2, ndl);
   // night lights (warm), faded in as the sun sets
   float nightMask = 1.0 - day;
