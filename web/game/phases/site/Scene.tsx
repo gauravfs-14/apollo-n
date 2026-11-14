@@ -306,7 +306,7 @@ export function Scene() {
     <>
       <SunLight sky={sky} />
       <LunarSky sky={sky} stars={1.1} earth={false} />
-      <Terrain data={data} sky={sky} overlay={overlay} edgeFade fill={overlay === "none" ? 0.09 : 0.09} />
+      <Terrain data={data} sky={sky} overlay={overlay} edgeFade fill={0.13} />
       <ScoutRig data={data} sky={sky} />
       <Picker data={data} />
       {sd.probe && <Probe key={sd.probe.id} data={data} p={sd.probe} />}
