@@ -5,6 +5,7 @@ import { useGame, usePhaseData } from "../../core/useGame";
 import { Button, Meter, Panel } from "../../ui/kit";
 import { SLOTS, SLOT_LABEL, evaluateBuild, partsFor, shipStats, type BuildCheck, type BuildParts, type ShipPart } from "../../data/parts";
 import type { Difficulty, Role, ShipSlot } from "../../types";
+import { phaseLabel } from "../../ui/phaseLabel";
 
 const SLOT_ROLE: Record<ShipSlot, Role> = { engine: "engineer", power: "engineer", legs: "pilot", comms: "pilot", payload: "scientist" };
 const ROLE_LABEL: Record<Role, string> = { commander: "Commander", pilot: "Pilot", engineer: "Engineer", scientist: "Scientist" };
@@ -125,7 +126,7 @@ export function BuildHud() {
       {/* left: mission needs + balance bars */}
       <div className="absolute left-6 top-5 flex w-[23rem] flex-col gap-3">
         <div className="pointer-events-none">
-          <div className="num text-[11px] text-amber">STEP 1 · BUILD</div>
+          <div className="num text-[11px] text-amber">{phaseLabel("build")}</div>
           <h2 className="text-2xl font-semibold leading-tight">Build the lander</h2>
         </div>
         <Panel>

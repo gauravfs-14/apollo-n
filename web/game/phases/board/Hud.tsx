@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useGame } from "../../core/useGame";
 import { Button } from "../../ui/kit";
 import { BOARD_END, boardCaption, useBoardClock } from "./clock";
+import { phaseLabel } from "../../ui/phaseLabel";
 
 export function BoardHud() {
   const t = useBoardClock((s) => s.t);
@@ -18,7 +19,7 @@ export function BoardHud() {
     <div className="absolute inset-0">
       <div className="pointer-events-none absolute inset-0 bg-black" style={{ opacity: black }} />
       <div className="pointer-events-none absolute left-6 top-5 [text-shadow:0_1px_10px_rgba(0,0,0,0.7)]">
-        <div className="num text-[11px] text-amber">STEP 4 · BOARDING</div>
+        <div className="num text-[11px] text-amber">{phaseLabel("board")}</div>
         <h2 className="text-2xl font-semibold leading-tight">{plan?.title ?? "Boarding"}</h2>
       </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-8 text-center text-sm text-white/90 [text-shadow:0_1px_10px_rgba(0,0,0,0.9)]">{boardCaption(t)}</div>

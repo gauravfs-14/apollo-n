@@ -4,6 +4,7 @@ import { sfx } from "../../core/audio";
 import { useGame, usePhaseData } from "../../core/useGame";
 import { Button, Panel } from "../../ui/kit";
 import { PERKS, crateTier, rollPerk, type PerkId } from "../../data/perks";
+import { phaseLabel } from "../../ui/phaseLabel";
 
 const TIER_TEXT = { common: "Standard crate", rare: "Reinforced crate", legendary: "Gold-seal crate" } as const;
 const TIER_CLASS = { common: "text-cyan", rare: "text-amber", legendary: "text-pink-300" } as const;
@@ -40,7 +41,7 @@ export function DropHud() {
   return (
     <div className="absolute inset-0">
       <div className="pointer-events-none absolute left-6 top-5 max-w-md [text-shadow:0_1px_10px_rgba(0,0,0,0.7)]">
-        <div className="num text-[11px] text-amber">STEP 2 · SUPPLY DROP</div>
+        <div className="num text-[11px] text-amber">{phaseLabel("drop")}</div>
         <h2 className="text-2xl font-semibold leading-tight">A crate for your crew</h2>
         <p className="mt-1 text-sm text-dim">Your build score of {score} earned this drop. Rewards are earned, never bought.</p>
       </div>

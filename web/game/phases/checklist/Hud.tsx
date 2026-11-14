@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { MINIGAMES, type MinigameResult } from "../../minigames";
 import { useGame, usePhaseData } from "../../core/useGame";
 import { Button, Panel, Stat } from "../../ui/kit";
+import { phaseLabel } from "../../ui/phaseLabel";
 
 const GOAL = {
   order_steps: "Order the steps",
@@ -33,7 +34,7 @@ export function ChecklistHud() {
   return (
     <div className="absolute inset-0">
       <div className="pointer-events-none absolute left-6 top-5 max-w-md">
-        <div className="num text-[11px] text-amber">STEP 5 · PRE-LAUNCH CHECKLIST</div>
+        <div className="num text-[11px] text-amber">{phaseLabel("checklist")}</div>
         <h2 className="text-2xl font-semibold leading-tight">{GOAL[style]}</h2>
         <p className="mt-1 text-sm text-dim">Every item has to be right before mission control gives the go.</p>
       </div>
