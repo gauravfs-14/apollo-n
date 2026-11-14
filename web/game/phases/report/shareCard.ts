@@ -102,7 +102,7 @@ export async function renderShareCard(plan: MissionPlan, result: Result, players
   ctx.fillStyle = "#e9edf2";
   ctx.font = "600 54px system-ui, -apple-system, Segoe UI, sans-serif";
   const title = plan.title.replace(/^Apollo \d+:\s*/, "");
-  let y = wrap(ctx, title, pad, 150, 640, 62, 2);
+  const y = wrap(ctx, title, pad, 150, 640, 62, 2);
 
   ctx.fillStyle = "rgba(233,237,242,0.65)";
   ctx.font = "400 24px system-ui, -apple-system, Segoe UI, sans-serif";

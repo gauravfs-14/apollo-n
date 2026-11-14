@@ -57,8 +57,19 @@ def _fmt(v) -> str:
     return str(v)
 
 
+UNITS = {"deg": "degrees", "pct": "percent", "kg": "kilograms", "km": "kilometers", "m": "meters", "s": "seconds",
+         "hours": "hours", "h": "hours", "mps": "meters per second", "ms": "milliseconds"}
+
+
+def _pair(k: str, v) -> str:
+    base, _, unit = k.rpartition("_")
+    if base and unit in UNITS:
+        return f"{_label(base)} {_fmt(v)} {UNITS[unit]}"
+    return f"{_label(k)} {_fmt(v)}"
+
+
 def template(body: DirectorIn) -> str:
-    parts = [f"{_label(k)} {_fmt(v)}" for k, v in list(body.numbers.items())[:6] if not isinstance(v, (dict, list))]
+    parts = [_pair(k, v) for k, v in list(body.numbers.items())[:6] if not isinstance(v, (dict, list))]
     phase = _label(body.phase)
     if not parts:
         return f"Flight, the {phase} numbers are in. We are watching them closely."
