@@ -1,26 +1,24 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* Apollo N design tokens: mission-control realism. Dark glass, warm amber for
+   action, cool cyan for telemetry, red only for real danger. No gradients-for-decoration. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-ink: #05070a;          /* page background */
+  --color-panel: rgb(10 13 18 / 0.72);
+  --color-line: rgb(255 255 255 / 0.1);
+  --color-dim: rgb(255 255 255 / 0.55);
+  --color-amber: #ffb547;        /* primary action, highlights */
+  --color-cyan: #6fd3ff;         /* telemetry, data, safe */
+  --color-go: #4ade80;           /* GO / success */
+  --color-nogo: #ff5a4f;         /* NO-GO / danger */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html, body {
+  background: #05070a;
+  color: #e9edf2;
+  overscroll-behavior: none;
 }
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+body { font-family: var(--font-geist-sans), system-ui, sans-serif; }
+.num { font-family: var(--font-geist-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; }

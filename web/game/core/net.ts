@@ -26,7 +26,7 @@ export function connect(room: string, mode: GameState["mode"], name: string) {
   setConnection("connecting");
 
   try {
-    ws = new WebSocket(`${WS_BASE}/ws/rooms/${room}`);
+    ws = new WebSocket(`${WS_BASE}/ws/rooms/${room}?mode=${mode}`);
   } catch {
     return goLocal();
   }

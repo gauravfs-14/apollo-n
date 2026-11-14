@@ -54,7 +54,7 @@ async def room_socket(ws: WebSocket, code: str) -> None:
     await ws.accept()
     room = rooms.get(code)
     if room is None:  # joining an unknown code creates it (handy for dev + server restarts)
-        room = rooms[code] = Room(code, "multi")
+        room = rooms[code] = Room(code, "solo" if ws.query_params.get("mode") == "solo" else "multi")
     player_id: str | None = None
     try:
         while True:

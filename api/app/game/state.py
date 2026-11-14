@@ -29,7 +29,12 @@ def apply(s: dict[str, Any], player_id: str, msg: dict[str, Any]) -> dict[str, A
             me["name"] = msg.get("name") or me["name"]
         else:
             if st["mode"] == "solo" and len(st["players"]) >= 1:
-                return "Solo room is full"
+                # A new tab/device takes over a solo game whose player has left.
+                if st["players"][0]["connected"]:
+                    return "Solo room is full"
+                st["players"][0].update(id=msg["id"], name=str(msg.get("name", "Astronaut"))[:24], connected=True)
+                st["version"] += 1
+                return st
             if len(st["players"]) >= 4:
                 return "Room is full (4 astronauts max)"
             st["players"].append({"id": msg["id"], "name": str(msg.get("name", "Astronaut"))[:24],

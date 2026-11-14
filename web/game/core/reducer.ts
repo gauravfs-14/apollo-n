@@ -16,7 +16,12 @@ export function apply(s: GameState, playerId: string, msg: ClientMsg): GameState
         me.connected = true;
         me.name = msg.name || me.name;
       } else {
-        if (st.mode === "solo" && st.players.length >= 1) return "Solo room is full";
+        if (st.mode === "solo" && st.players.length >= 1) {
+          // A new tab/device takes over a solo game whose player has left.
+          if (st.players[0].connected) return "Solo room is full";
+          st.players[0] = { ...st.players[0], id: msg.id, name: msg.name, connected: true };
+          break;
+        }
         if (st.players.length >= 4) return "Room is full (4 astronauts max)";
         st.players.push({ id: msg.id, name: msg.name, connected: true, isHost: st.players.length === 0 });
       }

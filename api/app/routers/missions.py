@@ -22,3 +22,8 @@ async def new_mission(body: NewMission) -> dict:
     plan = json.loads((FALLBACK / "apollo-1.json").read_text())
     plan["difficulty"] = body.difficulty
     return plan
+
+
+@router.get("/missions/fallback")
+async def fallback_mission() -> dict:
+    return json.loads((FALLBACK / "apollo-1.json").read_text())
