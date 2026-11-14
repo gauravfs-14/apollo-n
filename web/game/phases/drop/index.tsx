@@ -1,9 +1,6 @@
 "use client";
-import { StubHud } from "../../ui/StubPhase";
 import type { PhaseModule } from "../../types";
+import { DropHud } from "./Hud";
+import { DROP_ASSETS, DropScene } from "./Scene";
 
-function Hud() {
-  return <StubHud id="drop" title="Supply drop" />;
-}
-
-export const phase: PhaseModule = { id: "drop", Hud };
+export const phase: PhaseModule = { id: "drop", Scene: DropScene, Hud: DropHud, preload: DROP_ASSETS };
