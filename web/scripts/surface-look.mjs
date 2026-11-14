@@ -17,4 +17,7 @@ await page.evaluate(() => { window.__surface.rt.camYaw += Math.PI; window.__surf
 await page.waitForTimeout(1200);
 console.log('footprints', await page.evaluate(() => window.__surface.footprints));
 await page.screenshot({ path: `${prefix}-prints.png` });
+await page.evaluate(() => { const r = window.__surface.rt; r.camPitch = 1.2; r.camDist = 12; });
+await page.waitForTimeout(800);
+await page.screenshot({ path: `${prefix}-top.png` });
 await browser.close();

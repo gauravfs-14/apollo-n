@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable react-hooks/immutability, react-hooks/refs, react-hooks/purity, react-hooks/set-state-in-effect */
+ 
 // Astronaut for the surface: uses P3's skinned suit when its GLB has shipped, otherwise a
 // primitive stand-in (same scale, same poses plus "climb"). Origin at the feet, faces +Z.
 import { useFrame } from "@react-three/fiber";

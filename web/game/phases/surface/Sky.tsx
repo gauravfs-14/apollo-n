@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable react-hooks/immutability, react-hooks/refs, react-hooks/purity, react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/immutability */
 // Lunar south-pole lighting: one hard Sun 2.4 degrees above the horizon, black sky, no sky light.
 // Shadow camera is a tight box that follows the player (texel-snapped, so shadows never shimmer).
 import { useTexture } from "@react-three/drei";

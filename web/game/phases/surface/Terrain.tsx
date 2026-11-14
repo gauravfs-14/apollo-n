@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable react-hooks/immutability, react-hooks/refs, react-hooks/purity, react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/immutability */
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { useQuality } from "../../core/perf";
@@ -9,7 +9,7 @@ import { useSurface } from "./store";
 
 export function Terrain({ ground }: { ground: Ground }) {
   const q = useQuality();
-  const seg = q.tier === "high" ? 480 : q.tier === "medium" ? 320 : 200;
+  const seg = q.tier === "high" ? 400 : q.tier === "medium" ? 300 : 190;
   const size = AREA + 20;
 
   const material = useMemo(() => makeRegolith({ color: "#a39f98", roughness: 1 }), []);

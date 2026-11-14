@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable react-hooks/immutability, react-hooks/refs, react-hooks/purity, react-hooks/set-state-in-effect */
+ 
 // Other astronauts: remote players (interpolated 10 Hz `pos` stream) and, in solo, AI crewmates
 // (one waits by the lander, others trail the player at a distance).
 import { useFrame } from "@react-three/fiber";

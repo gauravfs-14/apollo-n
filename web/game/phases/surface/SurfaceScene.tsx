@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable react-hooks/immutability, react-hooks/refs, react-hooks/purity, react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/immutability */
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Effects } from "../../core/Effects";
@@ -61,7 +61,22 @@ export function SurfaceScene() {
     return () => window.removeEventListener("blur", fn);
   }, []);
 
+  // dev measurement (?calls): accumulate renderer stats across all passes (shadow + scene + post)
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    if (!new URLSearchParams(location.search).has("calls")) return;
+    gl.info.autoReset = false;
+    return () => {
+      gl.info.autoReset = true;
+    };
+  }, [gl]);
   useFrame(() => {
+    if (!gl.info.autoReset) {
+      const w = window as unknown as { __surface: Record<string, unknown> };
+      w.__surface.calls = gl.info.render.calls;
+      w.__surface.tris = gl.info.render.triangles;
+      gl.info.reset();
+    }
     surfaceUniforms.uPlayer.value.copy(rt.pos);
   });
 

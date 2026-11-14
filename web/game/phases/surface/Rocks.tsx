@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable react-hooks/immutability, react-hooks/refs, react-hooks/purity, react-hooks/set-state-in-effect */
+ 
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -46,11 +46,11 @@ export function Rocks({ ground }: { ground: Ground }) {
     [],
   );
   const geos = useMemo(
-    () => ({ boulder: rockGeometry(3, 1), rock: rockGeometry(2, 2), pebble: rockGeometry(0, 3) }),
+    () => ({ boulder: rockGeometry(3, 1), rock: rockGeometry(1, 2), pebble: rockGeometry(0, 3) }),
     [],
   );
 
-  const nBoulder = Math.round(90 * q.instances);
+  const nBoulder = Math.round(70 * q.instances);
   const nRock = Math.round(800 * q.instances);
   const nPebble = Math.round(3400 * q.instances);
 

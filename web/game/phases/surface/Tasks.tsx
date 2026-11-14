@@ -1,8 +1,8 @@
 "use client";
-/* eslint-disable react-hooks/immutability, react-hooks/refs, react-hooks/purity, react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/immutability, react-hooks/refs, react-hooks/purity */
 // Task chain, world markers, role gating and the interactions for every task type.
 import { useFrame } from "@react-three/fiber";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { speak } from "../../core/audio";
 import { useGame } from "../../core/useGame";
@@ -69,6 +69,7 @@ export function Tasks({ ground }: { ground: Ground }) {
     if (w.__surface) Object.assign(w.__surface, { spots, done: [...done] });
   }, [spots, done]);
   const mistakes = useSurface((s) => s.mistakes);
+  const [flag, setFlag] = useState<[number, number, number] | null>(null);
 
   const prog = useRef({
     hold: 0,
@@ -126,6 +127,7 @@ export function Tasks({ ground }: { ground: Ground }) {
     rt.focus = null;
     p.flagPos.set(rt.pos.x + Math.sin(rt.rotY) * 3.2, 0, rt.pos.z + Math.cos(rt.rotY) * 3.2);
     p.flagPos.y = ground.heightAt(p.flagPos.x, p.flagPos.z);
+    setFlag([p.flagPos.x, p.flagPos.y, p.flagPos.z]);
     useSurface.getState().set({ finale: true, prompt: null, progress: null, signal: null, bars: null, guides: [] });
     speak("Houston: mission goal achieved. The whole world is watching. Well done, crew.", "surface_finale");
     chirp(440, 1320, 0.8, 0.12);
@@ -378,7 +380,7 @@ export function Tasks({ ground }: { ground: Ground }) {
       })}
       {relay && <RelayModel x={relay.x} z={relay.z} ground={ground} placedAt={prog.current.placedAt} />}
       <CarriedRelay />
-      {fin && <Flag pos={prog.current.flagPos} />}
+      {flag && <Flag pos={flag} />}
       {plan.surface.tasks
         .filter((t) => t.type === "repair" && !done.has(t.id))
         .map((t) => spots[t.id] && <RepairPanel key={t.id} x={spots[t.id].main.x} z={spots[t.id].main.z} ground={ground} />)}
@@ -585,7 +587,7 @@ function CarriedRelay() {
   );
 }
 
-function Flag({ pos }: { pos: THREE.Vector3 }) {
+function Flag({ pos }: { pos: [number, number, number] }) {
   const cloth = useRef<THREE.Mesh>(null);
   const tex = useMemo(() => {
     const c = document.createElement("canvas");
@@ -614,6 +616,7 @@ function Flag({ pos }: { pos: THREE.Vector3 }) {
   });
   return (
     <group position={pos}>
+      <pointLight position={[0.3, 3.2, 1.2]} intensity={40} distance={26} decay={2} color="#ffe2b8" />
       <mesh position={[0, 1.2, 0]} castShadow>
         <cylinderGeometry args={[0.015, 0.015, 2.4, 6]} />
         <meshStandardMaterial color="#d0d0d0" metalness={0.6} roughness={0.4} />

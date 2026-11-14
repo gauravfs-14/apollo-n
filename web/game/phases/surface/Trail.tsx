@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable react-hooks/immutability, react-hooks/refs, react-hooks/purity, react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/immutability */
 // Footprints (instanced decals, ring buffer) and ballistic dust (one Points draw call).
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";

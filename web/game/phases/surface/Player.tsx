@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable react-hooks/immutability, react-hooks/refs, react-hooks/purity, react-hooks/set-state-in-effect */
+ 
 // Third-person astronaut controller: low gravity (1.62 m/s2) lope, jump arcs, slope-aware ground following,
 // circle collisions, soft boundary, ladder exit sequence, orbit camera, 10 Hz position broadcast.
 import { useFrame, useThree } from "@react-three/fiber";
@@ -178,7 +178,7 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
       }
       s.shade = blocked;
     }
-    if (lamp.current) lamp.current.intensity += (s.shade * 14 - lamp.current.intensity) * Math.min(1, dt * 3);
+    if (lamp.current) lamp.current.intensity += (s.shade * 6 - lamp.current.intensity) * Math.min(1, dt * 3);
 
     // camera
     followCamera(camera, ground, dt, pivot, s);
@@ -255,6 +255,9 @@ function stepPhysics(
     } else if (hs > 0.5 && s.ground > 0.05) {
       rt.vel.y = 0.34 + 0.055 * hs;
       rt.grounded = false;
+      // push-off print from the trailing foot
+      const side = (rt.lastStepSide *= -1);
+      addFootprint(rt.pos.x + Math.cos(rt.rotY) * 0.13 * side, rt.pos.z - Math.sin(rt.rotY) * 0.13 * side, rt.rotY);
       addDust(rt.pos.x, rt.pos.y, rt.pos.z, 3, 0.5);
     }
   }
