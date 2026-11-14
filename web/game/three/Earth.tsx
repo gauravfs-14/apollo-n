@@ -155,6 +155,15 @@ export function Earth({ radius = 1, sun = [1, 0.25, 0.6], spin = 0.02, tilt = 0.
       t.needsUpdate = true;
     }
   }, [day, night, ocean, tier]);
+  // the drei cache keeps these textures forever; free the GPU copies when the scene goes away (re-uploaded on the next mount)
+  useEffect(
+    () => () => {
+      day.dispose();
+      night.dispose();
+      ocean.dispose();
+    },
+    [day, night, ocean],
+  );
 
   const sunVec = useMemo(() => new THREE.Vector3(...sun).normalize(), [sun]);
   const octaves = tier === "low" ? 3 : tier === "medium" ? 4 : 5;

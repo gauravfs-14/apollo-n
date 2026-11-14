@@ -136,6 +136,7 @@ function makeEarthTexture() {
 /** Stars (dimmed when looking toward the Sun), the Sun disc and Earth low on the horizon. */
 export function Sky() {
   const tex = useTexture(STAR_TEXTURE);
+  useEffect(() => () => tex.dispose(), [tex]); // drei-cached: free the 4K GPU copy
   const sky = useRef<THREE.Mesh>(null);
   const sun = useRef<THREE.Mesh>(null);
   const earth = useRef<THREE.Mesh>(null);

@@ -54,6 +54,7 @@ interface Rig {
   hipsY: number;
 }
 
+const live = { n: 0 }; // mounted astronauts
 const MODEL_HEIGHT = 1.93;
 const MASK_URL = "/models/crew/accent_mask.webp";
 
@@ -105,6 +106,18 @@ export function Astronaut({ role = "commander", accent, pose = "idle", speed = 1
     accentColor.value.set(color);
   }, [accentColor, color]);
   useEffect(() => () => owned.forEach((o) => o.dispose()), [owned]);
+  // the GLB and its textures are shared by every astronaut and cached by drei: when the last one unmounts, free the GPU copies
+  useEffect(() => {
+    live.n++;
+    return () => {
+      if (--live.n > 0) return;
+      gltf.scene.traverse((o) => {
+        const mat = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+        if (mat) for (const v of Object.values(mat)) if (v && (v as THREE.Texture).isTexture) (v as THREE.Texture).dispose();
+      });
+      mask.dispose();
+    };
+  }, [gltf, mask]);
 
   // pose blend weights (smoothed so switching poses never pops)
   const w = useRef({ idle: 1, walk: 0, wave: 0 });

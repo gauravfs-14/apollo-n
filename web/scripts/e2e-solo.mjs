@@ -3,7 +3,7 @@
 // Esc-menu "Skip this phase (host)" is used ONLY where a phase can't be scripted (cruise hurdles, surface tasks) and is logged as "forced".
 // Writes /tmp/e2e/<nn>-<phase>.png and /tmp/e2e/solo.json (errors, timings, perf + memory per phase).
 import fs from "node:fs";
-import { BASE, OUT, getPhase, getState, launch, record, solveMemory, solveOrder, solveQuiz, solveSwitches, waitPhase } from "./e2e-lib.mjs";
+import { BASE, GPU_PROBE, OUT, getPhase, getState, launch, record, solveMemory, solveOrder, solveQuiz, solveSwitches, waitPhase } from "./e2e-lib.mjs";
 
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith("--")).map((a) => a.slice(2).split("=")));
 const parts = await import("../game/data/parts.ts");
@@ -11,6 +11,7 @@ const PHASES = ["select", "build", "drop", "crew", "board", "checklist", "launch
 
 const browser = await launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+await ctx.addInitScript(GPU_PROBE);
 if (flags.quality) await ctx.addInitScript((q) => localStorage.setItem("apollo.quality", q), flags.quality);
 const page = await ctx.newPage();
 const log = { phases: [], mem: [], forced: [], failed: [], fps: {} };
@@ -28,7 +29,8 @@ async function memSnap(phase, label = "start") {
   await cdp.send("HeapProfiler.collectGarbage").catch(() => {});
   const heap = await cdp.send("Runtime.getHeapUsage");
   const p = await page.evaluate(() => window.__apolloPerf?.latest ?? null);
-  const row = { phase, label, heapMB: +(heap.usedSize / 1048576).toFixed(1), geometries: p?.geometries, textures: p?.textures, fps: p?.fps, p95: p?.frameMsP95, calls: p?.drawCalls, tris: p?.triangles, quality: p?.quality };
+  const gpu = await page.evaluate(() => window.__gpu?.() ?? {});
+  const row = { phase, label, gpuTexMB: gpu.texMB, heapMB: +(heap.usedSize / 1048576).toFixed(1), geometries: p?.geometries, textures: p?.textures, fps: p?.fps, p95: p?.frameMsP95, calls: p?.drawCalls, tris: p?.triangles, quality: p?.quality };
   log.mem.push(row);
   log.fps[phase] = { fps: row.fps, p95: row.p95 };
   return row;
@@ -92,6 +94,7 @@ await step("select", async () => {
   await enter("select", "menu", 20000, 500);
   await page.getByRole("button", { name: "Select", exact: true }).first().waitFor({ timeout: 120000 });
   await page.waitForTimeout(1500);
+  await memSnap("select", "settled"); // baseline for the after-session comparison
   await shot("select", "-cards");
   const t = Date.now();
   await click(page.getByRole("button", { name: "Select", exact: true }));
@@ -250,6 +253,15 @@ await step("report", async () => {
 // ---- after the report: compare to the start
 await step("memory-final", async () => {
   await memSnap("report", "end");
+  // back to mission select: the scene is just the Moon again, so counts should return to the baseline
+  await click(page.getByRole("button", { name: "New mission" }));
+  await waitPhase(page, "select", 15000);
+  await page.waitForTimeout(3500);
+  await memSnap("select", "after-session");
+  const a = log.mem.find((m) => m.phase === "select" && m.label === "settled");
+  const b = log.mem.at(-1);
+  log.leak = { geometries: b.geometries - a.geometries, textures: b.textures - a.textures, gpuTexMB: +(b.gpuTexMB - a.gpuTexMB).toFixed(1), heapMB: +(b.heapMB - a.heapMB).toFixed(1) };
+  console.log("LEAK vs menu baseline", JSON.stringify(log.leak));
 });
 
 log.totalS = Math.round((Date.now() - T0) / 1000);
@@ -259,7 +271,7 @@ console.log("\n== phases", JSON.stringify(log.phases.map((p) => `${p.phase}:${p.
 console.log("== forced skips", JSON.stringify(log.forced));
 console.log("== failed", JSON.stringify(log.failed));
 console.log("== mem");
-for (const m of log.mem) console.log(`  ${m.phase.padEnd(10)} ${m.label.padEnd(7)} heap ${String(m.heapMB).padStart(6)}MB geo ${String(m.geometries).padStart(4)} tex ${String(m.textures).padStart(4)} fps ${m.fps} p95 ${m.p95} calls ${m.calls} tris ${Math.round((m.tris ?? 0) / 1000)}k q=${m.quality}`);
+for (const m of log.mem) console.log(`  ${m.phase.padEnd(10)} ${m.label.padEnd(13)} gpuTex ${String(m.gpuTexMB).padStart(6)}MB heap ${String(m.heapMB).padStart(6)}MB geo ${String(m.geometries).padStart(4)} tex ${String(m.textures).padStart(4)} fps ${m.fps} p95 ${m.p95} calls ${m.calls} tris ${Math.round((m.tris ?? 0) / 1000)}k q=${m.quality}`);
 const errs = log.errors.filter((e) => !/Clock|deprecated/.test(e.text));
 console.log(`== errors (${errs.length})`);
 for (const e of errs.slice(0, 30)) console.log("  ", e.kind, e.text);

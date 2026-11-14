@@ -61,6 +61,7 @@ export function Hangar({ orbit = true, distance = [11, 24] as [number, number] }
   useMemo(() => {
     diff.colorSpace = THREE.SRGBColorSpace;
   }, [diff]);
+  useEffect(() => () => [diff, nor, arm].forEach((t) => t.dispose()), [diff, nor, arm]); // drei-cached: free the GPU copies
   const ring = useMemo(() => ringTexture(), []);
   useEffect(() => () => ring.dispose(), [ring]);
 

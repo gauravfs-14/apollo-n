@@ -174,6 +174,7 @@ function buildLES() {
   return b;
 }
 
+let rocketsLive = 0;
 const cacheB = new Map<string, [K, THREE.BufferGeometry][]>();
 const get = (k: string, f: () => Build<K>) => {
   let v = cacheB.get(k);
@@ -208,6 +209,13 @@ export const Rocket = forwardRef<RocketRefs, RocketProps>(function Rocket({ extr
     mats.white.dispose(); mats.black.dispose(); mats.decal.dispose();
   }, [mats]);
 
+  // merged geometries are cached module-wide; free their GPU buffers when the last rocket unmounts (re-uploaded on demand)
+  useEffect(() => {
+    rocketsLive++;
+    return () => {
+      if (--rocketsLive === 0) for (const list of cacheB.values()) for (const [, g] of list) g.dispose();
+    };
+  }, []);
   const parts = useMemo(() => ({ s1: get("s1", buildS1), s2: get("s2", buildS2), s3: get("s3", buildS3), les: get("les", buildLES) }), []);
   const render = (d: [K, THREE.BufferGeometry][]) => d.map(([k, g], i) => <mesh key={i} geometry={g} material={mats[k]} castShadow={shadows} receiveShadow={shadows} />);
 

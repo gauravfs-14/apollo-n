@@ -29,6 +29,7 @@ const variantOf = (id: string | undefined) => {
 
 type Merged = [MatKey, THREE.BufferGeometry][];
 const geoCache = new Map<string, Merged>();
+let landersLive = 0;
 function cached(key: string, make: () => Build): Merged {
   let m = geoCache.get(key);
   if (!m) geoCache.set(key, (m = make().merged()));
@@ -94,6 +95,13 @@ export function Lander({ parts, assembled = 1, legsDeployed = false, animateChan
   // engine material instance so heat glow does not leak to other landers
   const bellMat = useMemo(() => shipMaterials().bell.clone(), []);
   useEffect(() => () => bellMat.dispose(), [bellMat]);
+  // cached geometries are shared; free their GPU buffers when the last lander unmounts (re-uploaded on demand)
+  useEffect(() => {
+    landersLive++;
+    return () => {
+      if (--landersLive === 0) for (const list of geoCache.values()) for (const [, g] of list) g.dispose();
+    };
+  }, []);
 
   const slotRefs = useRef<Record<ShipSlot, THREE.Group | null>>({ engine: null, power: null, legs: null, payload: null, comms: null });
   const legRefs = useRef<(THREE.Group | null)[]>([]);

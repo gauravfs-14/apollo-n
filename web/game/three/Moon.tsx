@@ -17,7 +17,7 @@
 // cached by drei, so every phase that reuses <Moon/> shares the same GPU textures.
 import { useTexture } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useQuality } from "../core/perf";
 
@@ -59,6 +59,14 @@ export function Moon({ radius = 100, rotationSpeed = 0, quality, relief = 3, bum
     });
   });
 
+  useEffect(
+    () => () => {
+      color.dispose(); // cached by drei; free the GPU copies when the scene goes away
+      normal.dispose();
+      disp.dispose();
+    },
+    [color, normal, disp],
+  );
   const geo = useMemo(() => new THREE.SphereGeometry(1, t.segments, t.segments / 2), [t.segments]);
   useLayoutEffect(() => () => geo.dispose(), [geo]);
 
