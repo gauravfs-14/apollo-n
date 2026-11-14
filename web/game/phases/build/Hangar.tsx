@@ -61,7 +61,7 @@ export function Hangar({ orbit = true, distance = [11, 24] as [number, number] }
   useMemo(() => {
     diff.colorSpace = THREE.SRGBColorSpace;
   }, [diff]);
-  const ring = useMemo(ringTexture, []);
+  const ring = useMemo(() => ringTexture(), []);
   useEffect(() => () => ring.dispose(), [ring]);
 
   useEffect(() => {
