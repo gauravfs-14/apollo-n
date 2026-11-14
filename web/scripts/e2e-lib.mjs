@@ -75,6 +75,15 @@ const answerLabel = (it) => (/^\d+$/.test(it.answer.trim()) ? `Step ${it.answer.
 
 /** Memory match: flip cards, read their text from aria-label while open, pair them up from what has been seen. */
 export async function solveMemory(page, items) {
+  try {
+    await solveMemoryInner(page, items);
+  } catch (e) {
+    // the game ends 600 ms after the last match and removes the cards: a late click is fine
+    if (!(await page.getByText("CHECKLIST COMPLETE").count())) throw e;
+  }
+}
+
+async function solveMemoryInner(page, items) {
   const pairOf = new Map();
   items.forEach((it, i) => {
     pairOf.set(it.prompt, i);
