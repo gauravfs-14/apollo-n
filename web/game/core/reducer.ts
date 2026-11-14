@@ -1,6 +1,18 @@
 // Local mirror of api/app/game/state.py `apply()`. Used only when the server is
 // unreachable in solo mode. Keep the two in sync.
-import { PHASE_ORDER, type ClientMsg, type GameState } from "../types";
+import { PHASE_ORDER, ROLES, type ClientMsg, type GameState } from "../types";
+
+/** Names are trimmed, capped at 24 chars and never empty (mirrors state.py clean_name). */
+export function cleanName(raw: unknown, fallback = "Astronaut"): string {
+  const name = typeof raw === "string" ? raw.trim().slice(0, 24) : "";
+  return name || fallback;
+}
+
+/** 0..100, NaN/garbage -> 0 (mirrors state.py clean_score). */
+export function cleanScore(raw: unknown): number {
+  const v = Number(raw ?? 0);
+  return Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 0;
+}
 
 export function newState(room: string, mode: GameState["mode"]): GameState {
   return { room, mode, phase: "select", players: [], scores: {}, phaseData: {}, version: 0 };
@@ -14,21 +26,24 @@ export function apply(s: GameState, playerId: string, msg: ClientMsg): GameState
     case "join": {
       if (me) {
         me.connected = true;
-        me.name = msg.name || me.name;
+        me.name = cleanName(msg.name, me.name);
       } else {
         if (st.mode === "solo" && st.players.length >= 1) {
           // A new tab/device takes over a solo game whose player has left.
           if (st.players[0].connected) return "Solo room is full";
-          st.players[0] = { ...st.players[0], id: msg.id, name: msg.name, connected: true };
+          st.players[0] = { ...st.players[0], id: msg.id, name: cleanName(msg.name), connected: true };
           break;
         }
         if (st.players.length >= 4) return "Room is full (4 astronauts max)";
-        st.players.push({ id: msg.id, name: msg.name, connected: true, isHost: st.players.length === 0 });
+        st.players.push({ id: msg.id, name: cleanName(msg.name), connected: true, isHost: st.players.length === 0 });
       }
+      // Never leave a room without a connected host: the (re)joining player takes over.
+      if (!st.players.some((p) => p.isHost && p.connected)) for (const p of st.players) p.isHost = p.id === msg.id;
       break;
     }
     case "pick_role": {
       if (!me) return "Join first";
+      if (msg.role && !ROLES.includes(msg.role)) return "Unknown role";
       if (msg.role && st.players.some((p) => p.id !== me.id && p.role === msg.role)) return "Role already taken";
       me.role = msg.role ?? undefined;
       break;
@@ -36,13 +51,15 @@ export function apply(s: GameState, playerId: string, msg: ClientMsg): GameState
     case "action": {
       if (!me) return "Join first";
       if (msg.phase !== st.phase) return `Not in phase ${msg.phase}`;
-      const data = msg.data ?? {};
+      const raw = msg.data as unknown;
+      const data = (!raw || (Array.isArray(raw) && raw.length === 0) ? {} : raw) as Record<string, unknown>;
+      if (typeof data !== "object" || Array.isArray(data)) return "Bad action data";
       if (msg.kind === "patch") {
         st.phaseData[st.phase] = { ...(st.phaseData[st.phase] ?? {}), ...data };
       } else if (msg.kind === "set_plan") {
         st.plan = data.plan as GameState["plan"];
       } else if (msg.kind === "complete") {
-        st.scores[st.phase] = Math.max(0, Math.min(100, Number(data.score ?? 0)));
+        st.scores[st.phase] = cleanScore(data.score);
         const i = PHASE_ORDER.indexOf(st.phase);
         if (i < PHASE_ORDER.length - 1) st.phase = PHASE_ORDER[i + 1];
       } else if (msg.kind === "goto") {

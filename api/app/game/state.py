@@ -12,6 +12,20 @@ PHASE_ORDER = [
 ROLES = ["commander", "pilot", "engineer", "scientist"]
 
 
+def clean_name(raw: Any, fallback: str = "Astronaut") -> str:
+    """Names are trimmed, capped at 24 chars and never empty (mirrored in reducer.ts)."""
+    name = str(raw).strip()[:24] if isinstance(raw, str) else ""
+    return name or fallback
+
+
+def clean_score(raw: Any) -> float:
+    try:
+        v = float(raw or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0.0, min(100.0, v)) if v == v else 0.0  # NaN -> 0
+
+
 def new_state(room: str, mode: str) -> dict[str, Any]:
     return {"room": room, "mode": mode, "phase": "select", "players": [],
             "scores": {}, "phaseData": {}, "version": 0}
@@ -26,19 +40,23 @@ def apply(s: dict[str, Any], player_id: str, msg: dict[str, Any]) -> dict[str, A
     if t == "join":
         if me:
             me["connected"] = True
-            me["name"] = msg.get("name") or me["name"]
+            me["name"] = clean_name(msg.get("name"), me["name"])
         else:
             if st["mode"] == "solo" and len(st["players"]) >= 1:
                 # A new tab/device takes over a solo game whose player has left.
                 if st["players"][0]["connected"]:
                     return "Solo room is full"
-                st["players"][0].update(id=msg["id"], name=str(msg.get("name", "Astronaut"))[:24], connected=True)
+                st["players"][0].update(id=msg["id"], name=clean_name(msg.get("name")), connected=True)
                 st["version"] += 1
                 return st
             if len(st["players"]) >= 4:
                 return "Room is full (4 astronauts max)"
-            st["players"].append({"id": msg["id"], "name": str(msg.get("name", "Astronaut"))[:24],
+            st["players"].append({"id": msg["id"], "name": clean_name(msg.get("name")),
                                   "connected": True, "isHost": len(st["players"]) == 0})
+        # Never leave a room without a connected host: the (re)joining player takes over.
+        if not any(p["isHost"] and p["connected"] for p in st["players"]):
+            for p in st["players"]:
+                p["isHost"] = p["id"] == msg["id"]
     elif t == "pick_role":
         if not me:
             return "Join first"
@@ -57,12 +75,14 @@ def apply(s: dict[str, Any], player_id: str, msg: dict[str, Any]) -> dict[str, A
         if msg.get("phase") != st["phase"]:
             return f"Not in phase {msg.get('phase')}"
         kind, data = msg.get("kind"), msg.get("data") or {}
+        if not isinstance(data, dict):
+            return "Bad action data"
         if kind == "patch":
             st["phaseData"][st["phase"]] = {**st["phaseData"].get(st["phase"], {}), **data}
         elif kind == "set_plan":
             st["plan"] = data.get("plan")
         elif kind == "complete":
-            st["scores"][st["phase"]] = max(0, min(100, float(data.get("score", 0) or 0)))
+            st["scores"][st["phase"]] = clean_score(data.get("score", 0))
             i = PHASE_ORDER.index(st["phase"])
             if i < len(PHASE_ORDER) - 1:
                 st["phase"] = PHASE_ORDER[i + 1]
@@ -98,4 +118,14 @@ def disconnect(s: dict[str, Any], player_id: str) -> dict[str, Any]:
             for p in st["players"]:
                 p["isHost"] = p is nxt
     st["version"] += 1
+    return st
+
+
+def release_role(s: dict[str, Any], player_id: str) -> dict[str, Any]:
+    """A player gone for too long: their role becomes unclaimed (the host plays it via actsAs)."""
+    st = copy.deepcopy(s)
+    for p in st["players"]:
+        if p["id"] == player_id and not p["connected"] and "role" in p:
+            p.pop("role")
+            st["version"] += 1
     return st
