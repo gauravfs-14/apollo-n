@@ -16,9 +16,10 @@ for (let i = 0; i < 4; i++) {
   await p.reload();
 }
 p.setDefaultTimeout(4000);
-const click = async (t) => { await p.getByText(t, { exact: false }).first().click({ force: true }).catch((e) => errs.push("click " + t)); await p.waitForTimeout(250); };
+const click = async (t) => { await p.locator("button", { hasText: new RegExp("^\\s*" + t) }).first().click({ force: true }).catch((e) => errs.push("click " + t)); await p.waitForTimeout(250); };
 if (phase === "build") {
-  for (const [slot, part] of [["Engine", "Hydrolox bell"], ["Power", "RTG + battery"], ["Payload", "Ice drill"], ["Landing legs", "Wide splayed"], ["Radio", "High-gain dish"]]) { await click(slot); await click(part); }
+  const picks = process.env.PICKS ? JSON.parse(process.env.PICKS) : [["Engine", "Hydrolox bell"], ["Power", "RTG + battery"], ["Payload", "Ice drill"], ["Landing legs", "Wide splayed"], ["Radio", "High-gain dish"]];
+  for (const [slot, part] of picks) { await click(slot); await click(part); }
 }
 if (phase === "drop") { await p.waitForTimeout(5500); await click("Open crate"); await p.waitForTimeout(Number(process.env.DROPWAIT ?? 4500)); }
 await p.waitForTimeout(500);
