@@ -63,6 +63,12 @@ function groundedY(data: TerrainData, x: number, z: number, q: THREE.Quaternion,
   return y;
 }
 
+/** Hover assist takes over at the current ground speed (no lurch). */
+function holdVelocity(s: LandSim) {
+  s.vcF = s.vx * s.fx + s.vz * s.fz;
+  s.vcR = s.vx * -s.fz + s.vz * s.fx;
+}
+
 function Descent({
   data, ground, P, target, heading, parts, siteName, ringR, onFocus, penalty,
 }: {
@@ -76,6 +82,7 @@ function Descent({
   const revealed = useRevealed("landing");
   const root = useRef<THREE.Group>(null);
   const lights = useRef<THREE.Group>(null);
+  const stopMark = useRef<THREE.Mesh>(null);
   const thr = useRef(0);
   const dust = useRef<DustState>({ x: 0, z: 0, strength: 0 });
   const [sim] = useState(() => newLand(1, target, ground, P, heading)); // one flight per mount: a quality change must not restart it
@@ -116,18 +123,47 @@ function Descent({
       if (first) Object.assign(sim, { x, y, z, vx, vy, vz, lf, lr, thr: th });
     },
     (c) => {
-      if (c.k === "auto" && !sim.down) { sim.auto = true; sim.hover = true; sim.assisted ||= !P.autoAvail; }
+      if (c.k === "auto" && !sim.down) { sim.auto = true; sim.hover = true; sim.assisted ||= !P.autoFree; }
     },
   );
   const reqRef = useRef(sync.sendCmd);
   useEffect(() => { reqRef.current = sync.sendCmd; });
 
   useEffect(() => installKeys(), []);
+  // camera: drag (or double-click to lock the mouse) to look around the lander, wheel to zoom
+  const gl = useThree((x) => x.gl);
+  const view = useMemo(() => ({ yaw: 0, pitch: 0, zoom: 1 }), []);
+  useEffect(() => {
+    const el = gl.domElement;
+    let drag = false;
+    const down = (e: PointerEvent) => { drag = true; el.setPointerCapture?.(e.pointerId); };
+    const up = (e: PointerEvent) => { drag = false; el.releasePointerCapture?.(e.pointerId); };
+    const move = (e: PointerEvent) => {
+      if (!drag && document.pointerLockElement !== el) return;
+      view.yaw += e.movementX * 0.005;
+      view.pitch = clamp(view.pitch + e.movementY * 0.004, -0.15, 0.9);
+    };
+    const dbl = () => { if (document.pointerLockElement !== el) void el.requestPointerLock?.()?.catch?.(() => {}); };
+    const wheel = (e: WheelEvent) => { view.zoom = clamp(view.zoom * Math.exp(e.deltaY * 0.001), 0.45, 2.2); };
+    el.addEventListener("pointerdown", down);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointermove", move);
+    el.addEventListener("dblclick", dbl);
+    el.addEventListener("wheel", wheel, { passive: true });
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("dblclick", dbl);
+      el.removeEventListener("wheel", wheel);
+      if (document.pointerLockElement === el) document.exitPointerLock();
+    };
+  }, [gl, view]);
   useEffect(() => {
     useLanding.setState({ ready: true, s: null, info, request: (k) => reqRef.current({ k }) });
     // the descent engine is felt through the structure, not a launch roar: a low rumble under the radio
     sfx("rumble", { volume: 0.35 });
-    if (process.env.NODE_ENV !== "production") Object.assign(window, { __landSim: sim, __landTarget: target });
+    if (process.env.NODE_ENV !== "production") Object.assign(window, { __landSim: sim, __landTarget: target, __stopMark: stopMark });
     return () => useLanding.setState({ ready: false, s: null });
   }, [info, sim, target]);
   useEffect(() => {
@@ -150,20 +186,24 @@ function Descent({
       } else {
         const inp = st.inp;
         inp.thr = axis(["KeyS"], ["KeyW"]);
-        inp.lf = axis(["ArrowDown"], ["ArrowUp"]);
-        inp.lr = axis(["ArrowLeft"], ["ArrowRight"]);
+        // arrows are relative to the camera: turn them by the camera's yaw away from the flight heading
+        const kf = axis(["ArrowDown"], ["ArrowUp"]), kr = axis(["ArrowLeft"], ["ArrowRight"]);
+        const cy = Math.cos(view.yaw), sy = Math.sin(view.yaw);
+        inp.lf = kf * cy - kr * sy;
+        inp.lr = kf * sy + kr * cy;
         inp.cut = held("KeyX");
         inp.full = held("ShiftLeft", "ShiftRight");
         if (take("KeyH") && P.hoverAvail && !sim.auto) {
           sim.hover = !sim.hover;
-          if (sim.hover) sim.vt = clamp(sim.vy, -12, 3);
+          if (sim.hover) { sim.vt = clamp(sim.vy, -12, 3); holdVelocity(sim); }
         }
         if (take("KeyP") && P.autoAvail) {
           sim.auto = !sim.auto;
           sim.hover = sim.auto || P.hoverAvail;
+          if (sim.auto) sim.assisted ||= !P.autoFree;
         }
         const touched = inp.thr !== 0 || inp.lf !== 0 || inp.lr !== 0 || inp.cut;
-        if (sim.auto && touched) { sim.auto = false; sim.hover = P.hoverAvail; sim.vt = clamp(sim.vy, -12, 3); }
+        if (sim.auto && touched) { sim.auto = false; sim.hover = P.hoverAvail; sim.vt = clamp(sim.vy, -12, 3); holdVelocity(sim); }
         stepLand(sim, dt, inp, ground, P, target);
       }
     } else if (!pilot && st.tgt && !sim.down) {
@@ -293,22 +333,36 @@ function Descent({
       onFocus(sim.x, sim.z);
     }
 
+    // ---- where the lander comes to rest if the pilot lets go now (hover assist braking at full lean)
+    const sm = stopMark.current;
+    if (sm) {
+      sm.visible = !sim.down && alt > 1.5 && vh > 0.3;
+      if (sm.visible) {
+        const brake = G * Math.tan(P.maxLean * 0.85);
+        const k = vh / (2 * brake);
+        const px = sim.x + hvx * k, pz = sim.z + hvz * k;
+        sm.position.set(px, data.heightAt(px, pz) + 0.4, pz);
+        sm.scale.setScalar(clamp(0.6 + alt / 120, 1, 3)); // stays readable from high up
+      }
+    }
+
     // ---- camera: chase behind and above, looking toward the zone; low and to the side once down
     cam.near = 0.3;
     const fxh = sim.fx, fzh = sim.fz;
     const gy = data.heightAt(sim.x, sim.z);
     if (!sim.down) {
-      const d = clamp(40 + 0.2 * alt, 40, 95);
-      const u = clamp(8 + 0.16 * alt, 8, 45);
-      st.want.set(sim.x - fxh * d, sim.y + u, sim.z - fzh * d);
+      const d = clamp(40 + 0.2 * alt, 40, 95) * view.zoom;
+      const u = clamp(8 + 0.16 * alt, 8, 45) * view.zoom + view.pitch * d;
+      const a = Math.atan2(fzh, fxh) + view.yaw;
+      st.want.set(sim.x - Math.cos(a) * d, sim.y + u, sim.z - Math.sin(a) * d);
       st.want.y = Math.max(st.want.y, data.heightAt(st.want.x, st.want.z) + 4);
       // aim between the lander and the landing zone, so the zone is in frame during the approach
-      const w = 0.35 * ss(8, 60, alt);
+      const w = 0.35 * ss(8, 60, alt) * Math.max(0, Math.cos(view.yaw)); // only while the camera faces the zone
       st.look.set(sim.x + (target.x - sim.x) * w, sim.y + (data.heightAt(target.x, target.z) - sim.y) * w * 0.9 + 2, sim.z + (target.z - sim.z) * w);
     } else {
       st.orbit += dt * 0.12;
-      const a = Math.atan2(fzh, fxh) + Math.PI + 0.9 + st.orbit;
-      const rad = sim.result?.reason === "tipped" ? 46 : 36;
+      const a = Math.atan2(fzh, fxh) + Math.PI + 0.9 + st.orbit + view.yaw;
+      const rad = (sim.result?.reason === "tipped" ? 46 : 36) * view.zoom;
       st.want.set(sim.x + Math.cos(a) * rad, 0, sim.z + Math.sin(a) * rad);
       st.want.y = data.heightAt(st.want.x, st.want.z) + 4;
       st.look.set(sim.x, gy + 3, sim.z);
@@ -369,6 +423,11 @@ function Descent({
       {/* the landing zone: a beam to find it from far away, a ring on the ground at the scale of the lander, and the wider scatter ring */}
       {!landed && <Beacon position={[target.x, tgtY, target.z]} color="#b87a14" height={140} size={5} />}
       <GroundRing data={data} x={target.x} z={target.z} radius={15} width={0.8} color="#ffb020" opacity={0.75} tone={1.3} />
+      {/* predicted stop point: where the drift ends if you let go of the arrows */}
+      <mesh ref={stopMark} rotation={[-Math.PI / 2, 0, 0]} renderOrder={4} visible={false}>
+        <ringGeometry args={[4, 5.2, 48]} />
+        <meshBasicMaterial color={[2.2, 2.2, 2.2]} transparent opacity={0.85} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} polygonOffset polygonOffsetFactor={-4} />
+      </mesh>
       <GroundRing data={data} x={target.x} z={target.z} radius={ringR} width={0.7} color="#6fd3ff" opacity={0.4} tone={1.2} segments={160} />
     </>
   );

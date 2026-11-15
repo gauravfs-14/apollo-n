@@ -40,6 +40,8 @@ export interface LandParams {
   hoverAvail: boolean;
   hoverDefault: boolean;
   autoAvail: boolean;
+  /** the autopilot is part of easy mode; on normal and hard using it caps the score */
+  autoFree: boolean;
   /** footpad ring radius (m) */
   padR: number;
 }
@@ -56,8 +58,9 @@ export function landParams(d: Difficulty | undefined, o: { limitDeg: number; del
     limit: o.limitDeg * k,
     fuel0: 120 * (0.88 + 0.12 * (o.deltaV / 2900)) * fuelK * o.fuelMult,
     hoverAvail: d !== "hard",
-    hoverDefault: d === "easy",
-    autoAvail: d === "easy",
+    hoverDefault: d !== "hard",
+    autoAvail: true,
+    autoFree: d === "easy",
     padR: o.padR,
   };
 }
@@ -103,6 +106,8 @@ export interface LandSim {
   fuel: number;
   /** hover assist: target vertical speed */
   vt: number;
+  /** hover assist: commanded ground speed forward / right (m/s), set by the arrows; zero = hold position */
+  vcF: number; vcR: number;
   hover: boolean;
   auto: boolean;
   /** heading the controls are relative to: unit (x, z) */
@@ -132,7 +137,7 @@ export function newLand(att: number, target: { x: number; z: number }, ground: G
   sx = clamp(sx, -lim, lim); sz = clamp(sz, -lim, lim);
   const y0 = Math.max(ground.h(sx, sz), ground.h(target.x, target.z)) + 300;
   return {
-    att, t: 0, x: sx, y: y0, z: sz, vx: fx * 15, vy: -8, vz: fz * 15, lf: -0.2, lr: 0, cf: 0, cr: 0, thr: 0.4, thrCmd: 0.4, fuel: P.fuel0, vt: -8,
+    att, t: 0, x: sx, y: y0, z: sz, vx: fx * 15, vy: -8, vz: fz * 15, lf: -0.2, lr: 0, cf: 0, cr: 0, thr: 0.4, thrCmd: 0.4, fuel: P.fuel0, vt: -8, vcF: 15, vcR: 0,
     hover: P.hoverDefault, auto: false, fx, fz, alt: 300, contact: false, fuelOutAt: -1, down: false, tDown: -1, result: null, retries, assisted: false,
   };
 }
@@ -226,10 +231,11 @@ export function autopilot(s: LandSim, target: { x: number; z: number }) {
 }
 
 const H = 1 / 120;
+const VC_MAX = 10; // m/s: top ground speed the arrows ask for under the hover assist
 
 /** Hold a key and the commanded lean grows (46 deg/s); release and it relaxes back to level. */
 function ramp(v: number, axis: number, max: number, h: number) {
-  if (axis !== 0) return clamp(v + axis * 0.8 * h * (Math.sign(v) === -axis ? 2 : 1), -max, max);
+  if (axis !== 0) return clamp(v + axis * 0.8 * h * (v * axis < 0 ? 2 : 1), -max, max);
   return v - Math.sign(v) * Math.min(Math.abs(v), 1.5 * h);
 }
 
@@ -254,6 +260,19 @@ function sub(s: LandSim, h: number, inp: LandInput, ground: Ground, P: LandParam
     cLf = c.lf; cLr = c.lr; s.vt = c.vt;
   } else if (hovering) {
     s.vt = clamp(s.vt + inp.thr * 3.5 * h, -12, 3);
+    // velocity control, like a translation hand controller: the arrows ask for a ground speed in that direction,
+    // letting go asks for zero; the computer leans the lander to get there (no drift to catch by hand)
+    const step = 6 * h;
+    s.vcF += clamp(inp.lf * VC_MAX - s.vcF, -step, step);
+    s.vcR += clamp(inp.lr * VC_MAX - s.vcR, -step, step);
+    const rx = -s.fz, rz = s.fx;
+    const vF = s.vx * s.fx + s.vz * s.fz, vR = s.vx * rx + s.vz * rz;
+    const aF = clamp(1.1 * (s.vcF - vF), -2, 2), aR = clamp(1.1 * (s.vcR - vR), -2, 2);
+    const am = Math.hypot(aF, aR);
+    const lean = Math.min(Math.atan2(am, G), P.maxLean * 0.85);
+    cLf = am > 1e-6 ? (lean * aF) / am : 0;
+    cLr = am > 1e-6 ? (lean * aR) / am : 0;
+    s.cf = cLf; s.cr = cLr; // hand back smoothly if the assist is switched off
   }
   // attitude: first-order response, rate limited
   s.lf += clamp((cLf - s.lf) / P.tau, -1.2, 1.2) * h;
@@ -267,7 +286,7 @@ function sub(s: LandSim, h: number, inp: LandInput, ground: Ground, P: LandParam
     s.thrCmd = clamp((G + 2.0 * (vt - s.vy)) / (P.aMax * Math.max(0.5, up[1])), 0, 1);
     if (inp.cut) { s.hover = false; s.auto = false; s.thrCmd = 0; }
   } else {
-    s.thrCmd = inp.cut ? 0 : clamp(s.thrCmd + (inp.thr + (inp.full ? 1.2 : 0)) * 0.5 * h, 0, 1);
+    s.thrCmd = inp.cut ? 0 : clamp(s.thrCmd + (inp.thr + (inp.full ? 1.2 : 0)) * 0.9 * h, 0, 1);
   }
   if (s.fuel <= 0) s.thrCmd = 0;
   s.thr += (s.thrCmd - s.thr) * Math.min(1, h / 0.25);

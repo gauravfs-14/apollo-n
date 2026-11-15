@@ -110,12 +110,18 @@ export function LandingHud() {
                 [["W", "S"], s.hover || s.auto ? "Sink rate: less / more" : "Throttle up / down"],
                 [["Shift"], "Full throttle (hold)"],
                 [["X"], "Engine cut"],
-                [["Up", "Down"], "Lean forward / back"],
-                [["Left", "Right"], "Lean left / right"],
+                ...(s.hover && !s.auto
+                  ? [[["Arrows"], "Fly that way (let go and it stops drifting)"] as [string[], string]]
+                  : [[["Up", "Down"], "Lean forward / back"] as [string[], string], [["Left", "Right"], "Lean left / right"] as [string[], string]]),
+                [["Drag"], "Look around (double-click locks the mouse, wheel zooms)"],
                 ...(info.hoverAvail ? [[["H"], "Hover assist"] as [string[], string]] : []),
-                ...(info.autoAvail ? [[["P"], "Autopilot (any key takes over)"] as [string[], string]] : []),
+                ...(info.autoAvail ? [[["P"], diff === "easy" ? "Autopilot (any key takes over)" : "Autopilot (any key takes over, caps the score at 60)"] as [string[], string]] : []),
               ]}
-              note="Leaning tilts the thrust, so lean toward where you want to go and the other way to stop. Touch down slowly, level, on the ring."
+              note={
+                s.hover && !s.auto
+                  ? "Arrows follow the camera. The computer tilts the lander for you and holds your sink rate. The white ring shows where you stop if you let go: put it on the orange ring, then come down slowly."
+                  : "Leaning tilts the thrust, so lean toward where you want to go and the other way to stop. Arrows follow the camera. Touch down slowly, level, on the ring."
+              }
             />
           ) : (
             <Panel className="w-64 !p-3 text-xs text-dim">The pilot is flying the lander.</Panel>
