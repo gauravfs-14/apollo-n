@@ -17,6 +17,11 @@ import { isRevealed } from "../../core/loading";
 import { traceEvent } from "../../core/comms";
 
 const G = 1.62;
+const JUMP_BUFFER = 0.18; // s: Space pressed this early before landing still jumps
+const COYOTE = 0.14; // s: Space still jumps this long after walking off the ground
+const JUMP_V = 2.7; // m/s: constant take-off speed -> constant 2.25 m jump in 1/6 g
+const WALK_V = 2.3;
+const RUN_V = 6.0;
 const EXIT_DUR = 5.6;
 const FOOT = 4.3; // end of the ladder climb
 const tmpN = new THREE.Vector3();
@@ -34,10 +39,11 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
   const group = useRef<THREE.Group>(null);
   const { gl, camera } = useThree();
   const [pose, setPose] = useState<AvatarPose>("idle");
+  const [animSpeed, setAnimSpeed] = useState(1);
   const poseRef = useRef<AvatarPose>("idle");
   const lamp = useRef<THREE.PointLight>(null);
   const pivot = useMemo(() => new THREE.Vector3(), []);
-  const state = useRef({ air: 0, ground: 0, sendT: 0, boundaryT: 0, hudT: 0, camInit: false, shadeT: 0, shade: 0, lastX: 0, lastZ: 0, exitSayed: false });
+  const state = useRef({ air: 0, ground: 0, sendT: 0, boundaryT: 0, hudT: 0, camInit: false, shadeT: 0, shade: 0, lastX: 0, lastZ: 0, exitSayed: false, anim: 1, coyote: 0, hop: 0 as 0 | 1 | 2 });
 
   // input
   useEffect(() => {
@@ -45,28 +51,44 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
       const t = e.target as HTMLElement | null;
       return !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
     };
+    // Shift state is re-synced from every event so it can never stay stuck (released off-window, alt-tab, etc.)
+    const syncShift = (e: KeyboardEvent) => {
+      if (!e.shiftKey) rt.keys.ShiftLeft = rt.keys.ShiftRight = false;
+    };
     const down = (e: KeyboardEvent) => {
       if (typing(e)) return;
       unlockAudio();
+      syncShift(e);
       rt.keys[e.code] = true;
       if (e.code === "KeyE") rt.interact = true;
       if (e.code === "Space") {
-        if (rt.exiting) rt.skipExit = true;
-        else rt.jumpPressed = true;
+        // capture phase + preventDefault: a focused HUD button must not swallow Space or scroll the page
+        e.preventDefault();
+        if (!e.repeat) {
+          if (rt.exiting) rt.skipExit = true;
+          else rt.jumpBuf = JUMP_BUFFER; // buffered: still fires if we land within this window
+        }
       }
-      if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault();
+      if (e.code.startsWith("Arrow")) e.preventDefault();
     };
     const up = (e: KeyboardEvent) => {
+      syncShift(e);
       rt.keys[e.code] = false;
       if (e.code === "KeyE") rt.interact = false;
+      if (e.code === "Space" && !typing(e)) e.preventDefault(); // stops a focused button from clicking on release
     };
     const blur = () => {
       rt.keys = {};
       rt.interact = false;
+      rt.jumpBuf = 0;
     };
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
+    const vis = () => {
+      if (document.hidden) blur();
+    };
+    window.addEventListener("keydown", down, true);
+    window.addEventListener("keyup", up, true);
     window.addEventListener("blur", blur);
+    document.addEventListener("visibilitychange", vis);
     const el = gl.domElement;
     let drag = false;
     const pd = (e: PointerEvent) => {
@@ -95,9 +117,10 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
     el.addEventListener("wheel", wheel, { passive: true });
     el.addEventListener("contextmenu", ctx);
     return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
+      window.removeEventListener("keydown", down, true);
+      window.removeEventListener("keyup", up, true);
       window.removeEventListener("blur", blur);
+      document.removeEventListener("visibilitychange", vis);
       el.removeEventListener("pointerdown", pd);
       el.removeEventListener("pointermove", pm);
       el.removeEventListener("pointerup", pu);
@@ -173,7 +196,15 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
     g.rotation.y = rt.rotY;
 
     // pose
-    if (!rt.exiting) setPoseOnce(rt.speed > 0.35 ? "walk" : useSurface.getState().finale ? "wave" : "idle");
+    if (!rt.exiting) {
+      setPoseOnce(rt.speed > 0.35 ? "walk" : useSurface.getState().finale ? "wave" : "idle");
+      // gait follows speed (cadence up to ~2x when sprinting); quantised so React re-renders rarely
+      const a = Math.round((0.5 + 0.28 * Math.max(rt.speed, 1.5)) * 10) / 10;
+      if (a !== s.anim) {
+        s.anim = a;
+        setAnimSpeed(a);
+      }
+    }
 
     // helmet lamp: fades in when the Sun is blocked by terrain (crater floors)
     s.shadeT -= dt;
@@ -212,7 +243,7 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
 
   return (
     <group ref={group}>
-      <Avatar role={role ?? "commander"} pose={pose} speed={pose === "walk" ? 1.15 : 1} />
+      <Avatar role={role ?? "commander"} pose={pose} speed={pose === "walk" ? animSpeed : 1} />
       <pointLight ref={lamp} position={[0, 1.85, 0.45]} intensity={0} distance={22} decay={2} color="#fff0d8" />
     </group>
   );
@@ -221,7 +252,7 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
 function stepPhysics(
   dt: number,
   ground: Ground,
-  s: { air: number; ground: number; boundaryT: number; lastX: number; lastZ: number },
+  s: { air: number; ground: number; boundaryT: number; lastX: number; lastZ: number; coyote: number; hop: 0 | 1 | 2 },
 ) {
   const k = rt.keys;
   const hud = useSurface.getState();
@@ -237,11 +268,14 @@ function stepPhysics(
     mx /= ml;
     mz /= ml;
   }
-  const boost = !locked && (k.ShiftLeft || k.ShiftRight);
+  const boost = !locked && ml > 0 && (k.ShiftLeft || k.ShiftRight);
+  // run factor eases 0..1 so walk <-> sprint blends smoothly
+  rt.run += ((boost ? 1 : 0) - rt.run) * Math.min(1, dt * 3.5);
   ground.normalAt(rt.pos.x, rt.pos.z, tmpN);
   const slopeSlow = 1 - 0.45 * Math.min(1, Math.max(0, (1 - tmpN.y) * 3.5));
-  const maxV = (boost ? 5.0 : 2.3) * slopeSlow;
-  const accel = rt.grounded ? 14 : 2.2;
+  const maxV = (WALK_V + (RUN_V - WALK_V) * rt.run) * slopeSlow;
+  // a lope hop is part of walking, so it keeps full steering/acceleration; a real jump keeps its momentum
+  const accel = rt.grounded || s.hop === 1 ? 8 + 6 * (1 - rt.run) : 2.2;
   const tx = mx * maxV;
   const tz = mz * maxV;
   const stepA = accel * dt;
@@ -259,23 +293,36 @@ function stepPhysics(
     }
   }
 
-  // hop / jump
+  // hop / jump. Walking is a continuous low-gravity lope (auto hops), so the player is airborne much of the time:
+  // a lope hop (hop===1) therefore still counts as "on the ground" for Space. Real jumps (hop===2) cannot be repeated.
   if (rt.grounded) {
-    s.ground += dt;
+    s.coyote = COYOTE;
+    s.hop = 0;
+  } else s.coyote = Math.max(0, s.coyote - dt);
+  if (rt.jumpBuf > 0) rt.jumpBuf = locked ? 0 : rt.jumpBuf - dt;
+  if (rt.grounded) s.ground += dt;
+  const canJump = s.hop !== 2 && (rt.grounded || s.coyote > 0 || s.hop === 1);
+  if (rt.jumpBuf > 0 && canJump) {
+    rt.jumpBuf = 0;
+    rt.vel.y = JUMP_V;
+    if (rt.grounded) addDust(rt.pos.x, rt.pos.y, rt.pos.z, 5, 0.6);
+    rt.grounded = false;
+    s.hop = 2;
+    s.coyote = 0;
+    s.air = 0;
+    rt.jumps++;
+  } else if (rt.grounded) {
     const hs = Math.hypot(rt.vel.x, rt.vel.z);
-    if (rt.jumpPressed && !locked) {
-      rt.vel.y = 2.7;
+    if (hs > 0.5 && s.ground > 0.05) {
+      rt.vel.y = 0.34 + 0.055 * hs + 0.04 * Math.max(0, hs - WALK_V);
       rt.grounded = false;
-    } else if (hs > 0.5 && s.ground > 0.05) {
-      rt.vel.y = 0.34 + 0.055 * hs;
-      rt.grounded = false;
+      s.hop = 1;
       // push-off print from the trailing foot
       const side = (rt.lastStepSide *= -1);
       addFootprint(rt.pos.x + Math.cos(rt.rotY) * 0.13 * side, rt.pos.z - Math.sin(rt.rotY) * 0.13 * side, rt.rotY);
-      addDust(rt.pos.x, rt.pos.y, rt.pos.z, 3, 0.5);
+      addDust(rt.pos.x, rt.pos.y, rt.pos.z, rt.run > 0.5 ? 5 : 3, 0.5);
     }
   }
-  rt.jumpPressed = false;
 
   const prevGround = rt.grounded;
   if (!rt.grounded) {
@@ -357,7 +404,10 @@ function stepPhysics(
     }
   } else if (rt.pos.y > gy + 0.06 && rt.grounded && rt.vel.y <= 0) {
     // walking off a ledge: follow ground if it drops slowly, otherwise go airborne
-    if (rt.pos.y - gy > 0.35) rt.grounded = false;
+    if (rt.pos.y - gy > 0.35) {
+      rt.grounded = false;
+      s.hop = 0;
+    }
     else rt.pos.y = gy;
   }
   rt.speed = Math.hypot(rt.vel.x, rt.vel.z);

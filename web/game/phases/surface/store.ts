@@ -24,6 +24,9 @@ export const rt = {
   stepEvent: 0, // increments on each landing (for footprints/dust)
   lastStepSide: 1,
   jumpPressed: false,
+  jumpBuf: 0, // seconds left on a buffered Space press
+  jumps: 0, // jumps performed (test hook)
+  run: 0, // 0 walk .. 1 sprint (eased)
   skipExit: false,
   atFoot: false, // reached the foot of the ladder (egress radio starts)
   egressDone: false, // "I'm going to step off" said: free to step off
@@ -116,6 +119,8 @@ export function resetRuntime() {
   rt.egressDone = false;
   rt.footHold = 0;
   rt.jumpPressed = false;
+  rt.jumpBuf = 0;
+  rt.run = 0;
 }
 
 if (typeof window !== "undefined") {
