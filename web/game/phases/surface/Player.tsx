@@ -23,7 +23,7 @@ const JUMP_V = 2.7; // m/s: constant take-off speed -> constant 2.25 m jump in 1
 const WALK_V = 2.3;
 const RUN_V = 6.0;
 const EXIT_DUR = 5.6;
-const FOOT = 4.3; // end of the ladder climb
+const CALL_AT = 1.6; // s into the exit: the commander's surface call starts
 const tmpN = new THREE.Vector3();
 const tmpV = new THREE.Vector3();
 const tmpL = new THREE.Vector3();
@@ -98,8 +98,12 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
         el.setPointerCapture?.(e.pointerId);
       }
     };
+    // double-click locks the mouse for free look; Esc releases it (browser default)
+    const dbl = () => {
+      if (document.pointerLockElement !== el) void el.requestPointerLock?.()?.catch?.(() => {});
+    };
     const pm = (e: PointerEvent) => {
-      if (!drag) return;
+      if (!drag && document.pointerLockElement !== el) return;
       rt.camYaw -= e.movementX * 0.0055;
       rt.camPitch = THREE.MathUtils.clamp(rt.camPitch + e.movementY * 0.004, -0.35, 1.25);
     };
@@ -112,6 +116,7 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
     };
     const ctx = (e: Event) => e.preventDefault();
     el.addEventListener("pointerdown", pd);
+    el.addEventListener("dblclick", dbl);
     el.addEventListener("pointermove", pm);
     el.addEventListener("pointerup", pu);
     el.addEventListener("wheel", wheel, { passive: true });
@@ -122,6 +127,8 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
       window.removeEventListener("blur", blur);
       document.removeEventListener("visibilitychange", vis);
       el.removeEventListener("pointerdown", pd);
+      el.removeEventListener("dblclick", dbl);
+      if (document.pointerLockElement === el) document.exitPointerLock();
       el.removeEventListener("pointermove", pm);
       el.removeEventListener("pointerup", pu);
       el.removeEventListener("wheel", wheel);
@@ -146,15 +153,12 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
     if (rt.exiting) {
       if (rt.skipExit) rt.exitT = Math.max(rt.exitT, EXIT_DUR - 0.01);
       if ((hud.ready && isRevealed("surface")) || rt.skipExit) rt.exitT += dt;
-      // at the foot of the ladder the commander describes the surface before stepping off
-      if (rt.exitT >= FOOT && !rt.skipExit && !rt.egressDone) {
-        if (!rt.atFoot) {
-          rt.atFoot = true;
-          traceEvent("astronaut at the foot of the ladder");
-          useSurface.getState().set({ atFoot: true });
-        }
-        rt.footHold += dt;
-        if (rt.footHold < 20) rt.exitT = FOOT;
+      // part way down the ladder the commander starts describing the surface, so the call runs while
+      // he climbs down and steps off in one continuous move (no waiting at the foot for the line to end)
+      if (rt.exitT >= CALL_AT && !rt.atFoot) {
+        rt.atFoot = true;
+        traceEvent("astronaut climbing down the ladder");
+        useSurface.getState().set({ atFoot: true });
       }
       const t = rt.exitT;
       // porch -> ladder top -> down the ladder -> step off

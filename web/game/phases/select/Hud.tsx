@@ -49,10 +49,11 @@ function host(url: string) {
 }
 
 export function SelectHud() {
-  const { isHost, patch, action, complete, state } = useGame();
+  const { isHost, patch, action, complete } = useGame();
   const shared = usePhaseData<SelectData>("select");
   const j = useJourney();
-  const [picked, setPicked] = useState<number | null>(null);
+  // Next level / Retry level from the report lands here with that level already picked, ready to launch
+  const [picked, setPicked] = useState<number | null>(() => useJourneyStore.getState().autoPlay);
   const [busy, setBusy] = useState(false);
   const [more, setMore] = useState(false);
   const [peek, setPeek] = useState<{ level: number; plan: MissionPlan } | null>(null);
@@ -105,13 +106,9 @@ export function SelectHud() {
     [peek, patch, action, complete],
   );
 
-  // Next level / Retry level from the report: start straight away
-  const auto = j.autoPlay;
   useEffect(() => {
-    if (!isHost || !j.hydrated || auto === null || state?.phase !== "select") return;
-    useJourneyStore.getState().setAutoPlay(null);
-    void play(auto);
-  }, [auto, isHost, j.hydrated, state?.phase, play]);
+    if (j.autoPlay !== null) useJourneyStore.getState().setAutoPlay(null);
+  }, [j.autoPlay]);
 
   const plan = peek?.level === selected ? peek.plan : null;
   const best = hostView ? j.done[selected] : undefined;

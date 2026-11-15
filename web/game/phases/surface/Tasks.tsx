@@ -51,10 +51,10 @@ function useEvaComms() {
   const exiting = useSurface((s) => s.exiting);
   const { plan } = useGame();
   const id = plan?.id;
-  // at the foot of the ladder: "Stepping off" releases the step
+  // on the way down the ladder: the commander describes the surface
   const atFoot = useSurface((s) => s.atFoot);
   useEffect(() => {
-    if (atFoot) say(egress(), { once: `egress:${id}`, onDone: () => void (rt.egressDone = true) });
+    if (atFoot) say(egress(), { once: `egress:${id}` });
   }, [atFoot, id]);
   const stepped = useRef(false);
   useEffect(() => {

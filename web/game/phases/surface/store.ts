@@ -28,9 +28,7 @@ export const rt = {
   jumps: 0, // jumps performed (test hook)
   run: 0, // 0 walk .. 1 sprint (eased)
   skipExit: false,
-  atFoot: false, // reached the foot of the ladder (egress radio starts)
-  egressDone: false, // "I'm going to step off" said: free to step off
-  footHold: 0, // seconds held at the foot (capped, so the radio can never trap the player)
+  atFoot: false, // part way down the ladder (egress radio starts)
 };
 
 export interface Guide {
@@ -116,8 +114,6 @@ export function resetRuntime() {
   rt.stepEvent = 0;
   rt.skipExit = false;
   rt.atFoot = false;
-  rt.egressDone = false;
-  rt.footHold = 0;
   rt.jumpPressed = false;
   rt.jumpBuf = 0;
   rt.run = 0;
