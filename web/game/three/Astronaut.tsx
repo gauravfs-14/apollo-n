@@ -204,9 +204,11 @@ export function Astronaut({ role = "commander", accent, pose = "idle", speed = 1
     const t = state.clock.elapsedTime * speed + offset;
     const k = 1 - Math.exp(-dt * 6);
     const cur = w.current;
-    cur.idle += ((pose === "idle" ? 1 : 0) - cur.idle) * k;
-    cur.walk += ((pose === "walk" ? 1 : 0) - cur.walk) * k;
-    cur.wave += ((pose === "wave" ? 1 : 0) - cur.wave) * k;
+    // "wave" stands relaxed with both arms down: the bulky glove never read as a real wave
+    const p = pose === "wave" ? "idle" : pose;
+    cur.idle += ((p === "idle" ? 1 : 0) - cur.idle) * k;
+    cur.walk += ((p === "walk" ? 1 : 0) - cur.walk) * k;
+    cur.wave += (0 - cur.wave) * k;
 
     const breathe = Math.sin(t * 1.6);
     const s = Math.sin(t * 4.6); // walk cycle
