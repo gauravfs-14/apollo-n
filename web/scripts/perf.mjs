@@ -1,11 +1,9 @@
-// Benchmark every phase at high and low quality and write docs/perf.md.
-// Usage: node scripts/perf.mjs [--phases=a,b] [--quality=high,low] [--seconds=6] [--warmup=6000] [--out=../docs/perf.md]
+// Benchmark every phase at high and low quality and write a markdown report (default /tmp/apollo-perf.md).
+// Usage: node scripts/perf.mjs [--phases=a,b] [--quality=high,low] [--seconds=6] [--warmup=6000] [--out=/tmp/apollo-perf.md]
 // Needs the dev servers running (web :3000, api :8000). Uses the real GPU like scripts/shot.mjs.
 // Each visit uses a fresh room (PERF-<phase>-<rand>) and pins the quality tier (no adaptive switching).
 import { chromium } from "playwright";
 import { writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
 
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith("--")).map((a) => a.slice(2).split("=")));
 const ALL = ["select", "build", "drop", "crew", "board", "checklist", "launch", "cruise", "site", "landing", "surface", "report"];
@@ -14,7 +12,7 @@ const qualities = flags.quality ? flags.quality.split(",") : ["high", "low"];
 const seconds = Number(flags.seconds ?? 6);
 const warmup = Number(flags.warmup ?? 6000);
 const base = process.env.WEB_URL ?? "http://localhost:3000";
-const out = flags.out ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../docs/perf.md");
+const out = flags.out ?? "/tmp/apollo-perf.md";
 const [w, h] = (flags.size ?? "1440x900").split("x").map(Number);
 
 // Targets (docs/TEAM.md): high >= 55 fps, p95 < 25 ms, < 300 draw calls, < 1.5M triangles. Low is held to fps and p95 only.

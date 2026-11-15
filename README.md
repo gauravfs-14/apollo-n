@@ -138,40 +138,14 @@ cd web && node scripts/gameplay-video.mjs   # API and web dev server running; wr
 The script plays a full solo mission through the real UI at high quality, records the screen and the game's audio, and draws the pointer, clicks and keys (`scripts/input-overlay.js`, `scripts/audio-tap.js`). `--from=<phase>` records just part of the run.
 `python3 scripts/gameplay-cut.py` cuts that recording to two minutes of long takes joined by short dips to black; its cut list holds the start and end of every take.
 
-<details>
-<summary><b>For contributors: layout, contracts and performance rules</b></summary>
+## Documentation
 
-Full design: [docs/plan.md](docs/plan.md) · Contracts: [docs/hour1-setup.md](docs/hour1-setup.md) · Science notes: [docs/science.md](docs/science.md) · Performance: [docs/perf.md](docs/perf.md)
+Full docs are in [`docs/`](docs/README.md):
 
-### Layout
-
-```
-web/game/core/       store, net (WebSocket + offline solo), PhaseRunner (one shared Canvas), perf, audio, Effects
-web/game/phases/<id> one folder per phase, each exports `phase: PhaseModule`
-web/game/minigames/  reusable puzzles
-web/game/types/      contracts (MissionPlan, GameState, messages)
-web/public/          models/ (glb), textures/, hdri/, terrain/, audio/
-api/app/             routers/ services/ sim/ game/state.py (authoritative reducer)
-shared/              mission-plan.schema.json, fallback-plans/
-assets-src/credits/  license + source of every downloaded asset
-```
-
-### Contracts
-
-- **Phase module**: `{ id, Scene?, Hud, preload?, frameloop? }`. `Scene` renders inside the single shared `<Canvas>`; `Hud` is a 2D overlay (its wrapper is `pointer-events-none`, so add `pointer-events-auto` to interactive panels).
-- **Inside a phase**: `const { state, plan, me, patch, complete, emit, actsAs } = useGame()`. Never mutate state locally.
-  - `patch(phase, data)` merges into `state.phaseData[phase]` (shared with the crew).
-  - `complete(phase, score0to100)` finishes the phase; the server advances.
-  - `emit(kind, data)` broadcasts a transient event; listen with `onServerEvent`.
-  - `actsAs(role)` – true if this player plays that role (solo: all roles; multi: own role + unclaimed roles for the host).
-- **Server reducer**: `api/app/game/state.py` and `web/game/core/reducer.ts` must stay identical in behavior.
-- **Assets**: `.glb`, 1 unit = 1 m, Y-up, `category_name_variant.glb`, compressed (Meshopt + WebP/KTX2), textures ≤ 2K. Record every download in `assets-src/credits/`.
-
-### Performance rules
-
-- One `<Canvas>` for the whole game; never create another.
-- Respect `useQuality()` (`low | medium | high`): DPR cap, shadows, shadow-map size, post effects, instance counts, terrain segments. Quality auto-drops when FPS falls.
-- Instancing for repeated meshes (rocks, debris), no per-frame allocations in `useFrame`, dispose what you create, `frameloop: "demand"` for static phases.
-- Perf numbers per phase live on `window.__apolloPerf`. Target: ≥ 55 fps p95 < 25 ms on an M-series laptop at `high`; ≥ 30 fps at `low` on integrated graphics.
-
-</details>
+- [Getting started](docs/getting-started.md): setup, configuration, controls, deploying
+- [Architecture](docs/architecture.md) and [Multiplayer](docs/multiplayer.md): game state, phases, rooms and the WebSocket protocol
+- [Gameplay](docs/gameplay.md): every phase, its controls and how it is scored
+- [Missions](docs/missions.md): the plan format and how missions are written from the news
+- [API reference](docs/api.md)
+- [Science and data](docs/science.md): NASA datasets, the site score and the Monte Carlo landings
+- [Audio](docs/audio.md), [Development](docs/development.md), [Known issues](docs/known-issues.md)
