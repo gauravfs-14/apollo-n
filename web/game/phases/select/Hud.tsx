@@ -55,7 +55,6 @@ export function SelectHud() {
   // Next level / Retry level from the report lands here with that level already picked, ready to launch
   const [picked, setPicked] = useState<number | null>(() => useJourneyStore.getState().autoPlay);
   const [busy, setBusy] = useState(false);
-  const [more, setMore] = useState(false);
   const [peek, setPeek] = useState<{ level: number; plan: MissionPlan } | null>(null);
   const started = useRef(false);
 
@@ -179,23 +178,18 @@ export function SelectHud() {
         </div>
 
         <div className="mt-3 border-t border-line pt-2.5">
-          <button onClick={() => setMore((m) => !m)} aria-expanded={more} className="text-[12.5px] text-cyan hover:underline">
-            {more ? "Hide details" : "Learn more"}
-          </button>
-          {more && (
-            <div className="mt-2 text-[12.5px] leading-snug text-white/80">
-              {plan ? (
-                <>
-                  <p>{plan.tagline}</p>
-                  <a href={plan.inspired_by.source_url} target="_blank" rel="noreferrer" className="mt-1.5 block text-cyan hover:underline">
-                    Based on: {plan.inspired_by.name} ({host(plan.inspired_by.source_url)})
-                  </a>
-                </>
-              ) : (
-                <p className="text-dim">Every mission is written from recent real lunar news. {st === "locked" ? "Its source is shown once the level opens." : "Loading the source..."}</p>
-              )}
-            </div>
-          )}
+          <div className="text-[12.5px] leading-snug text-white/80">
+            {plan ? (
+              <>
+                <p>{plan.tagline}</p>
+                <a href={plan.inspired_by.source_url} target="_blank" rel="noreferrer" className="mt-1.5 block text-cyan hover:underline">
+                  Based on: {plan.inspired_by.name} ({host(plan.inspired_by.source_url)})
+                </a>
+              </>
+            ) : (
+              <p className="text-dim">Every mission is written from recent real lunar news. {st === "locked" ? "Its source is shown once the level opens." : "Loading the source..."}</p>
+            )}
+          </div>
         </div>
       </aside>
     </div>
