@@ -19,7 +19,9 @@ export const rt = {
   exitT: 0,
   locked: false, // movement locked (repair, finale)
   focus: null as null | { pos: THREE.Vector3; look: THREE.Vector3 },
-  carrying: null as null | "relay",
+  carrying: null as null | "relay" | "sample" | "crate",
+  speedMul: 1, // < 1 while hauling something heavy
+  gather: null as null | { x: number; z: number }, // AI crew walk here for the team photo (solo)
   t0: 0,
   stepEvent: 0, // increments on each landing (for footprints/dust)
   lastStepSide: 1,
@@ -37,6 +39,7 @@ export interface Guide {
   angle: number; // radians relative to camera forward (0 = ahead, + = right)
   dist: number;
   label: string;
+  rough?: boolean; // distance is a rounded hint
 }
 
 export interface SurfaceHud {
@@ -48,6 +51,7 @@ export interface SurfaceHud {
   inventory: string[];
   message: string | null;
   messageId: number;
+  tone: "info" | "bad" | "good";
   guides: Guide[];
   mistakes: number;
   elapsed: number;
@@ -56,9 +60,21 @@ export interface SurfaceHud {
   finale: boolean;
   repair: null | { angle: number; aligned: number };
   boundary: boolean;
+  hazard: boolean; // steep, shadowed ground underfoot
+  card: string | null; // POI id whose field notes are open
+  sight: number | null; // 0..1 while lining up a far marker
+  sightLabel: string | null;
+  poiNear: string | null; // a discovered note within reach (press F)
+  poiFound: number;
+  poiTotal: number;
+  coop: string | null; // one line on a co-op action in progress
+  flash: number; // bumps for a camera flash
+  site: null | { ok: boolean; note: string; slope: number }; // helmet reading of the ground under you (flexible placement tasks)
+  regions: { x: number; z: number; r: number }[]; // hinted areas (tier 2+), shown on the radar
+  reveal: number; // bumps when a task is done (the next objective is revealed)
   ready: boolean;
   set: (p: Partial<SurfaceHud>) => void;
-  say: (text: string) => void;
+  say: (text: string, tone?: "info" | "bad" | "good") => void;
   reset: () => void;
 }
 
@@ -71,6 +87,7 @@ const initial = {
   inventory: [],
   message: null,
   messageId: 0,
+  tone: "info" as const,
   guides: [],
   mistakes: 0,
   elapsed: 0,
@@ -79,13 +96,25 @@ const initial = {
   finale: false,
   repair: null,
   boundary: false,
+  hazard: false,
+  card: null,
+  sight: null,
+  sightLabel: null,
+  poiNear: null,
+  poiFound: 0,
+  poiTotal: 0,
+  coop: null,
+  flash: 0,
+  reveal: 0,
+  site: null,
+  regions: [] as { x: number; z: number; r: number }[],
 };
 
 export const useSurface = create<SurfaceHud>((set) => ({
   ...initial,
   ready: false,
   set: (p) => set(p),
-  say: (text) => set((s) => ({ message: text, messageId: s.messageId + 1 })),
+  say: (text, tone = "info") => set((s) => ({ message: text, tone, messageId: s.messageId + 1 })),
   reset: () => set({ ...initial }),
 }));
 
@@ -112,6 +141,8 @@ export function resetRuntime() {
   rt.locked = false;
   rt.focus = null;
   rt.carrying = null;
+  rt.speedMul = 1;
+  rt.gather = null;
   rt.t0 = performance.now();
   rt.stepEvent = 0;
   rt.skipExit = false;

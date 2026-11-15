@@ -12,16 +12,9 @@ import { Avatar, type AvatarPose } from "./Avatar";
 import type { Ground } from "./ground";
 import { Label } from "./Label";
 import { rolesOf } from "../../core/roles";
+import { remotes } from "./coop";
 import { ROLE_COLOR, rt } from "./store";
 
-interface Remote {
-  x: number;
-  y: number;
-  z: number;
-  rotY: number;
-  t: number;
-}
-const remotes = new Map<string, Remote>();
 
 function NameTag({ name, role }: { name: string; role?: Role }) {
   return <Label text={name} color={ROLE_COLOR[role ?? "commander"]} position={[0, 2.3, 0]} scale={0.026} />;
@@ -85,7 +78,21 @@ function NpcAstronaut({ idx, role, ground }: { idx: number; role: Role; ground: 
     c.t += dt;
     let moving = false;
     if (!rt.exiting) {
-      if (follower) {
+      if (rt.gather) {
+        // team photo: walk to a spot beside the flag and face the camera side
+        const gx = rt.gather.x + (idx === 0 ? -2.3 : 2.3);
+        const gz = rt.gather.z + 1.2;
+        const dx = gx - c.x;
+        const dz = gz - c.z;
+        const d = Math.hypot(dx, dz);
+        if (d > 0.4) {
+          const sp = Math.min(3.6, 1 + d * 0.4);
+          c.x += (dx / d) * sp * dt;
+          c.z += (dz / d) * sp * dt;
+          c.rotY += (Math.atan2(dx, dz) - c.rotY) * Math.min(1, dt * 6);
+          moving = true;
+        } else c.rotY += (Math.atan2(rt.gather.x - c.x, rt.gather.z - c.z) + 0.5 - c.rotY) * Math.min(1, dt * 2);
+      } else if (follower) {
         // trail the player at ~9 m, off to one side
         const side = idx === 1 ? 1 : -1;
         tmp.set(rt.pos.x - Math.sin(rt.rotY) * 9 + Math.cos(rt.rotY) * 3 * side, 0, rt.pos.z - Math.cos(rt.rotY) * 9 - Math.sin(rt.rotY) * 3 * side);
