@@ -21,7 +21,7 @@ Solo or with up to four friends.
 ## Gameplay video
 
 A full solo mission recorded in the game, from the menu to the mission report, cut to two minutes with the game's own music, radio and sound effects.
-Every frame is the real game screen with its HUD; long stretches are sped up (marked on screen), and the mouse pointer, clicks and pressed keys are drawn on top so you can follow what the player does.
+Every frame is the real game screen with its HUD, at normal speed (only the rocket in space and the high part of the descent run faster, marked on screen). The mouse pointer, clicks and pressed keys are drawn on top so you can follow what the player does.
 
 <div align="center">
 
@@ -136,7 +136,7 @@ cd web && node scripts/gameplay-video.mjs   # API and web dev server running; wr
 ```
 
 The script plays a full solo mission through the real UI at high quality, records the screen and the game's audio, and draws the pointer, clicks and keys (`scripts/input-overlay.js`, `scripts/audio-tap.js`). `--from=<phase>` records just part of the run.
-`python3 scripts/gameplay-cut.py` cuts that recording to two minutes; its cut list holds the start, end and speed of every kept stretch.
+`python3 scripts/gameplay-cut.py` cuts that recording to two minutes with short crossfades; its cut list holds the start, end and speed of every kept stretch.
 
 <details>
 <summary><b>For contributors: layout, contracts and performance rules</b></summary>
