@@ -2,7 +2,7 @@
 // Mounts the current phase. ONE shared <Canvas> for the whole game (one WebGL
 // context, no context churn between phases). Quality adapts to measured FPS.
 import { AdaptiveDpr, PerformanceMonitor, useProgress } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { create } from "zustand";
@@ -76,8 +76,15 @@ function PhaseLoading({ visible, phase, status, onForce }: { visible: boolean; p
  * until then PhaseRunner keeps a black veil over the canvas so the hitch happens behind black, not mid-cinematic.
  */
 function SceneGate({ onReady }: { onReady: () => void }) {
-  // Suspense resolved: the scene's assets are in, now warming up
-  useEffect(() => void useSceneStage.setState({ assetsIn: true }), []);
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+  // Suspense resolved: the scene's assets are in, now warming up. compileAsync starts every material's program compiling in
+  // parallel (KHR_parallel_shader_compile) instead of one blocking compile per material on the first rendered frames.
+  useEffect(() => {
+    useSceneStage.setState({ assetsIn: true });
+    gl.compileAsync(scene, camera).catch(() => {});
+  }, [gl, scene, camera]);
   const st = useRef({ frames: 0, quiet: 0, t0: 0, done: false });
   useFrame((_, dt) => {
     const s = st.current;

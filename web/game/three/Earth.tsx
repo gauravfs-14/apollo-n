@@ -63,22 +63,23 @@ void main(){
   float lit = max(ndl, 0.0);
   // soft wrap so the terminator is not razor sharp; slightly warm near it (long atmospheric path)
   vec3 sunCol = mix(vec3(1.0,0.62,0.38), vec3(1.0,0.97,0.92), smoothstep(0.0, 0.35, ndl));
-  vec3 col = albedo * sunCol * (pow(lit, 0.9) * 1.25 + 0.02);
+  vec3 col = albedo * sunCol * (pow(max(lit, 1e-4), 0.9) * 1.25 + 0.02);
   // ocean: darker, glossy
   col *= mix(1.0, 0.82, ocean);
   vec3 H = normalize(sunDir + V);
-  float spec = pow(max(dot(N, H), 0.0), 220.0) * ocean * 0.9 + pow(max(dot(N, H), 0.0), 24.0) * ocean * 0.06;
+  float nh = max(dot(N, H), 1e-4);
+  float spec = pow(nh, 220.0) * ocean * 0.9 + pow(nh, 24.0) * ocean * 0.06;
   col += sunCol * spec * smoothstep(0.0, 0.2, ndl);
   // night lights (warm), faded in as the sun sets
   float nightMask = 1.0 - day;
-  vec3 nl = pow(lights, vec3(1.6)) * vec3(1.0, 0.78, 0.5) * 2.2;
+  vec3 nl = pow(max(lights, vec3(1e-4)), vec3(1.6)) * vec3(1.0, 0.78, 0.5) * 2.2;
   col += nl * nightMask * (1.0 - ocean * 0.6);
   // faint earthshine / ambient on the night side so continents stay readable
   col += albedo * vec3(0.012, 0.018, 0.03) * nightMask;
   // atmosphere limb tint on the surface
-  float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+  float fres = pow(clamp(1.0 - dot(N, V), 1e-4, 1.0), 3.0);
   col += vec3(0.22, 0.45, 1.0) * fres * (0.15 + 0.9 * day) * 0.9;
-  gl_FragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(clamp(col, 0.0, 64.0), 1.0);
   #include <colorspace_fragment>
 }`;
 
@@ -127,15 +128,16 @@ void main(){
   vec3 N = normalize(vN);
   vec3 V = normalize(cameraPosition - vW);
   // backside sphere: normals face away from the camera
-  float rim = pow(clamp(0.55 - dot(N, V), 0.0, 1.0), 3.5);
+  float rim = pow(clamp(0.55 - dot(N, V), 1e-4, 1.0), 3.5);
   float ndl = dot(N, sunDir);
   float day = smoothstep(-0.25, 0.35, ndl);
-  float twilight = exp(-pow((ndl - 0.02) * 4.0, 2.0));
+  float tw = (ndl - 0.02) * 4.0; // pow(negative, 2.0) is NaN on Metal/ANGLE; additive NaN bloomed to a black frame
+  float twilight = exp(-tw * tw);
   vec3 blue = vec3(0.26, 0.52, 1.0);
   vec3 orange = vec3(1.0, 0.45, 0.16);
   vec3 col = mix(blue, orange, twilight * 0.7);
   float a = rim * (0.12 + 0.95 * day);
-  gl_FragColor = vec4(col * a * 1.7, a);
+  gl_FragColor = vec4(max(col * a * 1.7, 0.0), clamp(a, 0.0, 1.0));
   #include <colorspace_fragment>
 }`;
 

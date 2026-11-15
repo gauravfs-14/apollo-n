@@ -25,16 +25,16 @@ const FRAG = /* glsl */ `
     return mix(mix(n(i), n(i+vec2(1,0)), f.x), mix(n(i+vec2(0,1)), n(i+vec2(1,1)), f.x), f.y); }
   void main(){
     float t = vT;
-    float rim = pow(abs(dot(normalize(vN), normalize(vV))), 1.3);
+    float rim = pow(clamp(abs(dot(normalize(vN), normalize(vV))), 1e-4, 1.0), 1.3);
     float flick = 0.75 + 0.25 * vn(vec2(vUv.x * 14.0 + uSeed, t * 7.0 - uTime * 26.0));
     float flick2 = 0.8 + 0.2 * sin(uTime * 41.0 + uSeed);
     float diamonds = 0.82 + 0.18 * sin(t * 44.0 - uTime * 2.0) * (1.0 - t);
-    float body = pow(1.0 - t, 1.25) * smoothstep(0.0, 0.02, t + 0.02);
+    float body = pow(clamp(1.0 - t, 1e-4, 1.0), 1.25) * smoothstep(0.0, 0.02, t + 0.02);
     float a = body * rim * flick * flick2 * diamonds * uLevel;
     vec3 col = mix(uHot, uMid, smoothstep(0.0, 0.35, t));
     col = mix(col, uCool, smoothstep(0.3, 0.9, t));
-    col = mix(col, uHot, pow(rim, 3.0) * (1.0 - t) * 0.6);
-    gl_FragColor = vec4(col * a * 1.6, a);
+    col = mix(col, uHot, pow(max(rim, 1e-4), 3.0) * (1.0 - t) * 0.6);
+    gl_FragColor = vec4(clamp(col * a * 1.6, 0.0, 16.0), clamp(a, 0.0, 1.0));
   }
 `;
 

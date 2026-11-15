@@ -189,6 +189,25 @@ export const decalTexture = (() => {
   return () => (t ??= decalSheet());
 })();
 
+/** Toksvig specular anti-aliasing for normal-mapped metals. A minified crinkle map averages to a shorter-than-unit normal; that
+ *  length loss widens the lobe so sub-pixel folds stop twinkling as the camera moves (the foil "blinking" under a hard Sun). */
+function toksvig<T extends THREE.MeshStandardMaterial>(m: T, key: string): T {
+  m.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace(
+      "#include <normal_fragment_maps>",
+      `#include <normal_fragment_maps>
+      #ifdef USE_NORMALMAP_TANGENTSPACE
+      {
+        float nLen = clamp(length(texture2D(normalMap, vNormalMapUv).xyz * 2.0 - 1.0), 0.05, 1.0);
+        roughnessFactor = min(1.0, sqrt(roughnessFactor * roughnessFactor + 0.5 * (1.0 - nLen) / nLen));
+      }
+      #endif`,
+    );
+  };
+  m.customProgramCacheKey = () => `toksvig-${key}`;
+  return m;
+}
+
 type Mats = {
   gold: THREE.MeshStandardMaterial;
   silver: THREE.MeshStandardMaterial;
@@ -212,8 +231,8 @@ export function shipMaterials(): Mats {
   const brushed = brushedRough();
   const std = (p: THREE.MeshStandardMaterialParameters) => new THREE.MeshStandardMaterial(p);
   cache = {
-    gold: std({ map: goldBlanket(), color: "#ffffff", metalness: 1, roughness: 0.32, normalMap: foilN, normalScale: new THREE.Vector2(1.1, 1.1) }),
-    silver: std({ color: "#d8dde3", metalness: 1, roughness: 0.28, normalMap: foilN, normalScale: new THREE.Vector2(0.8, 0.8) }),
+    gold: toksvig(std({ map: goldBlanket(), color: "#ffffff", metalness: 1, roughness: 0.32, normalMap: foilN, normalScale: new THREE.Vector2(1.1, 1.1) }), "gold"),
+    silver: toksvig(std({ color: "#d8dde3", metalness: 1, roughness: 0.28, normalMap: foilN, normalScale: new THREE.Vector2(0.8, 0.8) }), "silver"),
     alu: std({ color: "#c4c8cc", metalness: 1, roughness: 1, roughnessMap: brushed }),
     white: std({ color: "#c9ccce", metalness: 0.1, roughness: 0.5 }),
     dark: std({ color: "#23262b", metalness: 0.7, roughness: 0.5, roughnessMap: brushed }),

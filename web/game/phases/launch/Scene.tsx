@@ -68,8 +68,9 @@ export function LaunchScene() {
   const spec = useMemo<EmitSpec>(() => ({ pos: [0, 0, 0], posJitter: [0, 0, 0], vel: [0, 0, 0], velJitter: [0, 0, 0], life: 1, size0: 1, size1: 1 }), []);
 
   // the pad haze must not wash out the Moon and Earth (thousands of metres away) once we are in space
+  // The Fog object stays attached (pushed out of range): removing it drops USE_FOG and recompiles every lit material at the cut.
   useEffect(() => {
-    if (space) scene.fog = null;
+    if (space && scene.fog instanceof THREE.Fog) { scene.fog.near = 1e8; scene.fog.far = 2e8; }
   }, [space, scene]);
 
   // camera setup / restore (the Canvas camera is shared by all phases)
@@ -304,10 +305,12 @@ export function LaunchScene() {
   return (
     <>
       <Suspense fallback={null}>
-        {!space && <Environment files={LAUNCH_HDRI} background backgroundBlurriness={0.01} environmentIntensity={0.5} backgroundIntensity={0.75} backgroundRotation={[0, 5.04, 0]} environmentRotation={[0, 5.04, 0]} />}
+        {/* Never unmounted at the cut: dropping scene.environment drops USE_ENVMAP and recompiles every lit material (a ~70 ms
+            freeze mid-cinematic). In space it is silenced instead (intensity 0) and the Starfield sphere draws over its background. */}
+        <Environment files={LAUNCH_HDRI} background backgroundBlurriness={0.01} environmentIntensity={space ? 0 : 0.5} backgroundIntensity={0.75} backgroundRotation={[0, 5.04, 0]} environmentRotation={[0, 5.04, 0]} />
         {/* The space-cut objects are mounted from the start at ~zero scale: their shaders compile and textures upload behind the
             loading veil instead of freezing the page at the 24 s cut. */}
-        <group scale={space ? 1 : 1e-6}>
+        <group ref={unculled} scale={space ? 1 : 1e-6}>
           <Starfield brightness={1.6} />
         </group>
       </Suspense>
@@ -325,7 +328,7 @@ export function LaunchScene() {
 
       {!space && <LaunchPad shadows={q.shadows} />}
 
-      <group scale={space ? 1 : 1e-6}>
+      <group ref={unculled} scale={space ? 1 : 1e-6}>
         <Earth radius={3500} position={[500, -3750, -300]} sun={SPACE_SUN} lite={q.tier === "low"} spin={0.003} />
         <Moon radius={320} position={[7500, 900, -2600]} quality={q.tier === "high" ? "medium" : "low"} />
       </group>
@@ -359,3 +362,10 @@ export function LaunchScene() {
 }
 
 const AXIS_Z = new THREE.Vector3(0, 0, 1);
+
+/** Ref callback: draw these meshes even while off-screen. The pre-mounted space objects sit outside the pad camera's frustum,
+ *  so three culls them and their shaders (for the composer's render-target colour space, which scene.compile cannot match)
+ *  would compile at the cut to space instead of behind the loading screen. */
+function unculled(g: THREE.Group | null) {
+  g?.traverse((o) => { o.frustumCulled = false; });
+}

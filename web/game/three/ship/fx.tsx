@@ -84,7 +84,7 @@ const VERT = /* glsl */ `
     vec2 q = position.xy; q = vec2(q.x*cs - q.y*sn, q.x*sn + q.y*cs);
     vec4 mv = viewMatrix * vec4(p, 1.0);
     mv.xy += q * size;
-    vGlow = aG * pow(1.0 - k, 2.0) + exp(-length(p - uGlowPos) / max(uGlowR, 0.001)) * step(0.0001, uGlowR);
+    vGlow = aG * (1.0 - k) * (1.0 - k) + exp(-length(p - uGlowPos) / max(uGlowR, 0.001)) * step(0.0001, uGlowR);
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -95,12 +95,13 @@ const FRAG = /* glsl */ `
     vec2 c = vUv * 2.0 - 1.0;
     float a = texture2D(uMap, vUv).a;
     float r2 = dot(c, c);
-    vec3 n = normalize(vec3(c, sqrt(max(0.0, 1.0 - r2))));
-    float diff = clamp(dot(n, normalize(uLight)) * 0.5 + 0.5, 0.0, 1.0);
+    vec3 n = normalize(vec3(c, sqrt(max(0.0, 1.0 - r2))) + vec3(0.0, 0.0, 1e-4));
+    float diff = clamp(dot(n, uLight) * 0.5 + 0.5, 0.0, 1.0);
     vec3 col = vC.rgb * (uAmbient + diff * (1.0 - uAmbient)) + uGlowColor * vGlow;
     float fadeIn = smoothstep(0.0, 0.08, vK);
-    float fadeOut = pow(1.0 - vK, 1.3);
+    float fadeOut = pow(clamp(1.0 - vK, 1e-4, 1.0), 1.3);
     float alpha = a * fadeIn * fadeOut * uOpacity;
+    col = clamp(col, 0.0, 32.0);
     if (uAdditive > 0.5) { gl_FragColor = vec4(col * alpha, alpha); } else { gl_FragColor = vec4(col, alpha); }
     if (alpha < 0.003) discard;
     #include <colorspace_fragment>
@@ -160,7 +161,7 @@ export const Particles = forwardRef<ParticlesApi, Props>(function Particles(
         uniforms: {
           uTime: { value: 0 }, uDrag: { value: drag }, uGravity: { value: new THREE.Vector3(...gravity) },
           uGlowPos: { value: new THREE.Vector3(...glowPos) }, uGlowR: { value: glowRadius },
-          uMap: { value: cloudTexture() }, uOpacity: { value: opacity }, uLight: { value: new THREE.Vector3() },
+          uMap: { value: cloudTexture() }, uOpacity: { value: opacity }, uLight: { value: new THREE.Vector3(0, 1, 0) },
           uAmbient: { value: new THREE.Vector3(ambient, ambient, ambient) }, uGlowColor: { value: new THREE.Color(glowColor) },
           uAdditive: { value: additive ? 1 : 0 },
         },
@@ -181,7 +182,7 @@ export const Particles = forwardRef<ParticlesApi, Props>(function Particles(
     if (glowRef) u.uGlowPos.value.copy(glowRef.current); else u.uGlowPos.value.set(...glowPos);
     u.uGlowR.value = glowRadius;
     u.uAmbient.value.setScalar(ambient);
-    lightV.set(...lightDir).transformDirection(state.camera.matrixWorldInverse);
+    lightV.set(...lightDir).transformDirection(state.camera.matrixWorldInverse).normalize(); // pre-normalised: the shader never normalizes a zero uniform
     u.uLight.value.copy(lightV);
   });
 
