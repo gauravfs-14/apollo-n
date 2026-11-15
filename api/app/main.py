@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.middleware.gzip import GZipMiddleware  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
-from app.routers import director, landing, missions, rooms, voice  # noqa: E402
+from app.routers import director, landing, missions, rooms, surface, voice  # noqa: E402
 
 app = FastAPI(title="Apollo N API")
 app.add_middleware(GZipMiddleware, minimum_size=1024)
@@ -23,7 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (missions, landing, director, voice, rooms):
+for r in (missions, landing, director, voice, rooms, surface):
     app.include_router(r.router)
 
 MEDIA = Path(__file__).resolve().parents[1] / "data" / "media"
