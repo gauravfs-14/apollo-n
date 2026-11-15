@@ -11,7 +11,7 @@ Speakers, like real mission audio:
   crew2   the lunar module pilot / recovery    ELEVENLABS_LMP_VOICE_ID   (default: Eric, younger American)
   pao     Launch Control / Apollo Control PAO  ELEVENLABS_PAO_VOICE_ID   (default: Adam, broadcast narrator)
 
-Env: ELEVENLABS_API_KEY, optional ELEVENLABS_MODEL (default eleven_multilingual_v2), ELEVENLABS_SPEED (default 1.12),
+Env: ELEVENLABS_API_KEY, optional ELEVENLABS_MODEL (default eleven_v3), ELEVENLABS_SPEED (default 1.12),
 PUBLIC_API_URL (default: the request's own base URL).
 Any failure returns {url: null} so the game falls back to the system voice and never stalls.
 POST /voice/prefetch synthesizes a mission's lines in the background so playback never waits.
@@ -34,12 +34,14 @@ router = APIRouter()
 log = logging.getLogger("apollo.voice")
 
 VOICE_DIR = Path(__file__).resolve().parents[2] / "data" / "media" / "voice"
-# ElevenLabs premade voices: Bill, Brian, Eric, Adam
+# ElevenLabs Voice Library voices (usable by id, no voices_read scope needed):
+# capcom Jon (warm, grounded), commander JM (husky), LMP Mark (young, conversational),
+# launch control David Castlemore (newsreader)
 DEFAULT_VOICES = {
-    "capcom": "pqHfZKP75CvOlQylNhV4",
-    "crew": "nPczCjzI2devNBz1zQrb",
-    "crew2": "cjVigY5qzO86Huf0OWal",
-    "pao": "pNInz6obpgDQGcFmaJgB",
+    "capcom": "MFZUKuGQUsGJPQjTS4wC",
+    "crew": "EkK5I93UQWFDigLMpZcX",
+    "crew2": "UgBBYS2sOqTuMpoF3BR0",
+    "pao": "XjLkpWUlnhS8i7gGz3lZ",
 }
 VOICE_ENV = {"capcom": "ELEVENLABS_VOICE_ID", "crew": "ELEVENLABS_CREW_VOICE_ID", "crew2": "ELEVENLABS_LMP_VOICE_ID", "pao": "ELEVENLABS_PAO_VOICE_ID"}
 _locks: dict[str, asyncio.Lock] = {}
@@ -74,8 +76,8 @@ def _voice_id(speaker: str) -> str:
 
 
 def _model() -> str:
-    # multilingual_v2: the most natural, steady narration voice, and it supports a speed setting
-    return os.getenv("ELEVENLABS_MODEL") or "eleven_multilingual_v2"
+    # v3: the newest and most human model (no speed setting; set ELEVENLABS_MODEL=eleven_multilingual_v2 for that)
+    return os.getenv("ELEVENLABS_MODEL") or "eleven_v3"
 
 
 def _speed() -> float:
