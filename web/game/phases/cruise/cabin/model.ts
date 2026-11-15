@@ -57,9 +57,12 @@ export interface InitArgs {
   seed: number;
   fx: PerkEffects;
   solo: boolean;
+  /** hangar upgrade: multiplies each hurdle's time limit (1 stock) */
+  timeMult?: number;
 }
 export function initD(a: InitArgs): D {
   const r = mulberry(a.seed * 977 + 13);
+  const tm = a.timeMult ?? 1;
   const base: D = { step: 0, t: 0, st: 0, _help: {} as Record<string, number>, prep: [0, 0, 0], need: 0, score: 0 };
   switch (a.type) {
     case "engine_fault": {
@@ -67,16 +70,16 @@ export function initD(a: InitArgs): D {
       const valves = [0, 0, 0, 0, 0, 1];
       for (const i of [1, 2, 3, 4]) valves[i] = i !== jam && r() < 0.35 ? 1 : 0;
       if (a.fx.engineFaultTime > 1) valves[0] = 1; // spare parts: one valve already set
-      return { ...base, lim: (a.level < 0.3 ? 125 : a.level < 0.6 ? 100 : 80) * a.fx.engineFaultTime, door: 0, valves, jam, wrong: 0, prime: 0, stuckAt: -9, iso: [0, 0], ok: false };
+      return { ...base, lim: (a.level < 0.3 ? 125 : a.level < 0.6 ? 100 : 80) * a.fx.engineFaultTime * tm, door: 0, valves, jam, wrong: 0, prime: 0, stuckAt: -9, iso: [0, 0], ok: false };
     }
     case "solar_storm":
-      return { ...base, lim: (85 - a.level * 28) * a.fx.solarStormTime, wheelA: 0, wheelB: 0, shield: 0, inside: {} as Record<string, number>, npcIn: 0, alarmT: 0, zone: a.fx.solarStormTime > 1 ? 1.3 : 1 };
+      return { ...base, lim: (85 - a.level * 28) * a.fx.solarStormTime * tm, wheelA: 0, wheelB: 0, shield: 0, inside: {} as Record<string, number>, npcIn: 0, alarmT: 0, zone: a.fx.solarStormTime > 1 ? 1.3 : 1 };
     case "nav_correction": {
       const T = [0, 1].map((k) => ({ az: (k ? -1 : 1) * (3.2 + r() * 2.2), el: (k ? 1 : -1) * (1.6 + r() * 2.4) }));
-      return { ...base, lim: 150, T, p: { ax: 0, ay: 0 }, q: { x: 0, y: 0, vx: 0, vy: 0 }, hold: 0, tol: 0.62 - a.level * 0.2, drift: 0.28 + a.level * 0.3, marks: 0, burn: 0, burning: 0, burnTgt: 0.55 + r() * 0.3, burnTry: 0, imu: [0, 0, 0], err: 99, name: ["Canopus", "Sirius"][Math.floor(r() * 2)] };
+      return { ...base, lim: 150 * tm, T, p: { ax: 0, ay: 0 }, q: { x: 0, y: 0, vx: 0, vy: 0 }, hold: 0, tol: 0.62 - a.level * 0.2, drift: 0.28 + a.level * 0.3, marks: 0, burn: 0, burning: 0, burnTgt: 0.55 + r() * 0.3, burnTry: 0, imu: [0, 0, 0], err: 99, name: ["Canopus", "Sirius"][Math.floor(r() * 2)] };
     }
     case "comms_blackout":
-      return { ...base, lim: 130, az: 22 + r() * 8, el: 70 - r() * 8, azT: 40 + r() * 35, elT: 30 + r() * 35, fr: 18, frT: 55, amp: [0, 0], sig: 0, lock: 0, sigma: (11 - a.level * 4) * a.fx.commsWindow, aligned: 0 };
+      return { ...base, lim: 130 * tm, az: 22 + r() * 8, el: 70 - r() * 8, azT: 40 + r() * 35, elT: 30 + r() * 35, fr: 18, frT: 55, amp: [0, 0], sig: 0, lock: 0, sigma: (11 - a.level * 4) * a.fx.commsWindow, aligned: 0 };
     case "debris_field":
       return { ...base, lim: DEBRIS_SECONDS + 60, armed: [0, 0], breaches: [0, 0, 0, 0], bt: [0, 0, 0, 0], nb: 0, hits: 0, ft: 0, fx: 0, fy: 0, fin: 0 };
   }

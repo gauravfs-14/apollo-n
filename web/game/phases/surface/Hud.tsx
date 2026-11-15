@@ -5,6 +5,7 @@ import { useGame } from "../../core/useGame";
 import { buyRepair, PRICES, useSupply } from "../../core/economy";
 import { useMissionHp } from "../../core/hp";
 import { useStore } from "../../core/store";
+import { grade } from "../../core/juice";
 import { Button, Meter, Panel, PhaseTitle } from "../../ui/kit";
 import { phaseLabel } from "../../ui/phaseLabel";
 import type { MissionPlan, Role } from "../../types";
@@ -379,7 +380,11 @@ export function Hud() {
             <div className="text-sm">Taking long? You can head back to the lander and wrap up.</div>
             <div className="mt-2">
               {state?.mode === "solo" || isHost || h.elapsed > limit + 90 ? (
-                <Button onClick={() => complete("surface", scoreNow(state, h.elapsed, h.mistakes))}>Return to lander and finish</Button>
+                <Button onClick={() => {
+                  const score = scoreNow(state, h.elapsed, h.mistakes);
+                  grade("surface", score, { title: "Surface grade", once: `surface:${plan.id}` });
+                  complete("surface", score);
+                }}>Return to lander and finish</Button>
               ) : (
                 <div className="text-xs text-dim">Waiting for the host to end the mission.</div>
               )}

@@ -17,6 +17,7 @@ import {
   altitudeCall, autopilotCall, contactLight, descentStart, driftCall, engineStop, fuelCall, fuelOut, goForLanding, touchdownReport,
 } from "../../data/missionComms";
 import { perkEffects, usePerk } from "../../data/perks";
+import { useUpgrades } from "../../progress/effects";
 import { COST } from "../../core/hp";
 import { setEventGuard } from "../../core/events";
 import { award, grade, miss, slowmo, stinger, timeScale, useCameraShake } from "../../core/juice";
@@ -71,7 +72,7 @@ function Descent({
   data: TerrainData; ground: Ground; P: LandParams; target: { x: number; z: number }; heading: number;
   parts: Record<string, string>; siteName: string; ringR: number; onFocus: (x: number, z: number) => void; penalty: number;
 }) {
-  const { actsAs } = useGame();
+  const { actsAs, patch } = useGame();
   const pilot = actsAs("pilot");
   const { camera } = useThree();
   const cam = camera as THREE.PerspectiveCamera;
@@ -230,6 +231,7 @@ function Descent({
         const hit = r.reason === "crashed" ? [COST.fatal, "The lander crashed"] : r.reason === "tipped" ? [COST.severe, `Tipped over (${r.tilt.toFixed(0)} deg, legs allow ${r.limit.toFixed(0)})`]
           : r.reason === "hard" ? [r.vV > P.vSafe * 1.6 ? COST.severe : COST.major, `Hard landing (${(r.vV * FT).toFixed(0)} ft/s)`] : r.reason === "boulder" ? [COST.major, "A foot landed on a boulder"] : null;
         if (hit) flightDamage(hit[0] as number, hit[1] as string, pilot);
+        if (pilot && r.reason === "ok") patch("landing", { sink: Math.round(r.vV * 100) / 100 }); // personal record: softest landing
         sfx("thunk", { volume: r.reason === "crashed" ? 1 : 0.7 });
         // juice: a PERFECT landing is soft, level and on the ring; anything clean pays by the score
         const perfect = r.reason === "ok" && r.vV <= P.vSafe * 0.6 && r.vH <= 0.8 && r.tilt <= r.limit * 0.4 && r.miss <= 15 && !sim.assisted;
@@ -424,14 +426,15 @@ export function Scene() {
     return best;
   }, [sd.probe, data]);
   const fx = perkEffects(usePerk());
+  const up = useUpgrades(); // hangar fuel tank; the arcade lander never reads this
   const P = useMemo(
     () => landParams(diff, {
       limitDeg: sd.sim?.tilt_limit_deg ?? lander.max_tilt_deg,
       deltaV: shipStats(parts as never).deltaV || 2500,
-      fuelMult: fx.hoverTime,
+      fuelMult: fx.hoverTime * up.fuelMult,
       padR: lander.leg_span_m / 2,
     }),
-    [diff, sd.sim?.tilt_limit_deg, lander.max_tilt_deg, lander.leg_span_m, parts, fx.hoverTime],
+    [diff, sd.sim?.tilt_limit_deg, lander.max_tilt_deg, lander.leg_span_m, parts, fx.hoverTime, up.fuelMult],
   );
   // the boulders drawn around the zone are the ones that can damage a foot (same deterministic list as <Boulders/>)
   const seed = plan?.seed ?? 1;

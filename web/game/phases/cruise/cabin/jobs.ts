@@ -5,6 +5,7 @@ import { create } from "zustand";
 import { say, traceEvent } from "../../../core/comms";
 import { COST, damage } from "../../../core/hp";
 import { earn } from "../../../core/economy";
+import { award, miss } from "../../../core/juice";
 import type { MissionPlan } from "../../../types";
 import { mulberry } from "../flow";
 import { activityResult } from "../comms";
@@ -68,9 +69,10 @@ function pay(id: JobId, ok: boolean, base: number, detail: string, cost = 0, cos
   if (ok) {
     sp = base + (base > 0 ? streakBonus() : 0);
     J.streak = base > 0 ? J.streak + 1 : J.streak;
-    if (sp > 0) earn(sp, `${JOBS[id].title}: ${detail}`);
+    if (sp > 0) { earn(sp, `${JOBS[id].title}: ${detail}`); award(sp * 4, JOBS[id].title); }
   } else {
     J.streak = 0;
+    miss();
   }
   if (cost > 0) damage(cost, costWhy);
   J.acts[id] = ok ? `done:${sp}` : "failed";

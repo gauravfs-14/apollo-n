@@ -25,6 +25,9 @@ import { SEXTANT_FOV } from "./cabin/Stations2";
 import { J, JOBS, JOB_ORDER, available, diagLimit, photoPos, photoWidth, shoot, useJob } from "./cabin/jobs";
 import { jobPos } from "./cabin/objectives";
 import { earn } from "../../core/economy";
+import { useEventGuard } from "../../core/events";
+import { award, grade, miss } from "../../core/juice";
+import { useUpgrades } from "../../progress/effects";
 import { checksDone, debrisHit, hurdleOutcome, hurdleStep } from "./comms";
 import { type CruiseData, HURDLE_META, levelOf, useSeconds } from "./flow";
 import { DEBRIS_SECONDS, rt, setDebris } from "./rt";
@@ -73,6 +76,8 @@ export function CruiseHud() {
   const { state, plan, isHost, me, patch, complete, actsAs } = useGame();
   const perkOwned = usePerk();
   const fx = perkEffects(perkOwned);
+  const timeMultRef = useRef(1);
+  timeMultRef.current = useUpgrades().hurdleTimeMult;
   // dev/test only: ?hurdles=nav_correction,comms_blackout plays those hurdles (cruise scripts use it to cover every type)
   const hurdles = useMemo(() => {
     const q = typeof location !== "undefined" && process.env.NODE_ENV !== "production" ? new URLSearchParams(location.search).get("hurdles") : null;
@@ -119,6 +124,8 @@ export function CruiseHud() {
       const s = Math.max(0, Math.min(100, Math.round(score)));
       traceEvent(`cruise: ${hurdle?.type} finished ${s}`);
       if (s >= 60) earn(s >= 85 ? 15 : 8, `${hurdle ? HURDLE_META[hurdle.type].title : "Hurdle"} ${s >= 85 ? "handled cleanly" : "solved"}`);
+      if (s >= 60) award(s, hurdle ? HURDLE_META[hurdle.type].title : "Hurdle", { tone: s >= 85 ? "amber" : "go" });
+      else miss();
       patch("cruise", { idx, stage: "done", results: [...results.slice(0, idx), s], lastScore: s, lastNote: note ?? "" });
     },
     [patch, idx, results, hurdle?.type],
@@ -133,6 +140,7 @@ export function CruiseHud() {
     if (typeof r === "string") J.acts[id] = r;
   }
   useJob((s) => s.v);
+  useEventGuard(J.active !== null); // a supply job in progress is a critical moment
 
   // --- set up the model whenever the hurdle or stage changes
   useEffect(() => {
@@ -140,7 +148,7 @@ export function CruiseHud() {
     if (H.idx !== idx || H.type !== hurdle.type) resetH(idx, hurdle.type);
     H.checks = stage === "brief" && H.idx === idx ? Array.from(new Set([...H.checks, ...(data.checks ?? [])])) : (data.checks ?? []);
     if (stage === "play") {
-      if (!H.d.step && H.d.t === undefined) H.d = initD({ type: hurdle.type, level, seed, fx, solo: !!solo });
+      if (!H.d.step && H.d.t === undefined) H.d = initD({ type: hurdle.type, level, seed, fx, solo: !!solo, timeMult: timeMultRef.current });
       if (data.hs && data.hs.idx === idx && !actor) adopt(data.hs.d as never);
       if (hurdle.type === "debris_field") {
         rt.seed = seed;
@@ -260,9 +268,11 @@ export function CruiseHud() {
     if (idx + 1 < n) patch("cruise", { idx: idx + 1, stage: "brief", checks: [], hs: null });
     else {
       const all = results.length ? results : [data.lastScore ?? 50];
-      complete("cruise", all.reduce((a, b) => a + b, 0) / all.length);
+      const score = all.reduce((a, b) => a + b, 0) / all.length;
+      grade("cruise", score, { title: "Cruise grade", once: `cruise:${plan?.id}` });
+      complete("cruise", score);
     }
-  }, [patch, complete, idx, n, results, data.lastScore]);
+  }, [patch, complete, idx, n, results, data.lastScore, plan?.id]);
   useEffect(() => {
     if (stage !== "done" || !actor) return;
     const t = setTimeout(advance, 8000);

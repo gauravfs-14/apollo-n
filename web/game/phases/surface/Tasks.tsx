@@ -9,6 +9,8 @@ import { say } from "../../core/comms";
 import { COST, damage } from "../../core/hp";
 import { useStore } from "../../core/store";
 import { useGame } from "../../core/useGame";
+import { award, grade, miss } from "../../core/juice";
+import { useUpgrades } from "../../progress/effects";
 import { fieldNoteFound, goalAchieved, surfaceSlip, surfaceTaskResult, egress, firstStep } from "../../data/missionComms";
 import type { MissionPlan, Role } from "../../types";
 import { hintsUsed, hintTier, watchHintPurchases } from "./hints";
@@ -176,17 +178,20 @@ export function Tasks({ ground }: { ground: Ground }) {
   const { plan, state } = game;
   const sd = surf(state);
   const done = useMemo(() => doneSet(sd), [sd]);
+  const scanRange = useUpgrades().scanRange; // suit scanner upgrade (own hangar)
   const layout = useMemo(() => (plan ? getLayout(plan, ground) : null), [plan, ground]);
   const latest = useRef(game);
   const doneRef = useRef(done);
+  const scanRef = useRef(scanRange);
   useEffect(() => {
     latest.current = game;
     doneRef.current = done;
+    scanRef.current = scanRange;
   });
   useEffect(() => {
     const w = window as unknown as { __surface?: Record<string, unknown> };
-    if (w.__surface) Object.assign(w.__surface, { layout, done: [...done], ground, spots: layout });
-  }, [layout, done, ground]);
+    if (w.__surface) Object.assign(w.__surface, { layout, done: [...done], ground, spots: layout, scanRange });
+  }, [layout, done, ground, scanRange]);
   useEffect(() => {
     clearHolds();
     const un = [listenHolds(), watchHintPurchases()];
@@ -304,7 +309,9 @@ export function Tasks({ ground }: { ground: Ground }) {
     const id = setTimeout(
       () => {
         const st = useSurface.getState();
-        latest.current.complete("surface", scoreNow(useStore.getState().state, st.elapsed, st.mistakes));
+        const score = scoreNow(useStore.getState().state, st.elapsed, st.mistakes);
+        grade("surface", score, { title: "Surface grade", once: `surface:${plan?.id}` });
+        latest.current.complete("surface", score);
       },
       g.isHost || g.state?.mode === "solo" ? 9000 : 16000,
     );
@@ -362,6 +369,7 @@ export function Tasks({ ground }: { ground: Ground }) {
     const d2 = (s: Spot) => Math.hypot(s.x - px, s.z - pz);
     const toast = (msg: string, tone: "info" | "bad" | "good" = "info") => hud.say(msg, tone);
     const patchDone = (id: string, partner?: string) => {
+      award(60, TASK_BY_ID[id]?.title ?? "Objective done", { at: { x: 0.5, y: 0.3 } });
       patchSurface({ [`d_${id}`]: Date.now(), ...(partner ? { [`co_${id}`]: partner } : {}) });
     };
     /** Hold E near a spot to make progress; returns true while in range. */
@@ -388,6 +396,7 @@ export function Tasks({ ground }: { ground: Ground }) {
       if ((p.cooldowns[key] ?? 0) > now) return;
       p.cooldowns[key] = now + cool * 1000;
       hud.set({ mistakes: hud.mistakes + 1 });
+      miss();
       toast(`${msg} Ship integrity -${amount}`, "bad");
       damage(amount, msg);
       beep(180, 0.2, 0.1, "square");
@@ -455,10 +464,10 @@ export function Tasks({ ground }: { ground: Ground }) {
           const sp = L.scan.main;
           const d = d2(sp);
           F.scanDist = d;
-          F.signal = Math.max(0, Math.min(1, 1 - d / 95));
+          F.signal = Math.max(0, Math.min(1, 1 - d / (95 * scanRef.current)));
           p.beepT -= dt;
           if (p.beepT <= 0) {
-            p.beepT = Math.max(0.1, Math.min(1.6, 0.1 + d / 55));
+            p.beepT = Math.max(0.1, Math.min(1.6, 0.1 + d / (55 * scanRef.current)));
             beep(380 + 1100 * F.signal, 0.06, 0.1, "sine");
           }
           const near = d < 3.8;
@@ -467,6 +476,7 @@ export function Tasks({ ground }: { ground: Ground }) {
             if (p.badHold > 1 && !p.badLatch) {
               p.badLatch = true;
               hud.set({ mistakes: hud.mistakes + 1 });
+              miss();
               toast("Nothing here. Follow the beeps: faster means closer.", "bad");
               beep(180, 0.18, 0.1, "square");
             }
@@ -624,6 +634,7 @@ export function Tasks({ ground }: { ground: Ground }) {
               rt.locked = false;
               rt.focus = null;
               hud.set({ mistakes: hud.mistakes + 1 });
+              miss();
               toast("Panel left misaligned. Try again when ready.", "bad");
             }
           } else if (hud.repair) hud.set({ repair: null });
