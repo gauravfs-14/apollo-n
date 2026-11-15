@@ -287,10 +287,12 @@ export function Tasks({ ground }: { ground: Ground }) {
           }
           bars = p.bars;
           const far = Math.hypot(px, pz) > 14;
-          if (hint) guideTo(sp.main.x, sp.main.z, "Open ground toward Earth");
-          prompt = p.bars >= 3 && far ? "Press E to set down and unfold the relay" : "Walk until the signal bars fill. Earth is low on the horizon.";
+          // where no ground in reach gets full signal, the suggested spot (the clearest view there is) will do
+          const good = p.bars >= 3 || (!!sp.weak && Math.hypot(sp.main.x - px, sp.main.z - pz) < 4);
+          if (hint || sp.weak) guideTo(sp.main.x, sp.main.z, "Open ground toward Earth");
+          prompt = good && far ? "Press E to set down and unfold the relay" : sp.weak ? "Earth is barely above the horizon here. Walk to the marked spot, it has the clearest view." : "Walk until the signal bars fill. Earth is low on the horizon.";
           if (eEdge) {
-            if (p.bars >= 3 && far) {
+            if (good && far) {
               rt.carrying = null;
               p.placedAt = performance.now();
               hud.set({ inventory: hud.inventory.filter((i) => i !== "Radio relay") });

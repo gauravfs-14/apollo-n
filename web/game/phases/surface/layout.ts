@@ -10,6 +10,7 @@ export interface TaskSpots {
   main: Spot; // marker / target
   aux?: Spot; // relay: pickup point (main = suggested placement)
   area?: Spot; // scan: the search area center
+  weak?: boolean; // relay: no ground in reach gets full signal, so the suggested spot is the best there is
 }
 
 function flat(ground: Ground, x: number, z: number) {
@@ -65,15 +66,17 @@ export function layoutTasks(plan: MissionPlan, ground: Ground): Record<string, T
         relayN++;
         // best open ground toward Earth: search an annulus, prefer big clearance then near
         let bestScore = -1e9;
-        let best: Spot = { x: Math.sin(EARTH_AZ) * 40, z: Math.cos(EARTH_AZ) * 40 };
-        for (let i = 0; i < 70; i++) {
+        let best: Spot | null = null;
+        let open = { x: Math.sin(EARTH_AZ) * 40, z: Math.cos(EARTH_AZ) * 40, m: -1e9 }; // widest view of Earth found
+        for (let i = 0; i < 240; i++) {
           const a = EARTH_AZ + (rnd() - 0.5) * 2.6;
-          const r = 22 + rnd() * 70;
+          const r = 22 + rnd() * 118;
           const x = Math.sin(a) * r;
           const z = Math.cos(a) * r;
           if (Math.hypot(x - c.x, z - c.z) < c.r * 1.1) continue;
           if (flat(ground, x, z) < 0.93) continue;
           const m = Math.min(ground.earthMargin(x, z, 60), 8);
+          if (m > open.m) open = { x, z, m };
           const score = m * 3 - r * 0.05;
           if (m < 3) continue;
           if (score > bestScore) {
@@ -81,7 +84,8 @@ export function layoutTasks(plan: MissionPlan, ground: Ground): Record<string, T
             best = { x, z };
           }
         }
-        out[t.id] = { main: best, aux: pick };
+        // the old fallback (a fixed point toward Earth) could have no signal at all, making the task impossible
+        out[t.id] = best ? { main: best, aux: pick } : { main: { x: open.x, z: open.z }, aux: pick, weak: open.m < 1.6 };
         break;
       }
       case "repair":
