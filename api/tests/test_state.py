@@ -213,6 +213,31 @@ def test_rate_limit_bucket():
     assert b.allow(0.5)  # 5 tokens refilled
 
 
+def test_damage_fails_mission_at_zero():
+    s = new_state("R", "solo")
+    s = apply(s, "a", {"type": "join", "id": "a", "name": "A"})
+    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "complete", "data": {"score": 100}})
+    assert s["hp"] == 100 and s["phase"] == "build"
+    s = apply(s, "a", {"type": "action", "phase": "build", "kind": "damage", "data": {"amount": 40, "reason": "x"}})
+    assert s["hp"] == 60 and not s["failed"] and s["phase"] == "build"
+    s = apply(s, "a", {"type": "action", "phase": "build", "kind": "damage", "data": {"amount": 70, "reason": "Hull breach"}})
+    assert s["hp"] == 0 and s["failed"] == "Hull breach" and s["phase"] == "report"
+    # once failed, further damage is ignored
+    s2 = apply(s, "a", {"type": "action", "phase": "report", "kind": "damage", "data": {"amount": 5}})
+    assert s2["hp"] == 0 and s2["failed"] == "Hull breach"
+    # reset restores integrity
+    s3 = apply(s, "a", {"type": "action", "phase": "report", "kind": "reset"})
+    assert s3["hp"] == 100 and s3["failed"] is None and s3["phase"] == "select"
+
+
+def test_drop_phase_retired():
+    s = new_state("R", "solo")
+    s = apply(s, "a", {"type": "join", "id": "a", "name": "A"})
+    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "complete", "data": {"score": 100}})
+    s = apply(s, "a", {"type": "action", "phase": "build", "kind": "complete", "data": {"score": 80}})
+    assert s["phase"] == "crew"
+
+
 if __name__ == "__main__":
     fails = 0
     for name, fn in sorted(globals().items()):

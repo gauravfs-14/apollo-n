@@ -6,7 +6,7 @@ import copy
 from typing import Any
 
 PHASE_ORDER = [
-    "select", "build", "drop", "crew", "board", "checklist",
+    "select", "build", "crew", "board", "checklist",  # "drop" (supply crate) retired
     "launch", "cruise", "site", "landing", "surface", "report",
 ]
 ROLES = ["commander", "pilot", "engineer", "scientist"]
@@ -76,7 +76,7 @@ def rebalance(st: dict[str, Any]) -> None:
 
 def new_state(room: str, mode: str) -> dict[str, Any]:
     return {"room": room, "mode": mode, "phase": "select", "players": [],
-            "scores": {}, "phaseData": {}, "version": 0}
+            "scores": {}, "phaseData": {}, "hp": 100, "failed": None, "version": 0}
 
 
 def apply(s: dict[str, Any], player_id: str, msg: dict[str, Any]) -> dict[str, Any] | str:
@@ -138,6 +138,18 @@ def apply(s: dict[str, Any], player_id: str, msg: dict[str, Any]) -> dict[str, A
             i = PHASE_ORDER.index(st["phase"])
             if i < len(PHASE_ORDER) - 1:
                 st["phase"] = PHASE_ORDER[i + 1]
+        elif kind == "damage":
+            # ship integrity: at 0 the mission fails and everyone goes to the report
+            if st.get("failed"):
+                return s
+            try:
+                amount = max(0.0, min(100.0, float(data.get("amount", 0) or 0)))
+            except (TypeError, ValueError):
+                amount = 0.0
+            st["hp"] = max(0.0, float(st.get("hp", 100)) - amount)
+            if st["hp"] <= 0:
+                st["failed"] = str(data.get("reason") or "The ship was lost.")[:160]
+                st["phase"] = "report"
         elif kind == "goto":
             if not me["isHost"]:
                 return "Only the host can jump phases"

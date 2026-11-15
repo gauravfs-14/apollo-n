@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { rolesOf } from "../../core/roles";
 import { MINIGAMES, type MinigameResult } from "../../minigames";
 import { clearComms, say } from "../../core/comms";
+import { COST, damage } from "../../core/hp";
 import { useGame, usePhaseData } from "../../core/useGame";
 import { checklistDone } from "../../data/missionComms";
 import { Button, Panel, Stat } from "../../ui/kit";
@@ -23,6 +24,16 @@ export function ChecklistHud() {
     const t = setTimeout(() => setSkip(true), 45000);
     return () => clearTimeout(t);
   }, []);
+  // every wrong step costs ship integrity (reported once, by whoever is doing the checklist)
+  const mistakes = d.progress?.mistakes ?? 0;
+  const seenMistakes = useRef(0);
+  useEffect(() => {
+    if (!actsAs("commander") || mistakes <= seenMistakes.current) return;
+    damage(COST.minor * (mistakes - seenMistakes.current), "A pre-launch checklist step was done out of order.");
+    seenMistakes.current = mistakes;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to new mistakes only
+  }, [mistakes]);
+
   // checklist done: Launch Control reads the result, then the game moves on to launch by itself
   const finished = !!d.result;
   const advance = useRef(false);

@@ -4,6 +4,7 @@ import { sfx } from "../../core/audio";
 import { useGame, usePhaseData } from "../../core/useGame";
 import { Button, Meter, Panel } from "../../ui/kit";
 import { SLOTS, SLOT_LABEL, evaluateBuild, partsFor, shipStats, type BuildCheck, type BuildParts, type ShipPart } from "../../data/parts";
+import { rollPerk } from "../../data/perks";
 import type { Difficulty, Role, ShipSlot } from "../../types";
 import { phaseLabel } from "../../ui/phaseLabel";
 
@@ -115,7 +116,8 @@ export function BuildHud() {
       sfx("buzz", { volume: 0.4 });
       return;
     }
-    patch("build", { parts, stats: shipStats(parts), final: true, score: ev.score });
+    // the build score earns a perk (the old supply crate), used later by hurdles and the landing
+    patch("build", { parts, stats: shipStats(parts), final: true, score: ev.score, perk: plan ? rollPerk(ev.score, plan.seed) : undefined });
     complete("build", ev.score);
     sfx("chime", { volume: 0.5 });
   };

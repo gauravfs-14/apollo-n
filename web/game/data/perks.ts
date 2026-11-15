@@ -1,6 +1,8 @@
+import { usePhaseData } from "../core/useGame";
 // Supply-drop perks: earned from the build score, seeded (no paid randomness).
-// The Drop phase writes the chosen id to phaseData.drop.perk. Other phases read it with
-//   const perk = usePhaseData<{ perk: PerkId }>("drop").perk;  const fx = perkEffects(perk);
+// The build phase awards a perk when the ship is locked in (phaseData.build.perk; older games
+// stored it under phaseData.drop.perk). Read it with:
+//   const fx = perkEffects(usePerk());
 //
 // Perk ids and effects (multipliers; 1 = no change):
 //   extra_fuel        landing scatter x0.7 (tighter landing spread), +10% hover time     -> fx.landingScatter, fx.hoverTime
@@ -98,3 +100,10 @@ export function rollPerk(score: number, seed: number): PerkId {
 }
 
 export const crateTier = (score: number): Rarity => (score >= 85 ? "legendary" : score >= 55 ? "rare" : "common");
+
+/** The perk this mission earned (awarded at build lock-in). */
+export function usePerk(): PerkId | undefined {
+  const build = usePhaseData<{ perk: PerkId }>("build").perk;
+  const drop = usePhaseData<{ perk: PerkId }>("drop").perk;
+  return build ?? drop;
+}

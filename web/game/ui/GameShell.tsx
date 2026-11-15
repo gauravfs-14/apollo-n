@@ -2,6 +2,7 @@
 // Persistent game chrome on the play page: top bar (room, connection, crew), error toasts,
 // pause/settings menu and the multiplayer lobby card. Sits above every phase HUD.
 import { useRouter } from "next/navigation";
+import { useMissionHp } from "../core/hp";
 import { rolesOf } from "../core/roles";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { disconnect, send } from "../core/net";
@@ -100,6 +101,7 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
             ))}
           </div>
         )}
+        <HpChip />
         <button onClick={onMenu} className="rounded-md px-2 py-1 text-xs text-white/80 hover:bg-white/10 hover:text-white" aria-label="Open menu (Esc)">
           Menu
         </button>
@@ -273,5 +275,37 @@ export function GameShell() {
       <Connecting />
       {menu && <PauseMenu onClose={() => setMenu(false)} />}
     </div>
+  );
+}
+
+/** Ship integrity in the top bar; flashes when the ship takes damage. */
+function HpChip() {
+  const { hp } = useMissionHp();
+  const phase = useStore((s) => s.state?.phase);
+  const [flash, setFlash] = useState(false);
+  const prev = useRef(hp);
+  useEffect(() => {
+    if (hp < prev.current) {
+      setFlash(true);
+      const t = setTimeout(() => setFlash(false), 700);
+      prev.current = hp;
+      return () => clearTimeout(t);
+    }
+    prev.current = hp;
+  }, [hp]);
+  if (!phase || phase === "select") return null;
+  const tone = hp > 60 ? "bg-go" : hp > 30 ? "bg-amber" : "bg-nogo";
+  return (
+    <span
+      className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors ${flash ? "bg-nogo/30" : ""}`}
+      title="Ship integrity: mistakes cost integrity, and at zero the mission is lost"
+      aria-label={`Ship integrity ${Math.round(hp)} percent`}
+    >
+      <span className="text-dim">Ship</span>
+      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
+        <span className={`block h-full ${tone} transition-[width] duration-500`} style={{ width: `${hp}%` }} />
+      </span>
+      <span className="num w-8 text-right text-white">{Math.round(hp)}%</span>
+    </span>
   );
 }

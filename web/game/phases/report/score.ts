@@ -4,7 +4,6 @@ import type { GameState, PhaseId } from "../../types";
 export const SCORED: { id: PhaseId; label: string }[] = [
   { id: "select", label: "Mission select" },
   { id: "build", label: "Ship build" },
-  { id: "drop", label: "Supply drop" },
   { id: "crew", label: "Crew" },
   { id: "board", label: "Boarding" },
   { id: "checklist", label: "Pre-launch checklist" },

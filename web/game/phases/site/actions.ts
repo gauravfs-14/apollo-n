@@ -1,6 +1,7 @@
 "use client";
 // Shared logic for the site phase (used by both the 3D scene and the HUD).
 import { useCallback, useMemo } from "react";
+import { usePerk } from "../../data/perks";
 import { useGame, usePhaseData } from "../../core/useGame";
 import { loadTerrain, missionDateIso, missionTime, type TerrainData } from "../../three/terrain";
 import {
@@ -27,7 +28,7 @@ export function useSiteState() {
   const { plan } = useGame();
   const sd = usePhaseData<SiteData>("site");
   const build = usePhaseData<{ parts: Record<string, string> }>("build");
-  const drop = usePhaseData<{ perk: string }>("drop");
+  const drop = { perk: usePerk() };
   const sites = plan?.destination.candidate_sites ?? [];
   const siteId = sd.site_id ?? sites[0]?.id ?? "site_a";
   const lander = useMemo<LanderSpec>(() => landerFromBuild(build.parts), [build.parts]);

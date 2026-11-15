@@ -17,10 +17,10 @@ export type PhaseId =
   | "surface"
   | "report";
 
+// "drop" (the old supply crate) is no longer played; the build phase awards the perk.
 export const PHASE_ORDER: PhaseId[] = [
   "select",
   "build",
-  "drop",
   "crew",
   "board",
   "checklist",
@@ -142,11 +142,15 @@ export interface GameState {
   players: Player[];
   scores: Partial<Record<PhaseId, number>>;
   phaseData: Partial<Record<PhaseId, Record<string, unknown>>>;
+  /** Ship integrity 0..100: mistakes cost HP; at 0 the mission fails. */
+  hp?: number;
+  /** Why the mission failed (set when hp reached 0), else absent. */
+  failed?: string | null;
   version: number;
 }
 
 // ---- Wire messages (WebSocket /ws/rooms/{code}) ----
-export type ActionKind = "patch" | "set_plan" | "complete" | "goto" | "reset";
+export type ActionKind = "patch" | "set_plan" | "complete" | "goto" | "reset" | "damage";
 
 export type ClientMsg =
   | { type: "join"; id: string; name: string; rejoin?: boolean }

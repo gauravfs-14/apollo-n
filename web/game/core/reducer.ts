@@ -16,7 +16,7 @@ export function cleanScore(raw: unknown): number {
 }
 
 export function newState(room: string, mode: GameState["mode"]): GameState {
-  return { room, mode, phase: "select", players: [], scores: {}, phaseData: {}, version: 0 };
+  return { room, mode, phase: "select", players: [], scores: {}, phaseData: {}, hp: 100, failed: null, version: 0 };
 }
 
 export function apply(s: GameState, playerId: string, msg: ClientMsg): GameState | string {
@@ -69,6 +69,15 @@ export function apply(s: GameState, playerId: string, msg: ClientMsg): GameState
         st.scores[st.phase] = cleanScore(data.score);
         const i = PHASE_ORDER.indexOf(st.phase);
         if (i < PHASE_ORDER.length - 1) st.phase = PHASE_ORDER[i + 1];
+      } else if (msg.kind === "damage") {
+        // ship integrity: at 0 the mission fails and everyone goes to the report
+        if (st.failed) return s;
+        const amount = Math.max(0, Math.min(100, Number(data.amount) || 0));
+        st.hp = Math.max(0, (st.hp ?? 100) - amount);
+        if (st.hp <= 0) {
+          st.failed = String(data.reason ?? "The ship was lost.").slice(0, 160);
+          st.phase = "report";
+        }
       } else if (msg.kind === "goto") {
         if (!me.isHost) return "Only the host can jump phases";
         const target = data.phase as GameState["phase"];
