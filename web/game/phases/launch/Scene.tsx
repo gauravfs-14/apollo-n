@@ -8,11 +8,10 @@
 //   36-44 s  translunar injection burn with the Moon ahead
 import { Environment } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Howler } from "howler";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Effects } from "../../core/Effects";
-import { sfx, speak } from "../../core/audio";
+import { sfx, speak, stopSfx } from "../../core/audio";
 import { useQuality } from "../../core/perf";
 import { useGame } from "../../core/useGame";
 import { Earth } from "../../three/Earth";
@@ -82,7 +81,7 @@ export function LaunchScene() {
       persp.fov = fov;
       persp.updateProjectionMatrix();
       scene.fog = null;
-      Howler.stop();
+      stopSfx();
     };
   }, [persp, scene, st]);
 

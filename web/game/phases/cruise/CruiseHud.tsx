@@ -3,6 +3,7 @@
 // Cruise HUD: runs plan.cruise hurdles in order. Briefing -> play -> score card, driven by phaseData.cruise.
 import { useCallback, useEffect, useRef } from "react";
 import { speak, stopVoice } from "../../core/audio";
+import { setMusicOverride } from "../../core/music";
 import { usePhaseData, useGame } from "../../core/useGame";
 import { perkEffects, PERKS, type PerkId } from "../../data/perks";
 import { Button, Panel, PhaseTitle } from "../../ui/kit";
@@ -89,6 +90,11 @@ export function CruiseHud() {
     if (hurdle && stage === "brief") speak(hurdle.story, `cruise_${idx}`);
     return () => stopVoice();
   }, [hurdle, idx, stage]);
+
+  useEffect(() => {
+    setMusicOverride(stage === "play" ? "hurdle" : null);
+  }, [stage]);
+  useEffect(() => () => setMusicOverride(null), []);
 
   const start = useCallback(() => patch("cruise", { idx, stage: "play", results }), [patch, idx, results]);
   const finish = useCallback(

@@ -6,6 +6,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Suspense, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import type { PhaseModule } from "../types";
+import { PHASE_TRACK, setBaseMusic, setMusicOverride } from "./music";
 import { getLoadedPhase, loadPhase, preloadAssets, preloadNext } from "./phases";
 import { PerfOverlay, PerfProbe, QUALITY } from "./perf";
 import { useStore, type Quality } from "./store";
@@ -49,6 +50,11 @@ export function PhaseRunner() {
   const quality = useStore((s) => s.quality);
   const setQuality = useStore((s) => s.setQuality);
   const [mod, setMod] = useState<PhaseModule | null>(() => getLoadedPhase(phaseId) ?? null);
+
+  useEffect(() => {
+    setMusicOverride(null);
+    setBaseMusic(PHASE_TRACK[phaseId]);
+  }, [phaseId]);
 
   // shader compiles and asset uploads at a phase start dip the FPS; don't let that drop the quality tier
   const phaseStart = useRef(0);

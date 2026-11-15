@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/game/core/api";
 import { PerfOverlay } from "@/game/core/perf";
 import { Button, Panel } from "@/game/ui/kit";
+import { setBaseMusic } from "@/game/core/music";
 import { SettingsPanel, useApplyVolume } from "@/game/ui/Settings";
 
 const MenuScene = dynamic(() => import("@/game/ui/MenuScene"), { ssr: false });
@@ -33,6 +34,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   useApplyVolume();
+  useEffect(() => setBaseMusic("menu"), []);
 
   useEffect(() => {
     // never overwrite what the player already typed while the page was hydrating
