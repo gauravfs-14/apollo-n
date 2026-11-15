@@ -160,8 +160,9 @@ export function PhaseRunner() {
           : "Preparing the 3D scene…";
   const Hud = mod?.id === phaseId ? mod.Hud : undefined;
   const q = QUALITY[quality];
-  // Toggling shadows needs a fresh renderer (Canvas key). An automatic tier change must never restart a running
-  // cinematic, so with quality "auto" the shadow setting only changes at a phase boundary; a pinned choice applies at once.
+  // Shadows switch on the live renderer (R3F updates gl.shadowMap; materials recompile on their next frame), so a
+  // quality change never remounts the scene or restarts a cinematic. With quality "auto" the switch still waits for
+  // a phase boundary, because the recompile is a brief hitch; a setting the player picks applies at once.
   const auto = useStore((s) => s.qualityMode) === "auto";
   const [applied, setApplied] = useState({ phase: phaseId, shadows: q.shadows });
   if (applied.phase !== phaseId || (!auto && applied.shadows !== q.shadows)) setApplied({ phase: phaseId, shadows: q.shadows });
@@ -169,7 +170,6 @@ export function PhaseRunner() {
   return (
     <div className="fixed inset-0 bg-black">
       <Canvas
-        key={applied.shadows ? "hi" : "lo"}
         className="!fixed inset-0"
         dpr={[1, q.maxDpr]}
         shadows={applied.shadows ? "soft" : false}
@@ -197,7 +197,7 @@ export function PhaseRunner() {
       </Canvas>
       <div className="pointer-events-none fixed inset-0 z-10">{Hud && <Hud key={phaseId} />}</div>
       <MissionAudio phase={phaseId} />
-      <CommsCaption />
+      <CommsCaption phase={phaseId} />
       <PhaseLoading visible={loading} phase={phaseId} status={status} onForce={() => setForced(phaseId)} />
       <PerfOverlay />
     </div>

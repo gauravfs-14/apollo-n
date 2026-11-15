@@ -53,22 +53,33 @@ export function MissionAudio({ phase }: { phase: PhaseId }) {
   return null;
 }
 
+// Where the caption sits (the report's columns leave a narrower gap). Interactive phases keep their panels clear of a centre column under the
+// top bar; cinematics put their own readouts (the launch countdown) at the top, so the caption goes low.
+const BOTTOM: ReadonlySet<PhaseId> = new Set<PhaseId>(["board", "launch", "landing", "report"]);
+
 /** Caption for the transmission on air: who is talking and what they say. */
-export function CommsCaption() {
+export function CommsCaption({ phase }: { phase: PhaseId }) {
   const { label, text } = useTransmission();
   const clean = text?.replace(/\[[^\]]*\]\s*/g, "");
+  const low = BOTTOM.has(phase);
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-20 z-20 flex justify-center px-6"
+      className={`pointer-events-none fixed inset-x-0 z-20 flex justify-center px-6 ${low ? "bottom-24" : "top-14"}`}
       style={{ opacity: clean ? 1 : 0, transition: "opacity 250ms" }}
       aria-live="polite"
     >
       {clean && (
-        <div className="max-w-2xl rounded-lg bg-black/55 px-4 py-2 text-center backdrop-blur-sm">
+        <div className={`w-max rounded-lg ${phase === "report" ? "max-w-[22rem]" : "max-w-[max(16rem,min(28rem,calc(100vw-50rem)))]"} bg-black/60 px-4 py-2 text-center backdrop-blur-sm`}>
           <div className="num text-[10px] uppercase tracking-wider text-amber">{label}</div>
-          <div className="mt-0.5 text-sm leading-snug text-white/95">{clean}</div>
+          <div className="mt-0.5 line-clamp-3 text-[13px] leading-snug text-white/95">{clean}</div>
         </div>
       )}
     </div>
   );
+}
+
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+  // dev: show a caption without audio, for layout checks (scripts/caption-layout.mjs)
+  (window as unknown as { __caption: (label: string, text: string) => void }).__caption = (label, text) =>
+    useTransmission.setState({ label, text, speaker: "capcom" });
 }

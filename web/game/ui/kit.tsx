@@ -50,7 +50,8 @@ export function Meter({ value, target, tone = "data" }: { value: number; target?
 /** Top-left mission caption shared by all phases. */
 export function PhaseTitle({ step, title, subtitle }: { step: string; title: string; subtitle?: string }) {
   return (
-    <div className="pointer-events-none absolute left-6 top-5 max-w-md">
+    // stops short of the centre column, which is kept free for the radio caption (game/core/MissionAudio.tsx)
+    <div className="pointer-events-none absolute left-6 top-5 max-w-[min(28rem,calc(50vw-18rem))]">
       <div className="num text-[11px] text-amber">{step}</div>
       <h2 className="text-2xl font-semibold leading-tight">{title}</h2>
       {subtitle && <p className="mt-1 text-sm text-dim">{subtitle}</p>}

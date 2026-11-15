@@ -43,13 +43,13 @@ export function ChecklistHud() {
 
   return (
     <div className="absolute inset-0">
-      <div className="pointer-events-none absolute left-6 top-5 max-w-md">
+      <div className="pointer-events-none absolute left-6 top-5 max-w-[min(28rem,calc(50vw-18rem))]">
         <div className="num text-[11px] text-amber">{phaseLabel("checklist")}</div>
         <h2 className="text-2xl font-semibold leading-tight">{GOAL[style]}</h2>
         <p className="mt-1 text-sm text-dim">Every item has to be right before mission control gives the go.</p>
       </div>
 
-      <div className="absolute inset-0 grid place-items-center overflow-auto p-6 pt-24">
+      <div className="absolute inset-0 grid place-items-center overflow-auto p-6 pt-36">
         <Panel className={`w-full ${wide ? "max-w-4xl" : "max-w-xl"} bg-[rgb(10_13_18/0.82)]`}>
           {result ? (
             <div>

@@ -141,7 +141,7 @@ export function playMusic(src: string, level = 0.35) {
 // ---- Ambience ----
 // Room tone under the action (control room, cabin hum, suit breathing). Beds are short
 // loops, decoded once and crossfaded into themselves so the seam is never heard.
-let amb: { src: string; gain: GainNode; timer: ReturnType<typeof setTimeout> | null } | null = null;
+let amb: { src: string; level: number; gain: GainNode; timer: ReturnType<typeof setTimeout> | null } | null = null;
 const AMB_XF = 1.5;
 
 export function playAmbience(src: string | null, level = 0.25) {
@@ -160,7 +160,7 @@ export function playAmbience(src: string | null, level = 0.25) {
   const gain = ctx.createGain();
   gain.gain.value = 0;
   gain.connect(out);
-  const me = { src, gain, timer: null as ReturnType<typeof setTimeout> | null };
+  const me = { src, level, gain, timer: null as ReturnType<typeof setTimeout> | null };
   amb = me;
   loadBuffer(ctx, src)
     .then((buf) => {
@@ -722,4 +722,38 @@ export function stopVoice() {
   useTransmission.setState({ label: null, text: null, speaker: null });
   radio?.stop();
   if (hasTTS() && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel();
+}
+
+// ---- Output device changes (headphones plugged in or out) ----
+// An AudioContext keeps playing to the device it opened; Firefox in particular does not
+// follow a new system default. When the device list changes, rebuild the audio engine on
+// the current default: music resumes where it was, the ambience restarts, sound effects
+// reload. Decoded voice lines (AudioBuffers) are not tied to a context and are kept.
+let rebuilding: ReturnType<typeof setTimeout> | null = null;
+
+export function rebuildAudio(reason = "device change") {
+  if (typeof window === "undefined" || !Howler.ctx) return;
+  const ambNow = amb && { src: amb.src, level: amb.level };
+  radio?.stop();
+  if (amb?.timer) clearTimeout(amb.timer);
+  amb = null;
+  sfxCache.forEach((h) => h.unload());
+  sfxCache.clear();
+  Howler.unload(); // closes the old context and opens a new one on the current default output
+  musicCtx(); // sees the new context and carries the playing track over at the same position
+  if (ambNow) playAmbience(ambNow.src, ambNow.level);
+  const ctx = Howler.ctx;
+  if (ctx?.state === "suspended") ctx.resume().catch(() => waitForGesture());
+  if (process.env.NODE_ENV !== "production") console.info(`[audio] rebuilt after ${reason}`);
+}
+
+if (typeof window !== "undefined" && navigator.mediaDevices?.addEventListener) {
+  navigator.mediaDevices.addEventListener("devicechange", () => {
+    // a plug event fires several times in a row; rebuild once it settles
+    if (rebuilding) clearTimeout(rebuilding);
+    rebuilding = setTimeout(() => {
+      rebuilding = null;
+      rebuildAudio();
+    }, 600);
+  });
 }

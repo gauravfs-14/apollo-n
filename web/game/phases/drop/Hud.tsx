@@ -43,7 +43,7 @@ export function DropHud() {
 
   return (
     <div className="absolute inset-0">
-      <div className="pointer-events-none absolute left-6 top-5 max-w-md [text-shadow:0_1px_10px_rgba(0,0,0,0.7)]">
+      <div className="pointer-events-none absolute left-6 top-5 max-w-[min(28rem,calc(50vw-18rem))] [text-shadow:0_1px_10px_rgba(0,0,0,0.7)]">
         <div className="num text-[11px] text-amber">{phaseLabel("drop")}</div>
         <h2 className="text-2xl font-semibold leading-tight">A crate for your crew</h2>
         <p className="mt-1 text-sm text-dim">Your build score of {score} earned this drop. Rewards are earned, never bought.</p>
