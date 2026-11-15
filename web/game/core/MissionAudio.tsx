@@ -2,12 +2,14 @@
 // Per-phase mission audio: the ambience bed, the radio chatter that opens each phase,
 // and the on-screen caption for whoever is on the loop.
 import { useEffect } from "react";
-import { BOARD, CHECKLIST_START, CRUISE_DONE, CRUISE_START, SITE_BASES, SITE_START } from "../data/missionComms";
+import { BOARD, CHECKLIST_START, CRUISE_DONE, SITE_BASES, SITE_START } from "../data/missionComms";
 import type { PhaseId } from "../types";
 import { playAmbience, useTransmission } from "./audio";
 import { clearComms, say, setCommVars, type CommLine } from "./comms";
+import { useRevealed } from "./loading";
 import { useStore } from "./store";
 
+const AMBIENCE_LEVEL = 0.12; // room tone sits well under music and radio
 const AMBIENCE: Partial<Record<PhaseId, string>> = {
   board: "mcc",
   checklist: "mcc",
@@ -18,11 +20,10 @@ const AMBIENCE: Partial<Record<PhaseId, string>> = {
   report: "mcc",
 };
 
-// Chatter that opens a phase. Launch, landing, surface and report script their own.
+// Chatter that opens a phase. Launch, cruise, landing, surface and report script their own.
 const OPENING: Partial<Record<PhaseId, CommLine[]>> = {
   board: BOARD,
   checklist: CHECKLIST_START,
-  cruise: CRUISE_START,
   site: [...CRUISE_DONE, ...SITE_START],
 };
 
@@ -37,13 +38,17 @@ export function MissionAudio({ phase }: { phase: PhaseId }) {
     if (siteId) setCommVars({ BASE: SITE_BASES[siteId] ?? "Lunar Base" });
   }, [siteId]);
 
+  const revealed = useRevealed(phase);
   useEffect(() => {
     const a = AMBIENCE[phase];
-    playAmbience(a ? `/audio/ambience/${a}.mp3` : null, 0.22);
+    playAmbience(a ? `/audio/ambience/${a}.mp3` : null, a === "suit" ? AMBIENCE_LEVEL * 0.6 : AMBIENCE_LEVEL);
     if (phase === "select") clearComms(); // a new mission starts clean
-    const open = OPENING[phase];
-    if (open) say(open, { once: `open:${phase}:${useStore.getState().state?.plan?.id}` });
   }, [phase]);
+  // a phase's opening radio waits until its scene is on screen
+  useEffect(() => {
+    const open = OPENING[phase];
+    if (revealed && open) say(open, { once: `open:${phase}:${useStore.getState().state?.plan?.id}` });
+  }, [phase, revealed]);
 
   return null;
 }

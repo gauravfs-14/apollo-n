@@ -5,6 +5,7 @@ import { useGame, usePhaseData } from "../../core/useGame";
 import { Button, Panel } from "../../ui/kit";
 import { PERKS, crateTier, rollPerk, type PerkId } from "../../data/perks";
 import { phaseLabel } from "../../ui/phaseLabel";
+import { useRevealed } from "../../core/loading";
 
 const TIER_TEXT = { common: "Standard crate", rare: "Reinforced crate", legendary: "Gold-seal crate" } as const;
 const TIER_CLASS = { common: "text-cyan", rare: "text-amber", legendary: "text-pink-300" } as const;
@@ -17,10 +18,12 @@ export function DropHud() {
   const [reveal, setReveal] = useState(false);
   const [late, setLate] = useState(false);
 
+  const revealed = useRevealed("drop");
   useEffect(() => {
+    if (!revealed) return; // the crate starts falling when the scene is on screen
     const t = setTimeout(() => setLanded(true), 3800);
     return () => clearTimeout(t);
-  }, []);
+  }, [revealed]);
   useEffect(() => {
     if (!d.opened) return;
     const a = setTimeout(() => { setReveal(true); sfx("chime", { volume: 0.5 }); }, 2200);

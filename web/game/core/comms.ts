@@ -15,6 +15,8 @@ export interface CommLine {
   maxDelay?: number;
   /** Go on air at once, cutting the tail of whatever is playing (a countdown never waits). */
   cut?: boolean;
+  /** Background chatter: anything that matters on screen may cut it off. */
+  chatter?: boolean;
 }
 
 export const WHO: Record<Who, { speaker: Speaker; label: string }> = {
@@ -40,8 +42,12 @@ export function fill(text: string, v: CommVars = vars) {
   return text.replace(/\{(N|LM|BASE)\}/g, (_, k: keyof CommVars) => String(v[k]));
 }
 
-const queue: { line: CommLine; at: number }[] = [];
+const queue: { line: CommLine; at: number; done?: () => void }[] = [];
 const traceLog: string[] = [];
+/** Dev trace of what is on screen, next to what is on air (scripts/sync-test.mjs reads it). */
+export function traceEvent(msg: string) {
+  trace(`EVENT ${msg}`);
+}
 function trace(msg: string) {
   if (process.env.NODE_ENV === "production") return;
   traceLog.push(`${now().toFixed(2)} ${msg}`);
@@ -60,24 +66,34 @@ const said = new Set<string>();
  * `once`: a key that can only be said once (mount effects run twice in development, and
  * players can re-enter a phase).
  */
-export function say(lines: CommLine | CommLine[], opts: { interrupt?: boolean; once?: string } = {}) {
+export function say(lines: CommLine | CommLine[], opts: { interrupt?: boolean; once?: string; onDone?: () => void } = {}) {
   if (opts.once) {
-    if (said.has(opts.once)) return;
+    if (said.has(opts.once)) return opts.onDone?.();
     said.add(opts.once);
   }
   if (opts.interrupt) clearComms();
-  for (const line of Array.isArray(lines) ? lines : [lines]) {
-    queue.push({ line, at: now() });
+  const list = Array.isArray(lines) ? lines : [lines];
+  list.forEach((line, i) => {
+    queue.push({ line, at: now(), done: i === list.length - 1 ? opts.onDone : undefined });
     preload(line);
-  }
+  });
+  if (!list.length) opts.onDone?.();
   void pump();
 }
 
 /** Drop queued lines and cut the one on air (it fades out in ~40 ms). */
 export function clearComms() {
   gen++;
-  queue.length = 0;
+  const pending = queue.splice(0).map((q) => q.done);
   stopVoice();
+  pending.forEach((d) => d?.()); // anyone waiting on a batch is released
+}
+
+let onAir: CommLine | null = null;
+
+/** Only background chatter is on air or queued: safe to cut for something that matches the screen. */
+export function onlyChatter() {
+  return (!onAir || !!onAir.chatter) && queue.every((q) => q.line.chatter);
 }
 
 export function commsIdle() {
@@ -90,14 +106,18 @@ async function pump() {
   const my = gen;
   try {
     while (queue.length && my === gen) {
-      const { line, at } = queue.shift()!;
+      const { line, at, done } = queue.shift()!;
       if (line.maxDelay !== undefined && now() - at > line.maxDelay) {
         trace(`dropped (late ${(now() - at).toFixed(2)}s): ${line.text}`);
+        done?.();
         continue;
       }
       trace(`on air (+${(now() - at).toFixed(2)}s): ${line.text}`);
       const w = WHO[line.who];
+      onAir = line;
       await speak(fill(line.text), undefined, { speaker: w.speaker, label: line.label ?? w.label });
+      onAir = null;
+      done?.();
       if (my !== gen) break;
       // the next speaker keys up after a beat, like a real loop
       if (queue.length) await sleep(queue[0].line.maxDelay !== undefined ? 0.05 : 0.25 + Math.random() * 0.35);

@@ -25,6 +25,9 @@ export const rt = {
   lastStepSide: 1,
   jumpPressed: false,
   skipExit: false,
+  atFoot: false, // reached the foot of the ladder (egress radio starts)
+  egressDone: false, // "I'm going to step off" said: free to step off
+  footHold: 0, // seconds held at the foot (capped, so the radio can never trap the player)
 };
 
 export interface Guide {
@@ -46,6 +49,7 @@ export interface SurfaceHud {
   mistakes: number;
   elapsed: number;
   exiting: boolean;
+  atFoot: boolean;
   finale: boolean;
   repair: null | { angle: number; aligned: number };
   boundary: boolean;
@@ -68,6 +72,7 @@ const initial = {
   mistakes: 0,
   elapsed: 0,
   exiting: true,
+  atFoot: false,
   finale: false,
   repair: null,
   boundary: false,
@@ -107,6 +112,9 @@ export function resetRuntime() {
   rt.t0 = performance.now();
   rt.stepEvent = 0;
   rt.skipExit = false;
+  rt.atFoot = false;
+  rt.egressDone = false;
+  rt.footHold = 0;
   rt.jumpPressed = false;
 }
 

@@ -29,3 +29,14 @@ export function useLoadingHold(active: boolean, label: string) {
     return () => set(id, null);
   }, [id, active, label, set]);
 }
+
+/** The phase whose scene is on screen (loading screen gone). Cinematics and radio wait for it. */
+export const useReveal = create<{ phase: string | null }>(() => ({ phase: null }));
+
+export function isRevealed(phase: string) {
+  return useReveal.getState().phase === phase;
+}
+
+export function useRevealed(phase: string) {
+  return useReveal((s) => s.phase === phase);
+}

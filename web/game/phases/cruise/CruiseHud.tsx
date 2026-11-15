@@ -2,8 +2,8 @@
 /* eslint-disable react-hooks/purity, react-hooks/refs, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, react-hooks/immutability, react-hooks/preserve-manual-memoization -- timers, refs and three.js state are intentionally imperative here */
 // Cruise HUD: runs plan.cruise hurdles in order. Briefing -> play -> score card, driven by phaseData.cruise.
 import { useCallback, useEffect, useRef } from "react";
-import { commsIdle, say } from "../../core/comms";
-import { CRUISE_CHATTER, HURDLE_MISS, HURDLE_OK } from "../../data/missionComms";
+import { commsIdle, onlyChatter, say } from "../../core/comms";
+import { chatterAt, CRUISE_START, HURDLE_MISS, HURDLE_OK } from "../../data/missionComms";
 import { setMusicOverride } from "../../core/music";
 import { usePhaseData, useGame } from "../../core/useGame";
 import { perkEffects, PERKS, type PerkId } from "../../data/perks";
@@ -17,6 +17,7 @@ import { NavCorrection } from "./hurdles/NavCorrection";
 import { SolarStorm } from "./hurdles/SolarStorm";
 import { rt, setDebris } from "./rt";
 import { phaseLabel } from "../../ui/phaseLabel";
+import { useRevealed } from "../../core/loading";
 
 const PERK_FOR: Partial<Record<string, PerkId>> = { solar_storm: "water_shield", engine_fault: "spare_parts", comms_blackout: "high_gain_antenna" };
 
@@ -85,38 +86,23 @@ export function CruiseHud() {
     rt.playing = debrisOn && stage === "play";
   }, [debrisOn, stage]);
 
-  // story: Houston calls it up once per briefing (cuts any chatter on the loop)
-  const lastTalk = useRef(0);
+  // story: Houston calls it up once per briefing; it cuts chatter so what you hear matches the hurdle on screen
+  const revealed = useRevealed("cruise");
   useEffect(() => {
-    if (!hurdle || stage !== "brief") return;
-    say({ who: "capcom", text: hurdle.story }, { once: `story:${plan?.id}:${idx}` }); // waits its turn: never cuts the crew off
-    lastTalk.current = Date.now();
-  }, [hurdle, idx, stage]);
+    if (!revealed || !hurdle || stage !== "brief") return;
+    // the coast opens with Houston's first call, then the first hurdle
+    if (idx === 0) say(CRUISE_START, { once: `open:cruise:${plan?.id}` });
+    say({ who: "capcom", text: hurdle.story }, { once: `story:${plan?.id}:${idx}`, interrupt: idx > 0 && onlyChatter() && !commsIdle() });
+  }, [revealed, hurdle, idx, stage, plan?.id]);
 
-  // Houston acknowledges each result
+  // after each hurdle: Houston acknowledges, then one exchange from the real coast that fits the journey so far
   useEffect(() => {
     if (stage !== "done") return;
     const pool = (data.lastScore ?? 0) >= 60 ? HURDLE_OK : HURDLE_MISS;
     say(pool[(idx + seed) % pool.length], { once: `ack:${plan?.id}:${idx}` });
-    lastTalk.current = Date.now();
+    if (idx + 1 < n) say(chatterAt((idx + 1) / n), { once: `chatter:${plan?.id}:${idx}` });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per result
   }, [stage, idx]);
-
-  // the real coast chatter fills quiet stretches (never during a hurdle)
-  useEffect(() => {
-    let next = seed % CRUISE_CHATTER.length;
-    const iv = setInterval(() => {
-      if (stageRef.current === "play" || !commsIdle() || Date.now() - lastTalk.current < 24000) return;
-      say(CRUISE_CHATTER[next]);
-      next = (next + 1) % CRUISE_CHATTER.length;
-      lastTalk.current = Date.now();
-    }, 3000);
-    return () => clearInterval(iv);
-  }, [seed]);
-  const stageRef = useRef(stage);
-  useEffect(() => {
-    stageRef.current = stage;
-  }, [stage]);
 
   useEffect(() => {
     setMusicOverride(stage === "play" ? "hurdle" : null);

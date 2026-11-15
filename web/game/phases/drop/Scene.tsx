@@ -12,6 +12,7 @@ import { useGame, usePhaseData } from "../../core/useGame";
 import { PERKS, crateTier, type PerkId } from "../../data/perks";
 import { Particles, type ParticlesApi } from "../../three/ship/fx";
 import { Perk3D } from "./Perk3D";
+import { isRevealed } from "../../core/loading";
 
 export const DROP_HDRI = "/hdri/kiara_1_dawn_1k.hdr";
 const TEX = ["/textures/ship/concrete_diff.jpg", "/textures/ship/concrete_nor_gl.jpg", "/textures/ship/concrete_arm.jpg"];
@@ -104,7 +105,7 @@ function Crate({ opened, perk }: { opened: boolean; perk?: PerkId }) {
   useEffect(() => () => { chuteGeo.dispose(); lineGeo.dispose(); }, [chuteGeo, lineGeo]);
 
   useFrame((state, dt) => {
-    t0.current += dt;
+    if (isRevealed("drop")) t0.current += dt; // the crate falls once the scene is on screen
     const t = t0.current;
     const r = root.current!;
     // descent with swing, then settle

@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { create } from "zustand";
 import type { PhaseId, PhaseModule } from "../types";
 import { LoadingScreen } from "../ui/LoadingScreen";
-import { useLoadingHolds } from "./loading";
+import { useLoadingHolds, useReveal } from "./loading";
 import { CommsCaption, MissionAudio } from "./MissionAudio";
 import { PHASE_TRACK, setBaseMusic, setMusicOverride } from "./music";
 import { getLoadedPhase, loadPhase, preloadAssets, preloadNext } from "./phases";
@@ -16,6 +16,7 @@ import { PerfOverlay, PerfProbe, QUALITY } from "./perf";
 import { useStore, type Quality } from "./store";
 import { prefetchVoice } from "./audio";
 import { allLines } from "./voiceLines";
+import { traceEvent } from "./comms";
 
 const DOWN: Record<Quality, Quality> = { high: "medium", medium: "low", low: "low" };
 const UP: Record<Quality, Quality> = { low: "medium", medium: "high", high: "high" };
@@ -143,6 +144,11 @@ export function PhaseRunner() {
   const modReady = mod?.id === phaseId;
   // loader until the new scene's data is in and its first (hitchy) frames are behind us
   const loading = forced !== phaseId && (!hasState || !modReady || (!!mod.Scene && (holds.length > 0 || readyPhase !== phaseId)));
+  // tell cinematics and the radio when the scene is actually visible
+  useEffect(() => {
+    useReveal.setState({ phase: loading ? null : phaseId });
+    if (!loading) traceEvent(`scene on screen: ${phaseId}`);
+  }, [loading, phaseId]);
   const status = !hasState
     ? connection === "lost" ? "Reconnecting to Houston…" : "Contacting Houston…"
     : !modReady

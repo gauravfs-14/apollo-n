@@ -21,6 +21,8 @@ import { pickOutcome, type Outcome } from "./outcome";
 import { Plume } from "./Plume";
 import { DESCENT, TOTAL, useLanding } from "./store";
 import { useLoadingHold } from "../../core/loading";
+import { isRevealed, useRevealed } from "../../core/loading";
+import { traceEvent } from "../../core/comms";
 
 const A0 = 450; // start altitude above the touchdown point (m)
 const H0 = 300; // start horizontal distance (m)
@@ -70,6 +72,11 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
   const t = useRef(typeof location !== "undefined" ? Number(new URLSearchParams(location.search).get("t")) || 0 : 0); // ?t= jumps the timeline (dev)
   const flags = useRef({ started: false, contact: false, ended: false, lastUi: 0 });
   const calls = useRef(new Set<number>());
+  // the descent loop opens when the scene is on screen
+  const revealed = useRevealed("landing");
+  useEffect(() => {
+    if (revealed) say(DESCENT_START, { once: `descent:${useStore.getState().state?.plan?.id}` });
+  }, [revealed]);
   const q0 = useMemo(() => new THREE.Quaternion(), []);
   const q1 = useMemo(() => new THREE.Quaternion(), []);
   const tq = useMemo(() => new THREE.Quaternion(), []);
@@ -106,8 +113,8 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
 
   useEffect(() => {
     useLanding.setState({ t: 0, skipRequested: false, contact: false, ready: true, tele: { alt: A0, vs: 0, hs: 0, thr: 0 } });
-    say(DESCENT_START, { once: `descent:${useStore.getState().state?.plan?.id}` });
-    sfx("rocket_roar", { volume: 0.25 });
+    // the descent engine is felt through the structure, not a launch roar: a low rumble under the radio
+    sfx("rumble", { volume: 0.35 });
     return () => {
       useLanding.setState({ ready: false });
     };
@@ -121,7 +128,7 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
       flags.current.contact = true;
       clearComms();
       useLanding.setState({ contact: true });
-    } else t.current = Math.min(TOTAL, t.current + dt);
+    } else if (isRevealed("landing")) t.current = Math.min(TOTAL, t.current + dt); // starts when visible
     const tt = t.current;
     const s = Math.min(1, tt / DESCENT);
     const lift = tt >= T_CONTACT ? 0 : A0 * Math.pow(1 - s, 2.6);
@@ -171,7 +178,8 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
       flags.current.contact = true;
       useLanding.setState({ contact: true });
       sfx("thunk", { volume: 0.7 });
-      sfx("hiss", { volume: 0.35 });
+      traceEvent("touchdown (contact)");
+      sfx("hiss", { volume: 0.15 });
       if (!ui.skipRequested) say(CONTACT, { interrupt: true });
     }
     if (lights.current) lights.current.visible = tt >= T_CONTACT && Math.sin(tt * 9) > -0.35;

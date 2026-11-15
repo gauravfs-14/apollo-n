@@ -16,6 +16,7 @@ import { ACCESS_ARM_Y, LaunchPad, PAD_H, TOWER_X } from "../../three/ship/Pad";
 import { Particles, type ParticlesApi } from "../../three/ship/fx";
 import { Rocket } from "../../three/ship/Rocket";
 import { BOARD_END, useBoardClock } from "./clock";
+import { isRevealed } from "../../core/loading";
 
 export const BOARD_HDRI = "/hdri/kiara_1_dawn_1k.hdr";
 const RS = 0.9;
@@ -63,7 +64,7 @@ export function BoardScene() {
     const store = useBoardClock.getState();
     const dt = Math.min(rawDt, 0.05);
     if (store.skipped && st.t < BOARD_END - 0.3) st.t = BOARD_END - 0.3;
-    st.t += dt;
+    if (isRevealed("board")) st.t += dt; // starts when the scene is on screen
     const t = st.t;
     if (((t * 10) | 0) !== (((t - dt) * 10) | 0)) store.set(t);
 

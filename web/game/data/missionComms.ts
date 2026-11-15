@@ -67,21 +67,26 @@ export function launchCues(L: number): { t: number; lines: CommLine[] }[] {
 
 // ---------------------------------------------------------------- translunar coast
 export const CRUISE_START: CommLine[] = [
-  cc("Okay. I guess the view must be pretty good from up there. We show you just roughly somewhere around nineteen thousand miles out now."), // TEC 00 04 53 31
-  lmp("It's a beautiful sight."), // TEC 00 10 03 41
+  cc("Okay. We show you just roughly somewhere around nineteen thousand miles out now."), // TEC 00 04 53 31 (trimmed)
 ];
 
-/** Idle chatter between hurdles; each entry is one exchange. */
+/** Chatter between hurdles, in journey order: Earth falling behind first, the Moon ahead last. */
 export const CRUISE_CHATTER: CommLine[][] = [
   [lmp("Houston, Apollo {N}. How many miles out do you have us now?"), cc("Roger. We have you about forty-eight thousand miles now.")], // TEC 00 10 03 29-54
-  [cc("{N}, Houston. If that's not the Earth, we're in trouble."), cdr("That's the Earth, and we have a very good view of it today."), cc("Roger. If you think we're smaller, you're now a hundred and seventy-seven thousand miles out.")], // TEC 02 08 38 55-41 05
-  [cc("{N}, Houston. The exact range is one hundred twenty-five thousand two hundred miles, and you're traveling four thousand four hundred eighty-six feet per second.")], // TEC 01 08 53 16
   [lmp("Everything looks beautiful."), cc("Roger. We all envy you the view up there.")], // TEC 01 00 41 07, 01 00 45 54
+  [cc("{N}, Houston. The exact range is one hundred twenty-five thousand two hundred miles, and you're traveling four thousand four hundred eighty-six feet per second.")], // TEC 01 08 53 16
   [cc("The spacecraft's been beautiful, {N}. We've really no complaints at all. Things are really great.")], // TEC 01 10 32 00
+  [cc("{N}, Houston. If that's not the Earth, we're in trouble."), cdr("That's the Earth, and we have a very good view of it today."), cc("Roger. If you think we're smaller, you're now a hundred and seventy-seven thousand miles out.")], // TEC 02 08 38 55-41 05
+  [cc("Roger. Sounds like you've got a beautiful view up there."), lmp("Absolutely fantastic. I hope the pictures come out.")], // TEC 01 04 07 55-08 01
   [lmp("Houston, Apollo {N}. The earthshine coming through the window is so bright you can read a book by it.")], // TEC 02 23 52 15
   [cdr("We've got the Sun right behind the edge of the Moon now."), lmp("It's quite an eerie sight.")], // TEC 02 23 34 00-16
-  [cc("Roger. Sounds like you've got a beautiful view up there."), lmp("Absolutely fantastic. I hope the pictures come out.")], // TEC 01 04 07 55-08 01
 ];
+
+/** The exchange that fits progress p (0 = just left Earth, 1 = arriving at the Moon). */
+export function chatterAt(p: number): CommLine[] {
+  const i = Math.min(CRUISE_CHATTER.length - 1, Math.max(0, Math.round(p * (CRUISE_CHATTER.length - 1))));
+  return CRUISE_CHATTER[i].map((l) => ({ ...l, chatter: true }));
+}
 
 export const HURDLE_OK: CommLine[] = [
   cc("Roger. We copy. You're looking good."),
@@ -145,7 +150,7 @@ export const LANDED: Record<"ok" | "boulder" | "tipped", CommLine[]> = {
 
 // ---------------------------------------------------------------- surface (TEC 04 13 23 38 →)
 export const EGRESS: CommLine[] = [
-  cdr("I'm at the foot of the ladder. The footpads are only depressed in the surface about one or two inches, although the surface appears to be very, very fine grained, as you get close to it. It's almost like a powder."),
+  cdr("I'm at the foot of the ladder. The footpads are only depressed in the surface about one or two inches. It's almost like a powder."),
   cdr("I'm going to step off the {LM} now."),
 ];
 
@@ -164,6 +169,7 @@ export const SURFACE_CHATTER: CommLine[][] = [
 ];
 
 // ---------------------------------------------------------------- splashdown (PAO tape 570/1-2)
+// Not played yet: the report screen shows the Moon, not an ocean. Kept for a splashdown scene.
 export const SPLASHDOWN: CommLine[] = [
   pao("Apollo {N} should be on main chutes now."),
   { who: "recovery", text: "Apollo {N}, Apollo {N}. This is Hornet, Hornet. Over.", label: "USS Hornet" },
@@ -199,6 +205,5 @@ export function allScriptLines(): CommLine[] {
     ...EGRESS,
     ...FIRST_STEP,
     ...SURFACE_CHATTER.flat(),
-    ...SPLASHDOWN,
   ];
 }

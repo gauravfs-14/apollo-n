@@ -349,10 +349,11 @@ interface RadioProfile {
 }
 
 const PROFILES: Record<Speaker, RadioProfile> = {
-  capcom: { hp: 300, lp: 3400, drive: 1.6, lead: 0.38, quindar: true, squelch: 0.35, waver: 0.9, dropouts: false, hiss: 0.06, hissBand: 2400, drift: 1.6, keyUp: 0.3, pops: 0.9, pop: 0.14 },
-  crew: { hp: 450, lp: 2700, drive: 2.6, lead: 0.18, quindar: false, squelch: 0.6, waver: 0.82, dropouts: true, hiss: 0.11, hissBand: 1800, drift: 2.2, keyUp: 0.5, pops: 3, pop: 0.28 },
-  crew2: { hp: 420, lp: 2800, drive: 2.4, lead: 0.18, quindar: false, squelch: 0.55, waver: 0.84, dropouts: true, hiss: 0.1, hissBand: 1900, drift: 2.1, keyUp: 0.45, pops: 2.6, pop: 0.25 },
-  pao: { hp: 140, lp: 5600, drive: 1.25, lead: 0.06, quindar: false, squelch: 0, waver: 0.97, dropouts: false, hiss: 0.025, hissBand: 3200, drift: 1.2, keyUp: 0, pops: 0.15, pop: 0.05 },
+  // Kept subtle: texture under the voice, not effects on top of it.
+  capcom: { hp: 300, lp: 3400, drive: 1.5, lead: 0.38, quindar: true, squelch: 0.18, waver: 0.93, dropouts: false, hiss: 0.04, hissBand: 2400, drift: 1.4, keyUp: 0.15, pops: 0.2, pop: 0.08 },
+  crew: { hp: 400, lp: 2900, drive: 2.0, lead: 0.18, quindar: false, squelch: 0.3, waver: 0.88, dropouts: false, hiss: 0.07, hissBand: 1800, drift: 1.7, keyUp: 0.25, pops: 0.6, pop: 0.14 },
+  crew2: { hp: 400, lp: 2900, drive: 2.0, lead: 0.18, quindar: false, squelch: 0.3, waver: 0.88, dropouts: false, hiss: 0.07, hissBand: 1900, drift: 1.7, keyUp: 0.25, pops: 0.6, pop: 0.14 },
+  pao: { hp: 140, lp: 5600, drive: 1.2, lead: 0.06, quindar: false, squelch: 0, waver: 1, dropouts: false, hiss: 0.015, hissBand: 3200, drift: 1.1, keyUp: 0, pops: 0, pop: 0 },
 };
 
 const bufCache = new Map<string, Promise<AudioBuffer>>();

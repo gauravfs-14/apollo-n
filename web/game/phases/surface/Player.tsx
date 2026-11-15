@@ -13,9 +13,12 @@ import { rt, useSurface } from "./store";
 import { thud, unlockAudio } from "./synth";
 import { addDust, addFootprint } from "./Trail";
 import { colliders } from "./world";
+import { isRevealed } from "../../core/loading";
+import { traceEvent } from "../../core/comms";
 
 const G = 1.62;
 const EXIT_DUR = 5.6;
+const FOOT = 4.3; // end of the ladder climb
 const tmpN = new THREE.Vector3();
 const tmpV = new THREE.Vector3();
 const tmpL = new THREE.Vector3();
@@ -119,7 +122,17 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
 
     if (rt.exiting) {
       if (rt.skipExit) rt.exitT = Math.max(rt.exitT, EXIT_DUR - 0.01);
-      if (hud.ready || rt.skipExit) rt.exitT += dt;
+      if ((hud.ready && isRevealed("surface")) || rt.skipExit) rt.exitT += dt;
+      // at the foot of the ladder the commander describes the surface before stepping off
+      if (rt.exitT >= FOOT && !rt.skipExit && !rt.egressDone) {
+        if (!rt.atFoot) {
+          rt.atFoot = true;
+          traceEvent("astronaut at the foot of the ladder");
+          useSurface.getState().set({ atFoot: true });
+        }
+        rt.footHold += dt;
+        if (rt.footHold < 20) rt.exitT = FOOT;
+      }
       const t = rt.exitT;
       // porch -> ladder top -> down the ladder -> step off
       if (t < 0.9) {
@@ -147,6 +160,7 @@ export function Player({ ground, role }: { ground: Ground; role?: Role }) {
         rt.camDist = 6.5;
         rt.grounded = true;
         useSurface.getState().set({ exiting: false });
+        traceEvent("astronaut steps off the ladder");
         addDust(0, y, 4.1, 14, 0.8);
         thud(0.1, 140, 0.18);
       }

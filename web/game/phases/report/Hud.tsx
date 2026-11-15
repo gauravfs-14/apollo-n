@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../core/api";
 import { say } from "../../core/comms";
-import { SPLASHDOWN } from "../../data/missionComms";
 import { useGame } from "../../core/useGame";
 import { Button, Meter } from "../../ui/kit";
 import { RANK_COLOR, computeResult, type Result } from "./score";
@@ -56,9 +55,9 @@ export function ReportHud() {
   useEffect(() => {
     if (spoke.current || !plan) return;
     spoke.current = true;
-    // the real Apollo 11 recovery loop, then Houston's sign-off for this mission
+    // Houston's sign-off for this mission
     const line = plan.voice_lines.find((v) => v.id === "success_1");
-    say([...SPLASHDOWN, ...(line ? [{ who: "capcom" as const, text: line.text }] : [])]);
+    if (line) say({ who: "capcom", text: line.text }, { once: `success:${plan.id}` });
   }, [plan]);
 
   if (!plan || !state) return null;

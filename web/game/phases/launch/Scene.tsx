@@ -24,6 +24,8 @@ import { Particles, type EmitSpec, type ParticlesApi } from "../../three/ship/fx
 import { Plume } from "../../three/ship/Plume";
 import { Rocket, S1_ENGINES, type RocketRefs } from "../../three/ship/Rocket";
 import { T, useLaunchClock } from "./clock";
+import { isRevealed } from "../../core/loading";
+import { traceEvent } from "../../core/comms";
 
 export const LAUNCH_HDRI = "/hdri/kiara_1_dawn_1k.hdr";
 const RS = 0.9; // rocket scale
@@ -99,7 +101,7 @@ export function LaunchScene() {
     const store = useLaunchClock.getState();
     const dt = Math.min(rawDt, 0.05);
     if (store.skipped && st.t < T.end - 0.2) st.t = T.end - 0.2;
-    st.t += dt;
+    if (isRevealed("launch") || store.skipped) st.t += dt; // the clock starts when the scene is on screen
     const t = st.t;
     if (((t * 10) | 0) !== ((t - dt) * 10 | 0)) store.set(t);
     const tp = t - T.liftoff;
@@ -111,9 +113,9 @@ export function LaunchScene() {
     if (store.skipped) {
       if (!st.spoke) { st.spoke = true; clearComms(); }
     } else runCues(cues, t, fired.current);
-    if (!st.ign && t > T.ignition) { st.ign = true; sfx("ignition", { volume: 0.9 }); }
-    if (!st.roar && t > T.liftoff - 0.5) { st.roar = true; sfx("rocket_roar", { volume: 0.9 }); }
-    if (!st.rumble && t > T.liftoff) { st.rumble = true; sfx("rumble", { volume: 0.9 }); }
+    if (!st.ign && t > T.ignition) { st.ign = true; sfx("ignition", { volume: 0.7 }); traceEvent("engines ignite"); }
+    if (!st.roar && t > T.liftoff - 0.5) { st.roar = true; sfx("rocket_roar", { volume: 0.75 }); }
+    if (!st.rumble && t > T.liftoff) { st.rumble = true; traceEvent("liftoff (rocket leaves the pad)"); } // one recorded roar, no stacked layers
 
     // ---- mode cut ----
     if (!st.cut && t >= T.spaceCut) { st.cut = true; setSpace(true); }
@@ -215,14 +217,14 @@ export function LaunchScene() {
       const ts = t - T.spaceCut;
       const s1 = t >= T.sep1, s2 = t >= T.sep2;
       if (!st.sep1 && s1) {
-        st.sep1 = true; sfx("staging", { volume: 0.8 }); sfx("whoosh", { volume: 0.5 });
+        st.sep1 = true; sfx("staging", { volume: 0.6 }); traceEvent("first stage separates");
         st.s1p.set(0, 0, 0); st.s1v.set(-9, 0.6, 1.8);
         for (let i = 0; i < 40 * rate; i++) {
           fire.current?.emit(1, { pos: [0, 52 * RS, 0], posJitter: [4, 3, 4], vel: [(R() - 0.5) * 30, (R() - 0.5) * 30, (R() - 0.5) * 30], life: 0.9, size0: 4, size1: 22, color: [1, 0.85, 0.6], glow: 1 });
         }
       }
       if (!st.sep2 && s2) {
-        st.sep2 = true; sfx("staging", { volume: 0.7 }); sfx("whoosh", { volume: 0.4 });
+        st.sep2 = true; sfx("staging", { volume: 0.5 }); traceEvent("second stage separates");
         st.s2p.set(0, 0, 0); st.s2v.set(-6, -0.5, -1.4);
         for (let i = 0; i < 24 * rate; i++) {
           fire.current?.emit(1, { pos: [0, 78 * RS, 0], posJitter: [3, 2, 3], vel: [(R() - 0.5) * 20, (R() - 0.5) * 20, (R() - 0.5) * 20], life: 0.8, size0: 3, size1: 14, color: [1, 0.9, 0.7], glow: 1 });
