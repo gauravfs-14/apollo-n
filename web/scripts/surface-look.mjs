@@ -1,7 +1,7 @@
 // Screenshots: mid-ladder exit, then footprints looking back after a walk. Usage: node scripts/surface-look.mjs [prefix]
 import { chromium } from "playwright";
 const prefix = process.argv[2] ?? "/tmp/surface-look";
-const browser = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
+const browser = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--mute-audio", "--enable-gpu", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 await page.addInitScript(() => localStorage.setItem("apollo.quality", "high"));
 await page.goto(`http://localhost:3000/play/DEV-L${Date.now() % 1000000}?mode=solo&phase=surface&perf`, { waitUntil: "load" });

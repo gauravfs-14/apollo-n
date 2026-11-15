@@ -2,7 +2,7 @@
 // Usage: node scripts/surface-tasks.mjs [out-prefix]
 import { chromium } from "playwright";
 const prefix = process.argv[2] ?? "/tmp/surface-tasks";
-const browser = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
+const browser = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--mute-audio", "--enable-gpu", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));

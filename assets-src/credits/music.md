@@ -2,7 +2,7 @@
 
 All tracks by Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0
 (https://creativecommons.org/licenses/by/4.0/). Credit is shown in the in-game Settings panel.
-Shipped copies are trimmed to at most 4 minutes, loudness-normalized (-20 LUFS), faded and re-encoded at 96 kbps.
+Shipped copies have leading silence removed, are trimmed to at most 4 minutes, loudness-normalized (-20 LUFS), given a 0.25 s fade-in and 5 s fade-out, and re-encoded at 96 kbps.
 
 | File (web/public/audio/music) | Track | Source | Used in |
 |---|---|---|---|

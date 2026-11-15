@@ -36,17 +36,31 @@ let mctx: AudioContext | null = null;
 let bus: GainNode | null = null;
 let music: Track | null = null;
 let musicVolume = typeof window !== "undefined" ? Number(localStorage.getItem("apollo.musicVolume") ?? 0.6) : 0.6;
-let masterVolume = 1;
 let musicLevel = 0.35;
 let waiting = false;
 
+/**
+ * The game's single AudioContext (Howler's), shared by sfx, music and the surface
+ * synth. Each extra context opens another output stream, and opening one can pop
+ * the speakers (very audible in Firefox). Connect to `out` so master volume applies.
+ */
+export function audioGraph(): { ctx: AudioContext; out: AudioNode } | null {
+  if (typeof window === "undefined") return null;
+  if (!Howler.ctx) Howler.volume(Howler.volume()); // makes Howler set up its context
+  const ctx = Howler.ctx;
+  if (!ctx || !Howler.masterGain) return null;
+  return { ctx, out: Howler.masterGain };
+}
+
 function musicCtx() {
-  if (!mctx) {
-    mctx = new AudioContext();
-    bus = mctx.createGain();
-    bus.gain.value = masterVolume * musicVolume;
-    bus.connect(mctx.destination);
+  const g = audioGraph();
+  if (!g) return null;
+  if (!bus) {
+    bus = g.ctx.createGain();
+    bus.gain.value = musicVolume;
+    bus.connect(g.out);
   }
+  mctx = g.ctx;
   return mctx;
 }
 
@@ -59,10 +73,10 @@ function ramp(g: GainNode, to: number, seconds: number) {
 
 function startTrack(tr: Track) {
   const ctx = musicCtx();
-  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  if (ctx?.state === "suspended") ctx.resume().catch(() => {});
   tr.el
     .play()
-    .then(() => music === tr && ramp(tr.gain, musicLevel, 2))
+    .then(() => music === tr && ramp(tr.gain, musicLevel, 0.8))
     .catch(() => waitForGesture());
 }
 
@@ -92,6 +106,7 @@ function retire(tr: Track, seconds: number) {
 export function playMusic(src: string, level = 0.35) {
   if (typeof window === "undefined" || music?.src === src) return;
   const ctx = musicCtx();
+  if (!ctx) return;
   if (music) retire(music, 1.5);
   musicLevel = level;
   const el = new Audio(src);
@@ -109,6 +124,8 @@ if (typeof window !== "undefined") {
     music && {
       src: music.src.split("/").pop(),
       playing: !music.el.paused,
+      t: +music.el.currentTime.toFixed(2),
+      ready: music.el.readyState,
       gain: +(music.gain.gain.value * (bus?.gain.value ?? 0)).toFixed(3),
       ctx: mctx?.state,
     };
@@ -124,16 +141,14 @@ export function stopMusic() {
 export function setMusicVolume(v: number) {
   musicVolume = v;
   localStorage.setItem("apollo.musicVolume", String(v));
-  if (bus) ramp(bus, masterVolume * musicVolume, 0.1);
+  if (bus) ramp(bus, musicVolume, 0.1);
 }
 export function getMusicVolume() {
   return musicVolume;
 }
 
 export function setMasterVolume(v: number) {
-  masterVolume = v;
-  Howler.volume(v);
-  if (bus) ramp(bus, masterVolume * musicVolume, 0.1);
+  Howler.volume(v); // music and synth run through Howler's master gain too
 }
 
 // ---- Voice ----

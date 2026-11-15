@@ -7,7 +7,7 @@ const base = process.env.WEB_URL ?? "http://localhost:3000";
 const b =
   which === "firefox"
     ? await firefox.launch({ headless: process.env.HEADED !== "1", firefoxUserPrefs: { "media.autoplay.default": 1, "media.autoplay.blocking_policy": 0 } })
-    : await chromium.launch({ headless: false, args: ["--use-angle=metal"] });
+    : await chromium.launch({ headless: false, args: ["--use-angle=metal", "--mute-audio"] });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [];
 p.on("pageerror", (e) => errors.push(String(e)));
