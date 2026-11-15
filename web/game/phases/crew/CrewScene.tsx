@@ -56,6 +56,9 @@ function Floor() {
   );
 }
 
+// dev-only inspection flags: ?crewpose=idle|wave|walk, ?crewcam=x,y,z,tx,ty,tz (camera + target relative to the pilot, the second astronaut)
+const dev = (k: string) => (process.env.NODE_ENV !== "production" && typeof window !== "undefined" ? new URLSearchParams(window.location.search).get(k) : null);
+
 function Lineup() {
   const players = useStore((s) => s.state?.players);
   const mode = useStore((s) => s.state?.mode);
@@ -73,7 +76,7 @@ function Lineup() {
         const ai = mode === "multi" && !holder;
         return (
           <group key={role} position={[X[role], 0, 0]}>
-            <Astronaut role={role} pose={active ? "wave" : "idle"} offset={i * 1.7} rotation={[0, (i - 1.5) * -0.09, 0]} height={1.82} />
+            <Astronaut role={role} pose={(dev("crewpose") as "idle" | "wave" | "walk" | null) ?? (active ? "wave" : "idle")} offset={i * 1.7} rotation={[0, (i - 1.5) * -0.09, 0]} height={1.82} />
             {/* floor marker */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
               <ringGeometry args={[0.44, 0.49, 48]} />
@@ -101,6 +104,15 @@ function Rig() {
     camera.fov = 30;
     camera.position.set(Math.sin(t * 0.12) * 0.35, 1.35 + Math.sin(t * 0.09) * 0.03, 8.8);
     target.set(Math.sin(t * 0.12) * 0.1, 0.95, 0);
+    const cc = dev("crewcam");
+    if (cc) {
+      const cx = X.pilot;
+      camera.fov = 30;
+      // crewcam=x,y,z,tx,ty,tz relative to the pilot (second astronaut), fov 30
+      const v = cc.split(",").map(Number);
+      camera.position.set(cx + v[0], v[1], v[2]);
+      target.set(cx + v[3], v[4], v[5]);
+    }
     camera.lookAt(target);
     camera.updateProjectionMatrix();
   });

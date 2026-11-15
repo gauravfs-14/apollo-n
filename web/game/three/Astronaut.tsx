@@ -47,6 +47,8 @@ interface Rig {
   shR: THREE.Object3D;
   elL: THREE.Object3D;
   elR: THREE.Object3D;
+  wrL: THREE.Object3D;
+  wrR: THREE.Object3D;
   hipL: THREE.Object3D;
   hipR: THREE.Object3D;
   kneeL: THREE.Object3D;
@@ -55,7 +57,38 @@ interface Rig {
 }
 
 const live = { n: 0 }; // mounted astronauts
+
+// ---- arm posing ----
+// The scan's arms reach forward-down (~45 deg) in the bind pose, and every bone has an identity rest rotation, so each limb
+// segment's bind direction is a constant (left arm; the right arm mirrors x). An arm is posed by giving the world-ish
+// direction (character space: x left, y up, z forward) of the upper arm, forearm and hand: shoulder, elbow and wrist
+// rotations are the minimal rotations that take the bind direction to the target, plus a twist of the hand about its axis.
+const BIND_U = new THREE.Vector3(0, -0.12, 0.15).normalize(); // shoulder -> elbow
+const BIND_F = new THREE.Vector3(-0.015, -0.13, 0.17).normalize(); // elbow -> wrist
+const BIND_H = new THREE.Vector3(-0.005, -0.12, 0.11).normalize(); // wrist -> fingertips
+const bindR = (v: THREE.Vector3) => new THREE.Vector3(-v.x, v.y, v.z);
+const BIND = { L: { u: BIND_U, f: BIND_F, h: BIND_H }, R: { u: bindR(BIND_U), f: bindR(BIND_F), h: bindR(BIND_H) } };
+const qA = new THREE.Quaternion(), qB = new THREE.Quaternion(), qT = new THREE.Quaternion();
+const vA = new THREE.Vector3(), vB = new THREE.Vector3();
+const hang = (out: THREE.Vector3, side: 1 | -1, fwd: number, abd: number) =>
+  out.set(side * Math.sin(abd), -Math.cos(fwd) * Math.cos(abd), Math.sin(fwd) * Math.cos(abd)).normalize();
+function poseArm(
+  side: "L" | "R", sh: THREE.Object3D, el: THREE.Object3D, wr: THREE.Object3D,
+  u: THREE.Vector3, f: THREE.Vector3, h: THREE.Vector3, twist: number,
+) {
+  const b = BIND[side];
+  sh.quaternion.setFromUnitVectors(b.u, u);
+  qA.copy(sh.quaternion).invert();
+  el.quaternion.setFromUnitVectors(b.f, vA.copy(f).applyQuaternion(qA));
+  qA.copy(sh.quaternion).multiply(el.quaternion).invert();
+  qB.setFromUnitVectors(b.h, vB.copy(h).applyQuaternion(qA));
+  wr.quaternion.copy(qB).multiply(qT.setFromAxisAngle(b.h, twist));
+}
+const dU = new THREE.Vector3(), dF = new THREE.Vector3(), dH = new THREE.Vector3();
+const wU = new THREE.Vector3(), wF = new THREE.Vector3(), wH = new THREE.Vector3();
 const MODEL_HEIGHT = 1.93;
+const WAVE_TWIST = -1.57;
+const HANG_TWIST = 1.5; // palms toward the thighs (left arm -, right arm +)
 const MASK_URL = "/models/crew/accent_mask.webp";
 
 export function Astronaut({ role = "commander", accent, pose = "idle", speed = 1, height = 1.8, offset = 0, ...group }: AstronautProps) {
@@ -95,7 +128,7 @@ export function Astronaut({ role = "commander", accent, pose = "idle", speed = 1
     });
     const rig: Rig = {
       hips: get("hips"), spine: get("spine"), head: get("head"),
-      shL: get("shoulderL"), shR: get("shoulderR"), elL: get("elbowL"), elR: get("elbowR"),
+      shL: get("shoulderL"), shR: get("shoulderR"), elL: get("elbowL"), elR: get("elbowR"), wrL: get("wristL"), wrR: get("wristR"),
       hipL: get("hipL"), hipR: get("hipR"), kneeL: get("kneeL"), kneeR: get("kneeR"),
       hipsY: get("hips").position.y,
     };
@@ -132,8 +165,7 @@ export function Astronaut({ role = "commander", accent, pose = "idle", speed = 1
     const breathe = Math.sin(t * 1.6);
     const s = Math.sin(t * 4.6); // walk cycle
     const c = Math.cos(t * 4.6);
-    const wv = Math.sin(t * 7.5);
-    const { hips, spine, head, shL, shR, elL, elR, hipL, hipR, kneeL, kneeR } = rig;
+    const { hips, spine, head, shL, shR, elL, elR, wrL, wrR, hipL, hipR, kneeL, kneeR } = rig;
 
     hips.position.y = rig.hipsY + cur.walk * 0.03 * Math.abs(c) + cur.idle * 0.003 * breathe;
     hips.rotation.y = cur.walk * 0.07 * s;
@@ -147,14 +179,22 @@ export function Astronaut({ role = "commander", accent, pose = "idle", speed = 1
     hipR.rotation.x = -cur.walk * 0.45 * s;
     kneeL.rotation.x = cur.walk * 0.6 * Math.max(0, -c);
     kneeR.rotation.x = cur.walk * 0.6 * Math.max(0, c);
-    // arms: down at rest, counter-swing on walk, right arm raised + waving on wave
-    shL.rotation.x = -cur.walk * 0.4 * s;
-    shL.rotation.z = cur.idle * 0.015 * breathe;
-    elL.rotation.x = -cur.walk * 0.25 - cur.idle * 0.06;
-    shR.rotation.x = cur.walk * 0.4 * s;
-    shR.rotation.z = -cur.idle * 0.015 * breathe - cur.wave * 2.35;
-    elR.rotation.x = cur.walk * 0.25 * 0 - cur.idle * 0.06;
-    elR.rotation.z = -cur.wave * (0.35 + 0.45 * wv);
+    // arms: relaxed down at rest (slightly forward, elbow soft, palm toward the thigh), counter-swing on walk;
+    // the right arm blends to a wave: upper arm out to about shoulder height, forearm upright, palm forward,
+    // a gentle sway from the elbow with the wrist following
+    const sw = Math.sin(t * 6.5), swW = Math.sin(t * 6.5 - 0.6);
+    const sL = cur.walk * 0.4 * s, sR = -sL, br = cur.idle * 0.01 * breathe;
+    hang(dU, 1, 0.1 + sL, 0.1 + br); hang(dF, 1, 0.3 + sL * 1.3 + cur.walk * 0.25, 0.1); hang(dH, 1, 0.34 + sL * 1.3 + cur.walk * 0.25, 0.04);
+    poseArm("L", shL, elL, wrL, dU, dF, dH, -HANG_TWIST);
+    hang(dU, -1, 0.1 + sR, 0.1 - br); hang(dF, -1, 0.3 + sR * 1.3 + cur.walk * 0.25, 0.1); hang(dH, -1, 0.34 + sR * 1.3 + cur.walk * 0.25, 0.04);
+    const k2 = cur.wave;
+    if (k2 > 0.001) {
+      wU.set(-1, -0.85, 0.3).normalize();
+      wF.set(-0.2 - 0.38 * sw, 1, 0.12).normalize();
+      wH.set(-0.2 - 0.38 * sw - 0.3 * swW, 1, 0.22).normalize();
+      dU.lerp(wU, k2).normalize(); dF.lerp(wF, k2).normalize(); dH.lerp(wH, k2).normalize();
+    }
+    poseArm("R", shR, elR, wrR, dU, dF, dH, HANG_TWIST * (1 - k2) + WAVE_TWIST * k2);
   });
 
   return (

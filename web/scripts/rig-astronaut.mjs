@@ -27,15 +27,21 @@ const J = [
   { name: "hips", p: [0, 0.95, 0], parent: -1 },
   { name: "spine", p: [0, 1.15, 0], parent: 0 },
   { name: "head", p: [0, 1.56, 0.0], parent: 1 },
-  { name: "shoulderL", p: [0.27, 1.50, 0], parent: 1 },
-  { name: "shoulderR", p: [-0.27, 1.50, 0], parent: 1 },
-  { name: "elbowL", p: [0.33, 1.26, 0], parent: 3 },
-  { name: "elbowR", p: [-0.33, 1.26, 0], parent: 4 },
+  // The Z-2 scan has its arms reaching forward-down (~45 deg): armhole centre (torso boundary loop), elbow (the barrel/forearm ring) and
+  // wrist (narrowest point of the forearm cuff) are measured on the mesh so the joints bend where the suit does.
+  { name: "shoulderL", p: [0.30, 1.39, 0.19], parent: 1 },
+  { name: "shoulderR", p: [-0.30, 1.39, 0.19], parent: 1 },
+  { name: "elbowL", p: [0.30, 1.27, 0.34], parent: 3 },
+  { name: "elbowR", p: [-0.30, 1.27, 0.34], parent: 4 },
   { name: "hipL", p: [0.10, 0.93, 0], parent: 0 },
   { name: "hipR", p: [-0.10, 0.93, 0], parent: 0 },
   { name: "kneeL", p: [0.10, 0.50, 0], parent: 7 },
   { name: "kneeR", p: [-0.10, 0.50, 0], parent: 8 },
+  { name: "wristL", p: [0.285, 1.14, 0.51], parent: 5 },
+  { name: "wristR", p: [-0.285, 1.14, 0.51], parent: 6 },
 ];
+// forearm axis (elbow -> wrist), used to split the glove from the forearm
+const WRIST = { L: J[11].p, R: J[12].p };
 const I = Object.fromEntries(J.map((j, i) => [j.name, i]));
 const nodes = J.map((j) => doc.createNode(j.name));
 J.forEach((j, i) => {
@@ -89,7 +95,10 @@ for (const prim of mesh.listPrimitives()) {
   const boneOf = (c) => {
     const cx = (c.mn[0] + c.mx[0]) / 2, cy = (c.mn[1] + c.mx[1]) / 2, ax = Math.abs(cx), L = cx >= 0;
     const wide = c.mn[0] < -0.12 && c.mx[0] > 0.12; // spans both sides
-    if (cy > 1.0 && ax > 0.2 && c.n > 300 && !wide) return cy < 1.26 ? (L ? I.elbowL : I.elbowR) : (L ? I.shoulderL : I.shoulderR);
+    if (cy > 1.0 && ax > 0.2 && c.n > 300 && !wide) {
+      if (c.n < 600) return I.spine; // the little shoulder cap above the armhole stays with the torso
+      return cy < 1.26 ? (L ? I.elbowL : I.elbowR) : (L ? I.shoulderL : I.shoulderR);
+    }
     if (c.mx[1] > 1.55 && c.mn[1] > 1.5 && c.n < 3000 && ax < 0.25) return I.head; // helmet shells
     if (cy < 1.0 && !wide && ax > 0.03) return cy < 0.74 ? (L ? I.kneeL : I.kneeR) : (L ? I.hipL : I.hipR);
     if (cy < 1.0) return I.hips;
@@ -100,8 +109,17 @@ for (const prim of mesh.listPrimitives()) {
   for (let v = 0; v < n; v++) {
     const r = find(rep[v]);
     if (!cache.has(r)) cache.set(r, boneOf(box.get(r)));
-    joints[v * 4] = cache.get(r);
+    const b = cache.get(r);
+    joints[v * 4] = b;
     weights[v * 4] = 1;
+    // forearm shell: the glove (past the wrist) follows the wrist bone, blended over a narrow band at the cuff
+    if (b === I.elbowL || b === I.elbowR) {
+      const left = b === I.elbowL, w = left ? WRIST.L : WRIST.R, e = J[b].p;
+      const ax = [w[0] - e[0], w[1] - e[1], w[2] - e[2]], al = Math.hypot(...ax);
+      const t = ((pos[v * 3] - w[0]) * ax[0] + (pos[v * 3 + 1] - w[1]) * ax[1] + (pos[v * 3 + 2] - w[2]) * ax[2]) / al;
+      const k = ss(-0.035, 0.035, t);
+      if (k > 0) { joints[v * 4 + 1] = left ? I.wristL : I.wristR; weights[v * 4] = 1 - k; weights[v * 4 + 1] = k; }
+    }
   }
   prim.setAttribute("JOINTS_0", doc.createAccessor().setType("VEC4").setArray(joints).setBuffer(buffer));
   prim.setAttribute("WEIGHTS_0", doc.createAccessor().setType("VEC4").setArray(weights).setBuffer(buffer));
