@@ -25,7 +25,9 @@ Every frame is the real game screen with its HUD, played at normal speed in long
 
 <div align="center">
 
-[![Watch the full Apollo N gameplay video](docs/media/gameplay-video.jpg)](https://youtu.be/VIDEO_ID)
+[![Watch the full Apollo N gameplay video](docs/media/gameplay-video.jpg)](https://youtu.be/MUF4EU9TLHo)
+
+**[▶ Watch on YouTube](https://youtu.be/MUF4EU9TLHo)**
 
 </div>
 
