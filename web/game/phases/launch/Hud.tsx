@@ -17,7 +17,7 @@ export function LaunchHud() {
 
   const tMinus = T.liftoff - t;
   const counting = t >= T.countStart && tMinus > 0;
-  const fadeIn = t > T.spaceCut - 0.5 && t < T.spaceCut + 0.4 ? 1 - Math.abs(t - T.spaceCut) / 0.5 : 0;
+  const fadeIn = 0; // a clean cut to space: a dip to black mid-launch read as a flicker
   const fadeEnd = t > T.end - 1.4 ? Math.min(1, (t - (T.end - 1.4)) / 1.2) : 0;
   const fadeStart = t < 1.2 ? 1 - t / 1.2 : 0;
   const black = Math.max(fadeIn, fadeEnd, fadeStart);

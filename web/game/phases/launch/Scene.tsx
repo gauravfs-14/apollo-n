@@ -12,8 +12,8 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Effects } from "../../core/Effects";
 import { sfx, stopSfx } from "../../core/audio";
-import { clearComms, runCues } from "../../core/comms";
-import { launchCues } from "../../data/missionComms";
+import { clearComms, runCues, say } from "../../core/comms";
+import { LAUNCH_EVENTS, launchCues } from "../../data/missionComms";
 import { useQuality } from "../../core/perf";
 import { useGame } from "../../core/useGame";
 import { Earth } from "../../three/Earth";
@@ -221,14 +221,14 @@ export function LaunchScene() {
       const ts = t - T.spaceCut;
       const s1 = t >= T.sep1, s2 = t >= T.sep2;
       if (!st.sep1 && s1) {
-        st.sep1 = true; sfx("staging", { volume: 0.6 }); traceEvent("first stage separates");
+        st.sep1 = true; sfx("staging", { volume: 0.6 }); traceEvent("first stage separates"); if (!store.skipped) say(LAUNCH_EVENTS.staging);
         st.s1p.set(0, 0, 0); st.s1v.set(-9, 0.6, 1.8);
         for (let i = 0; i < 40 * rate; i++) {
           fire.current?.emit(1, { pos: [0, 52 * RS, 0], posJitter: [4, 3, 4], vel: [(R() - 0.5) * 30, (R() - 0.5) * 30, (R() - 0.5) * 30], life: 0.9, size0: 4, size1: 22, color: [1, 0.85, 0.6], glow: 1 });
         }
       }
       if (!st.sep2 && s2) {
-        st.sep2 = true; sfx("staging", { volume: 0.5 }); traceEvent("second stage separates");
+        st.sep2 = true; sfx("staging", { volume: 0.5 }); traceEvent("second stage separates"); if (!store.skipped) say(LAUNCH_EVENTS.stage2);
         st.s2p.set(0, 0, 0); st.s2v.set(-6, -0.5, -1.4);
         for (let i = 0; i < 24 * rate; i++) {
           fire.current?.emit(1, { pos: [0, 78 * RS, 0], posJitter: [3, 2, 3], vel: [(R() - 0.5) * 20, (R() - 0.5) * 20, (R() - 0.5) * 20], life: 0.8, size0: 3, size1: 14, color: [1, 0.9, 0.7], glow: 1 });
