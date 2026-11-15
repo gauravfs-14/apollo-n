@@ -68,7 +68,8 @@ export function thud(vol = 0.08, freq = 180, dur = 0.12) {
   f.type = "lowpass";
   f.frequency.value = freq;
   const g = c.createGain();
-  g.gain.value = vol;
+  g.gain.setValueAtTime(0, c.currentTime);
+  g.gain.linearRampToValueAtTime(vol, c.currentTime + 0.004); // no hard edge: avoids a click
   src.connect(f).connect(g).connect(c.destination);
   src.start();
 }
