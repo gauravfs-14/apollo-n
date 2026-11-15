@@ -169,7 +169,7 @@ export function createGround(seed: number, dem?: DemSource): Ground {
           const d = Math.sqrt(d2);
           if (d < 1) h -= dep * (1 - d2);
           h += dep * 0.28 * Math.exp(-((d - 1) * (d - 1)) / 0.1);
-          if (d > 1) h += (dep * 0.06) / (d2 * d);
+          h += (dep * 0.06) / Math.max(1, d2 * d); // held flat inside the rim: a step here made a 0.4 m cliff
         }
       }
     }
@@ -182,7 +182,7 @@ export function createGround(seed: number, dem?: DemSource): Ground {
         const d = Math.sqrt(d2);
         if (d < 1) h -= craterD * (1 - Math.pow(d, 2.6)) * 1.0;
         h += craterD * 0.12 * Math.exp(-((d - 1) * (d - 1)) / 0.06);
-        if (d > 1) h += (craterD * 0.04) / (d2 * d);
+        h += (craterD * 0.04) / Math.max(1, d2 * d); // continuous at the rim (was a 0.6 m step)
       }
     }
     // landing pad: flat and level around the lander
