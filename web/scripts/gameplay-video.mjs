@@ -177,27 +177,57 @@ await step("launch", async () => {
   await waitPhase(page, "cruise", 70000); // countdown, liftoff, staging, all of it
 });
 
+// ---- cruise hurdles: the ones a script can play for real are played, the rest are skipped from the menu
+async function navCorrection() {
+  // read the target ring off the SVG, then turn each dial along its arc to the value that lines the rings up
+  const g = await page.evaluate(() => {
+    const svg = [...document.querySelectorAll("svg[viewBox='0 0 400 300']")][0];
+    const ring = [...svg.querySelectorAll("circle")].find((c) => c.getAttribute("stroke") === "#ffffff" && c.getAttribute("r") === "54");
+    const dials = [...document.querySelectorAll("svg[role=slider]")].map((d) => { const r = d.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, v: +d.getAttribute("aria-valuenow") }; });
+    return { tx: +ring.getAttribute("cx"), ty: +ring.getAttribute("cy"), dials };
+  });
+  const want = [(g.tx - 200) / 2.3 + 50, 50 + (150 - g.ty) / 1.9];
+  const at = (d, v, r = 52) => { const a = ((-150 + v * 3) * Math.PI) / 180; return [d.x + Math.sin(a) * r, d.y - Math.cos(a) * r]; };
+  for (let k = 0; k < 2; k++) {
+    const d = g.dials[k];
+    const [x0, y0] = at(d, d.v);
+    await moveTo(x0, y0, 500);
+    await page.mouse.down();
+    const n = 50;
+    for (let i = 1; i <= n; i++) {
+      const e = i / n, ee = e < 0.5 ? 2 * e * e : 1 - (-2 * e + 2) ** 2 / 2;
+      const [x, y] = at(d, d.v + (want[k] - d.v) * ee);
+      await page.mouse.move(x, y);
+      await wait(22);
+    }
+    await page.mouse.up();
+    await wait(500);
+  }
+  await wait(3000); // hold steady
+}
+async function solarStorm() {
+  const pts = await page.evaluate(() => [...document.querySelectorAll("svg g.pointer-events-auto")].map((g) => { const r = g.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }));
+  for (const [x, y] of pts) await clickAt(x, y, 700);
+  await wait(3000);
+}
+const PLAYABLE = { nav_correction: navCorrection, solar_storm: solarStorm };
+
 await step("cruise", async () => {
   await wait(3500);
   const plan = (await getState(page)).plan;
-  const h = plan.cruise[0];
-  console.log("     hurdle", h?.type);
-  await tap(page.getByRole("button", { name: "Start", exact: true }), { pause: 1500 });
-  if (h?.type === "solar_storm") {
-    const pts = await page.evaluate(() => [...document.querySelectorAll("svg g.pointer-events-auto")].map((g) => { const r = g.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }));
-    for (const [x, y] of pts) await clickAt(x, y, 700);
-    await wait(4000);
-  } else if (h?.type === "debris_field") {
-    const keys = ["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown", "ArrowLeft", "ArrowRight"];
-    for (let i = 0; i < 14; i++) await hold(keys[i % keys.length], 600 + (i % 3) * 250);
-    await wait(2000);
-  } else {
-    await clickAt(W / 2, H / 2, 800);
-    await clickAt(W / 2 + 120, H / 2 + 60, 800);
-    await wait(5000);
+  for (let i = 0; i < plan.cruise.length; i++) {
+    const h = plan.cruise[i];
+    console.log("     hurdle", i, h.type);
+    if (!PLAYABLE[h.type]) break;
+    await tap(page.getByRole("button", { name: "Start", exact: true }), { pause: 1500 });
+    await PLAYABLE[h.type]();
+    const next = page.getByRole("button", { name: /Next hurdle|Continue to the Moon/ });
+    await next.waitFor({ timeout: 20000 });
+    await wait(2500);
+    await tap(next, { pause: 2500 });
+    if (i === plan.cruise.length - 1) return;
   }
-  await wait(2500);
-  await skipPhase(); // the remaining hurdles
+  await skipPhase(); // a hurdle the script can't play
 });
 
 await step("site", async () => {
@@ -274,23 +304,117 @@ await step("landing", async () => {
   await tap(page.getByRole("button", { name: /Continue to the surface/ }), { pause: 0 });
 });
 
+// ---- surface: walk to every task with real mouse and keys, do it, then explore and finish
+const SENS = 0.0055; // rad of camera yaw per pixel of drag (Player.tsx)
+const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
+const me = () => page.evaluate(() => { const rt = window.__surface.rt; return { x: rt.pos.x, z: rt.pos.z, yaw: rt.camYaw }; });
+async function face(x, z, ms = 700) {
+  const p = await me();
+  const d = angDiff(p.yaw, Math.atan2(x - p.x, z - p.z));
+  if (Math.abs(d) < 0.12) return;
+  await drag(960, 600, Math.max(-900, Math.min(900, -d / SENS)), 0, ms);
+}
+async function walkTo(x, z, stop = 2.5, sprint = false) {
+  await face(x, z, 900);
+  await page.keyboard.down("KeyW");
+  if (sprint) await page.keyboard.down("ShiftLeft");
+  let last = Infinity, stuck = 0, side = -1;
+  for (let t = 0; t < 120; t++) {
+    await wait(250);
+    const p = await me();
+    const dist = Math.hypot(x - p.x, z - p.z);
+    if (flags.debug && t % 4 === 0) console.log("       walk", p.x.toFixed(1), p.z.toFixed(1), "yaw", p.yaw.toFixed(2), "dist", dist.toFixed(1), await page.evaluate(() => JSON.stringify({ k: window.__surface.rt.keys, l: window.__surface.rt.locked, v: window.__surface.rt.vel })));
+    if (dist < stop) break;
+    if (sprint && dist < 8) { await page.keyboard.up("ShiftLeft"); sprint = false; }
+    if (Math.abs(angDiff(p.yaw, Math.atan2(x - p.x, z - p.z))) > 0.3) await face(x, z, 450);
+    stuck = dist > last - 0.05 ? stuck + 1 : 0;
+    last = dist;
+    if (stuck > 4) {
+      // blocked (a rock, a lander leg or ground too steep to climb): walk round it like a player would
+      side = -side;
+      await drag(960, 600, (side * 1.2) / SENS, 0, 600);
+      await wait(2200);
+      stuck = 0;
+    }
+  }
+  await page.keyboard.up("ShiftLeft");
+  await page.keyboard.up("KeyW");
+  await wait(300);
+}
+async function doTask(t, sp) {
+  console.log("     task", t.id, t.type);
+  if (t.type === "navigate_to") return walkTo(sp.main.x, sp.main.z, 2.5, true);
+  if (t.type === "scan") { await walkTo(sp.main.x, sp.main.z, 2.2, true); return hold("KeyE", 2200); }
+  if (t.type === "collect_sample") { await walkTo(sp.main.x, sp.main.z, 1.8, true); return hold("KeyE", 3200); }
+  if (t.type === "deploy_relay") {
+    await walkTo(sp.aux.x, sp.aux.z, 1.8, true);
+    await hold("KeyE", 250); // held across a few frames: the game acts on the key going down
+    await wait(1200);
+    // carry it out to the open ground with the clearest view of Earth, then set it down
+    const placed = () => page.evaluate(() => !window.__surface.rt.carrying);
+    await walkTo(sp.main.x, sp.main.z, 1.5, true);
+    await wait(600);
+    for (let k = 0; k < 4 && !(await placed()); k++) {
+      await hold("KeyE", 250);
+      await wait(1200);
+      if (flags.debug) console.log("       relay", await page.evaluate(() => { const h = window.__surface.hud.getState(); return JSON.stringify({ bars: h.bars, prompt: h.prompt, toast: h.toast, carrying: window.__surface.rt.carrying }); }));
+      if (!(await placed())) await hold("KeyW", 1200); // still too close to the lander
+    }
+    return wait(3800);
+  }
+  if (t.type === "repair") {
+    await walkTo(sp.main.x, sp.main.z, 3);
+    await hold("KeyE", 250);
+    await wait(1500);
+    let key = "KeyD", prev = Infinity;
+    for (let k = 0; k < 60; k++) {
+      const r = await page.evaluate(() => window.__surface.hud.getState().repair);
+      if (!r) break;
+      if (r.angle < 0.06) { await wait(400); continue; }
+      if (r.angle > prev) key = key === "KeyD" ? "KeyA" : "KeyD";
+      prev = r.angle;
+      await hold(key, Math.min(500, 120 + r.angle * 300));
+    }
+    return wait(800);
+  }
+}
+
 await step("surface", async () => {
   await waitPhase(page, "surface", 30000);
   await page.getByRole("button", { name: /Skip ladder/ }).waitFor({ timeout: 40000 });
   await page.getByRole("button", { name: /Skip ladder/ }).waitFor({ state: "detached", timeout: 40000 }).catch(() => {}); // climb down the whole ladder
-  await wait(2000);
-  await hold("KeyW", 2500);
-  await drag(960, 540, 380, 0, 2200);
-  await page.keyboard.down("KeyW");
-  await page.keyboard.down("ShiftLeft");
-  await wait(2000);
-  await page.keyboard.up("ShiftLeft");
-  await hold("KeyD", 900);
-  await page.keyboard.up("KeyW");
-  await drag(1300, 540, -520, -40, 2600);
-  await hold("KeyW", 2000);
-  await wait(1500);
-  await skipPhase(); // the task chain (scan, deploy, sample) is left out to keep the video short
+  await wait(2500);
+  const plan = (await getState(page)).plan;
+  const tasks = plan.surface.tasks;
+  const tries = {};
+  for (let guard = 0; guard < 10; guard++) {
+    const done = new Set(await page.evaluate(() => window.__surface.done));
+    if (tasks.every((t) => done.has(t.id)) || done.has(plan.surface.final)) break;
+    const referenced = new Set(tasks.map((t) => t.unlocks).filter(Boolean));
+    const t = tasks.find((t) => !done.has(t.id) && (!referenced.has(t.id) || tasks.some((p) => done.has(p.id) && p.unlocks === t.id)));
+    if ((tries[t.id] = (tries[t.id] ?? 0) + 1) > 2) throw new Error(`task ${t.id} (${t.type}) not completing`);
+    const sp = await page.evaluate((id) => window.__surface.spots[id], t.id);
+    await doTask(t, sp);
+    const at = await me();
+    console.log("       at", at.x.toFixed(1), at.z.toFixed(1), "spot", JSON.stringify(sp), "carrying", await page.evaluate(() => window.__surface.rt.carrying));
+    await wait(1500);
+  }
+  // mission goal reached: explore with the AR overlay, open a heritage site from the atlas, then finish
+  const explore = page.getByRole("button", { name: /Explore the Moon/ });
+  await explore.waitFor({ timeout: 30000 });
+  await wait(3500);
+  await tap(explore, { pause: 2500 });
+  await drag(960, 600, -420, 0, 2400);
+  await hold("KeyW", 3000);
+  await drag(960, 600, 520, 0, 2600);
+  await tap(page.getByRole("button", { name: "Atlas", exact: true }), { pause: 1500 });
+  // pick a well-known site from the atlas: the view turns to face it, then E opens its card
+  const rows = page.locator("li > button[title='Face this site']");
+  const famous = rows.filter({ hasText: /Chandrayaan-3|Apollo|Chang'e 4/ });
+  await tap((await famous.count()) ? famous : rows, { pause: 1800 });
+  await hold("KeyE", 250);
+  await wait(6000);
+  await tap(page.getByRole("button", { name: "Finish mission" }), { pause: 0 });
 });
 
 await step("report", async () => {
