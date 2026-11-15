@@ -1,4 +1,4 @@
-// Checks stage music: which track plays on the menu and per phase, hurdle override, voice ducking.
+// Checks stage music: which track plays on the menu and per phase, hurdle override, level under voice lines.
 // Usage: node scripts/music-test.mjs
 import { chromium } from "playwright";
 const base = process.env.WEB_URL ?? "http://localhost:3000";
@@ -22,7 +22,7 @@ for (const phase of ["build", "launch", "site", "surface", "report", "cruise"]) 
   await p.waitForTimeout(5000);
   console.log(phase + ":", await now());
 }
-// cruise: voice ducking during the hurdle briefing, then hurdle music after Start
+// cruise: music stays at full level during the hurdle briefing voice, then hurdle music after Start
 console.log("cruise during briefing voice:", await now());
 await p.getByRole("button", { name: "Start" }).first().click();
 await p.waitForTimeout(3500);

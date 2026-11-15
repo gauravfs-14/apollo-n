@@ -22,7 +22,7 @@ export function sfx(name: string, opts: { volume?: number; rate?: number } = {})
 
 // ---- Music ----
 // One looping track at a time, streamed (html5) so only the current stage's file
-// downloads. Tracks crossfade; music ducks under mission-control voice lines.
+// downloads. Tracks crossfade and keep playing at full level under voice lines.
 // Browsers block autoplay until a user gesture: a blocked track starts on unlock.
 /** Stop every playing sound effect (not music or voice). */
 export function stopSfx() {
@@ -33,10 +33,8 @@ let music: Howl | null = null;
 let musicSrc: string | null = null;
 let musicLevel = 0.35; // per-track mix level
 let musicVolume = typeof window !== "undefined" ? Number(localStorage.getItem("apollo.musicVolume") ?? 0.6) : 0.6;
-let ducked = false;
-const DUCK = 0.35;
 
-const musicTarget = () => musicLevel * musicVolume * (ducked ? DUCK : 1);
+const musicTarget = () => musicLevel * musicVolume;
 
 export function playMusic(src: string, level = 0.35) {
   if (musicSrc === src) return;
@@ -75,12 +73,6 @@ export function setMusicVolume(v: number) {
 }
 export function getMusicVolume() {
   return musicVolume;
-}
-
-function duck(on: boolean) {
-  if (ducked === on) return;
-  ducked = on;
-  if (music?.playing()) music.fade(music.volume(), musicTarget(), on ? 300 : 1200);
 }
 
 export function setMasterVolume(v: number) {
@@ -160,7 +152,6 @@ function speakSystem(text: string, my: number): Promise<void> {
     if (busy) speechSynthesis.cancel();
     const start = () => {
       if (my !== token) return resolve();
-      duck(true);
       speechSynthesis.resume(); // Chrome can get stuck paused
       const chunks = sentences(text);
       const volume = Howler.volume();
@@ -184,7 +175,7 @@ function speakSystem(text: string, my: number): Promise<void> {
     };
     if (busy) setTimeout(start, 60);
     else start();
-  }).finally(() => my === token && duck(false));
+  });
 }
 
 /** Speak a mission-control line. Resolves when finished. */
@@ -198,11 +189,10 @@ export async function speak(text: string, lineId?: string): Promise<void> {
       const { url } = await api<{ url: string | null }>("/voice", { line_id: lineId ?? null, text });
       if (my !== token) return;
       if (url) {
-        duck(true);
-        return new Promise<void>((resolve) => {
+          return new Promise<void>((resolve) => {
           voiceHowl = new Howl({ src: [url], html5: true, volume: 1, onend: () => resolve(), onloaderror: () => resolve() });
           voiceHowl.play();
-        }).finally(() => my === token && duck(false));
+        });
       }
     } catch {
       /* fall through to the system voice */
@@ -213,7 +203,6 @@ export async function speak(text: string, lineId?: string): Promise<void> {
 
 export function stopVoice() {
   token++;
-  duck(false);
   voiceHowl?.stop();
   if (hasTTS() && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel();
 }
