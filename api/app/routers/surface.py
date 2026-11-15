@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import re
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Query
@@ -152,7 +153,7 @@ async def _search_engine(engine: str, query: str) -> list[dict]:
         return []
     out = []
     for r in data.get("organic_results", []):
-        link, snip = r.get("link", ""), serp._clean(r.get("snippet"))
+        link, snip = r.get("link", ""), re.sub(r"\s*\[\d+\]", "", serp._clean(r.get("snippet")))
         if not link or not _trusted(link) or len(snip) < 50:
             continue
         snippet = snip[:240].rsplit(" ", 1)[0] + ("..." if len(snip) > 240 else "")
