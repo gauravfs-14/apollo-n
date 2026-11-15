@@ -26,6 +26,7 @@ export function damage(amount: number, reason: string) {
 
 export function useMissionHp() {
   const hp = useStore((s) => s.state?.hp ?? 100);
+  const hpMax = useStore((s) => s.state?.hpMax ?? 100);
   const failed = useStore((s) => s.state?.failed ?? null);
-  return { hp, failed };
+  return { hp, hpMax, failed };
 }

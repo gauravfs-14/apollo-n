@@ -146,6 +146,8 @@ export interface GameState {
   phaseData: Partial<Record<PhaseId, Record<string, unknown>>>;
   /** Ship integrity 0..100: mistakes cost HP; at 0 the mission fails. */
   hp?: number;
+  /** Hull maximum (100 stock; the reinforced-hull upgrades raise it when the mission starts). hp starts here. */
+  hpMax?: number;
   /** Why the mission failed (set when hp reached 0), else absent. */
   failed?: string | null;
   version: number;
