@@ -261,7 +261,7 @@ export function Hud() {
 
       {!h.exiting && !h.finale && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11px] text-dim">
-          WASD / arrows move - Shift sprint - Space jump - E {h.explore ? "open a tag" : "interact"} - drag to look - wheel to zoom
+          WASD / arrows move - Shift sprint - Space jump - E {h.explore ? "open a tag" : "interact"} - drag to look (double-click locks the mouse, Esc frees it) - wheel to zoom
         </div>
       )}
 
