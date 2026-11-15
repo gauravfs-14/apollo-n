@@ -9,7 +9,8 @@ import * as THREE from "three";
 import { Effects } from "../../core/Effects";
 import { sfx } from "../../core/audio";
 import { clearComms, say } from "../../core/comms";
-import { CONTACT, DESCENT_CALLS, DESCENT_START, LANDED } from "../../data/missionComms";
+import { altitudeCall, contact, descentStart, goForLanding, landed as landedReport } from "../../data/missionComms";
+import { preload } from "../../core/comms";
 import { useStore } from "../../core/store";
 import { useGame, usePhaseData } from "../../core/useGame";
 import { Boulders, GroundBounce, LunarSky, RenderInfo, SunLight, Terrain, missionTime, skyAt, useTerrainData, type TerrainData } from "../../three/terrain";
@@ -33,6 +34,14 @@ const ss = (a: number, b: number, v: number) => {
 };
 const compass = (deg: number, out: THREE.Vector3) => out.set(Math.sin(deg * D2R), 0, -Math.cos(deg * D2R));
 const T_CONTACT = DESCENT * (1 - Math.pow(0.15 / A0, 1 / 2.6));
+const FT = 3.281;
+/** Sink rate (ft/s) at height h (m) on the descent profile alt = A0·(1 − t/DESCENT)^2.6. */
+const sinkAt = (h: number) => (2.6 * A0 / DESCENT) * Math.pow(h / A0, 1.6 / 2.6) * FT;
+// the calls, made at the heights they name, with the lander's real sink rate there
+const CALLS = [
+  { alt: 250, line: goForLanding() },
+  ...[400, 200, 100, 40].map((ft, i, a) => ({ alt: ft / FT, line: altitudeCall(ft, sinkAt(ft / FT), i === a.length - 1) })),
+];
 
 interface SiteData {
   site_id: string;
@@ -70,12 +79,17 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
   const { camera } = useThree();
   const cam = camera as THREE.PerspectiveCamera;
   const t = useRef(typeof location !== "undefined" ? Number(new URLSearchParams(location.search).get("t")) || 0 : 0); // ?t= jumps the timeline (dev)
-  const flags = useRef({ started: false, contact: false, ended: false, lastUi: 0 });
+  const flags = useRef({ started: false, contact: false, ended: false, reported: false, lastUi: 0 });
   const calls = useRef(new Set<number>());
   // the descent loop opens when the scene is on screen
   const revealed = useRevealed("landing");
   useEffect(() => {
-    if (revealed) say(DESCENT_START, { once: `descent:${useStore.getState().state?.plan?.id}` });
+    if (!revealed) return;
+    const st = useStore.getState().state;
+    const siteId = (st?.phaseData.site as { site_id?: string } | undefined)?.site_id;
+    const siteName = st?.plan?.destination.candidate_sites.find((c) => c.id === siteId)?.name ?? "the landing site";
+    say(descentStart(siteName), { once: `descent:${st?.plan?.id}` });
+    CALLS.forEach((c) => preload(c.line)); // ready before each height is reached
   }, [revealed]);
   const q0 = useMemo(() => new THREE.Quaternion(), []);
   const q1 = useMemo(() => new THREE.Quaternion(), []);
@@ -165,7 +179,7 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
 
     // the crew's altitude calls, as the lander passes each height
     if (!ui.skipRequested) {
-      DESCENT_CALLS.forEach((c, i) => {
+      CALLS.forEach((c, i) => {
         if (lift <= c.alt && tt < T_CONTACT && !calls.current.has(i)) {
           calls.current.add(i);
           say(c.line);
@@ -180,7 +194,11 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
       sfx("thunk", { volume: 0.7 });
       traceEvent("touchdown (contact)");
       sfx("hiss", { volume: 0.15 });
-      if (!ui.skipRequested) say(CONTACT, { interrupt: true });
+      if (!ui.skipRequested) say(contact(), { interrupt: true });
+    }
+    if (!flags.current.reported && tt >= T_CONTACT + 2.2 && !ui.skipRequested) {
+      flags.current.reported = true;
+      say(landedReport(outcome.reason as "ok" | "boulder" | "tipped", outcome.tilt));
     }
     if (lights.current) lights.current.visible = tt >= T_CONTACT && Math.sin(tt * 9) > -0.35;
 
@@ -257,7 +275,7 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
     if (tt >= TOTAL && !flags.current.ended) {
       flags.current.ended = true;
       useLanding.setState({ t: TOTAL });
-      if (!ui.skipRequested) say(LANDED[outcome.reason as keyof typeof LANDED] ?? LANDED.ok);
+
     }
   });
 

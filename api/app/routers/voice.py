@@ -11,7 +11,7 @@ Speakers, like real mission audio:
   crew2   the lunar module pilot / recovery    ELEVENLABS_LMP_VOICE_ID   (default: Eric, younger American)
   pao     Launch Control / Apollo Control PAO  ELEVENLABS_PAO_VOICE_ID   (default: Adam, broadcast narrator)
 
-Env: ELEVENLABS_API_KEY, optional ELEVENLABS_MODEL (default eleven_v3, the most expressive model),
+Env: ELEVENLABS_API_KEY, optional ELEVENLABS_MODEL (default eleven_multilingual_v2), ELEVENLABS_SPEED (default 1.12),
 PUBLIC_API_URL (default: the request's own base URL).
 Any failure returns {url: null} so the game falls back to the system voice and never stalls.
 POST /voice/prefetch synthesizes a mission's lines in the background so playback never waits.
@@ -74,7 +74,12 @@ def _voice_id(speaker: str) -> str:
 
 
 def _model() -> str:
-    return os.getenv("ELEVENLABS_MODEL") or "eleven_v3"
+    # multilingual_v2: the most natural, steady narration voice, and it supports a speed setting
+    return os.getenv("ELEVENLABS_MODEL") or "eleven_multilingual_v2"
+
+
+def _speed() -> float:
+    return float(os.getenv("ELEVENLABS_SPEED") or 1.12)  # a touch brisker, like a real flight loop (0.7-1.2)
 
 
 def _clean(text: str) -> str:
@@ -83,14 +88,14 @@ def _clean(text: str) -> str:
 
 def _key(text: str, speaker: str) -> str:
     # voice id + model are part of the hash, so switching voices never serves stale audio
-    return hashlib.sha256(f"{_voice_id(speaker)}|{_model()}|{text}".encode()).hexdigest()[:24]
+    return hashlib.sha256(f"{_voice_id(speaker)}|{_model()}|{_speed()}|{text}".encode()).hexdigest()[:24]
 
 
 def _settings(model: str) -> dict:
     if model == "eleven_v3":
         # v3 stability is a mode: 0.0 creative, 0.5 natural, 1.0 robust. Natural keeps a calm, even delivery.
         return {"stability": 0.5, "similarity_boost": 0.8}
-    return {"stability": 0.6, "similarity_boost": 0.8, "style": 0.1, "use_speaker_boost": True}
+    return {"stability": 0.55, "similarity_boost": 0.8, "style": 0.15, "use_speaker_boost": True, "speed": _speed()}
 
 
 async def _synthesize(text: str, speaker: str, dest: Path) -> bool:

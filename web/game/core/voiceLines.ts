@@ -1,6 +1,5 @@
-// Every fixed line the game speaks, with who says it. Mission-specific lines
-// (briefing, launch, hurdle stories, success) come from the Mission Plan.
-// All of them are prefetched when a mission starts so playback never waits.
+// Fixed lines and a mission's known lines (briefing, hurdle stories, sign-off), prefetched when a
+// mission starts so playback never waits. Event lines built from game state are voiced when they happen.
 import type { MissionPlan } from "../types";
 import type { Speaker } from "./audio";
 import { fill, WHO } from "./comms";
@@ -13,14 +12,6 @@ export interface Line {
 
 export const LINES = {
   voiceCheck: { text: "Houston here. Voice check, loud and clear.", speaker: "capcom" },
-  launchFallback: { text: "All stations report go. You are clear for launch.", speaker: "capcom" },
-  task_navigate_to: { text: "Houston to crew: you are at the rim, good view into the dark. Next objective is open.", speaker: "capcom" },
-  task_deploy_relay: { text: "Houston: relay is up and we have signal. Nice work. Go find that ice.", speaker: "capcom" },
-  task_scan: { text: "Houston: strong reading. That is the signal we were looking for. Outstanding.", speaker: "capcom" },
-  task_collect_sample: { text: "Houston: sample tube sealed and stowed. Copy that, great scoop.", speaker: "capcom" },
-  task_repair: { text: "Houston: panel is aligned and locked. Telemetry is green.", speaker: "capcom" },
-  task_generic: { text: "Houston: task complete.", speaker: "capcom" },
-  finale: { text: "Houston: mission goal achieved. The whole world is watching. Well done, crew.", speaker: "capcom" },
 } satisfies Record<string, Line>;
 
 export function missionLines(plan: MissionPlan): Line[] {

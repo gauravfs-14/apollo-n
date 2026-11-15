@@ -8,7 +8,7 @@ import { useSiteActions, useSiteState } from "./actions";
 import { useSiteUi } from "./ui";
 import { phaseLabel } from "../../ui/phaseLabel";
 import { say } from "../../core/comms";
-import { SITE_CONFIRMED } from "../../data/missionComms";
+import { probeReport, simReport } from "../../data/missionComms";
 
 const MODES: { id: OverlayMode; label: string; text: (tilt: number) => string }[] = [
   { id: "none", label: "Off", text: () => "Natural view. Black areas are in shadow from the low Sun right now." },
@@ -125,12 +125,15 @@ function Report() {
   const { plan } = useGame();
   const sc = sd.report;
   const sim = sd.sim;
+  // Houston reads out what the probe and the test landings actually measured
   useEffect(() => {
-    if (sd.director) say({ who: "capcom", text: sd.director }, { once: `director:${sd.director}` });
-  }, [sd.director]);
+    if (sc) say(probeReport(sc), { once: `probe:${plan?.id}:${sd.probe?.x}:${sd.probe?.z}`, interrupt: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per probe report
+  }, [sc]);
   useEffect(() => {
-    if (sim) say(SITE_CONFIRMED, { once: `doi:${plan?.id}` });
-  }, [sim, plan?.id]);
+    if (sim) say(simReport(sim.safe_pct), { once: `sim:${plan?.id}:${sd.probe?.x}:${sd.probe?.z}` });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per test-landing run
+  }, [sim]);
   const tone = !sc ? "default" : sc.score >= 70 ? "go" : sc.score >= 45 ? "default" : "nogo";
   if (!sd.probe)
     return (

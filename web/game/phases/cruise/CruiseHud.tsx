@@ -2,8 +2,9 @@
 /* eslint-disable react-hooks/purity, react-hooks/refs, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, react-hooks/immutability, react-hooks/preserve-manual-memoization -- timers, refs and three.js state are intentionally imperative here */
 // Cruise HUD: runs plan.cruise hurdles in order. Briefing -> play -> score card, driven by phaseData.cruise.
 import { useCallback, useEffect, useRef } from "react";
-import { commsIdle, onlyChatter, say } from "../../core/comms";
-import { chatterAt, CRUISE_START, HURDLE_MISS, HURDLE_OK } from "../../data/missionComms";
+import { rolesOf } from "../../core/roles";
+import { say } from "../../core/comms";
+import { hurdleResult } from "../../data/missionComms";
 import { setMusicOverride } from "../../core/music";
 import { usePhaseData, useGame } from "../../core/useGame";
 import { perkEffects, PERKS, type PerkId } from "../../data/perks";
@@ -88,19 +89,17 @@ export function CruiseHud() {
 
   // story: Houston calls it up once per briefing; it cuts chatter so what you hear matches the hurdle on screen
   const revealed = useRevealed("cruise");
+  // each hurdle's briefing, once it is on screen
   useEffect(() => {
     if (!revealed || !hurdle || stage !== "brief") return;
-    // the coast opens with Houston's first call, then the first hurdle
-    if (idx === 0) say(CRUISE_START, { once: `open:cruise:${plan?.id}` });
-    say({ who: "capcom", text: hurdle.story }, { once: `story:${plan?.id}:${idx}`, interrupt: idx > 0 && onlyChatter() && !commsIdle() });
+    say({ who: "capcom", text: hurdle.story }, { once: `story:${plan?.id}:${idx}` });
   }, [revealed, hurdle, idx, stage, plan?.id]);
 
-  // after each hurdle: Houston acknowledges, then one exchange from the real coast that fits the journey so far
+  // the result, in Houston's words: what actually happened, addressed to the crew member who did it
   useEffect(() => {
-    if (stage !== "done") return;
-    const pool = (data.lastScore ?? 0) >= 60 ? HURDLE_OK : HURDLE_MISS;
-    say(pool[(idx + seed) % pool.length], { once: `ack:${plan?.id}:${idx}` });
-    if (idx + 1 < n) say(chatterAt((idx + 1) / n), { once: `chatter:${plan?.id}:${idx}` });
+    if (stage !== "done" || !hurdle) return;
+    const names = (state?.phaseData.crew as { names?: Partial<Record<string, string>> } | undefined)?.names;
+    say(hurdleResult(hurdle.type, data.lastScore ?? 0, names?.[hurdle.role]), { once: `ack:${plan?.id}:${idx}` });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per result
   }, [stage, idx]);
 
@@ -159,7 +158,7 @@ export function CruiseHud() {
 
   const meta = HURDLE_META[hurdle.type];
   const role = ROLE_INFO[hurdle.role];
-  const holder = state?.players.find((p) => p.role === hurdle.role && p.connected);
+  const holder = state?.players.find((p) => rolesOf(p).includes(hurdle.role) && p.connected);
   const actorName = actor ? "You" : (holder?.name ?? state?.players.find((p) => p.isHost)?.name ?? "The host");
   const perkId = PERK_FOR[hurdle.type];
   const perk = perkId && drop.perk === perkId ? PERKS[perkId] : null;

@@ -2,7 +2,7 @@
 // Per-phase mission audio: the ambience bed, the radio chatter that opens each phase,
 // and the on-screen caption for whoever is on the loop.
 import { useEffect } from "react";
-import { BOARD, CHECKLIST_START, CRUISE_DONE, SITE_BASES, SITE_START } from "../data/missionComms";
+import { cruiseArrival, SITE_BASES } from "../data/missionComms";
 import type { PhaseId } from "../types";
 import { playAmbience, useTransmission } from "./audio";
 import { clearComms, say, setCommVars, type CommLine } from "./comms";
@@ -20,11 +20,9 @@ const AMBIENCE: Partial<Record<PhaseId, string>> = {
   report: "mcc",
 };
 
-// Chatter that opens a phase. Launch, cruise, landing, surface and report script their own.
-const OPENING: Partial<Record<PhaseId, CommLine[]>> = {
-  board: BOARD,
-  checklist: CHECKLIST_START,
-  site: [...CRUISE_DONE, ...SITE_START],
+// A phase that opens with a call: only where the screen itself announces something new.
+const OPENING: Partial<Record<PhaseId, () => CommLine[]>> = {
+  site: () => [cruiseArrival()],
 };
 
 export function MissionAudio({ phase }: { phase: PhaseId }) {
@@ -47,7 +45,7 @@ export function MissionAudio({ phase }: { phase: PhaseId }) {
   // a phase's opening radio waits until its scene is on screen
   useEffect(() => {
     const open = OPENING[phase];
-    if (revealed && open) say(open, { once: `open:${phase}:${useStore.getState().state?.plan?.id}` });
+    if (revealed && open) say(open(), { once: `open:${phase}:${useStore.getState().state?.plan?.id}` });
   }, [phase, revealed]);
 
   return null;

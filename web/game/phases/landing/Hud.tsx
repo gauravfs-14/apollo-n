@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { rolesOf } from "../../core/roles";
 import { useGame, usePhaseData } from "../../core/useGame";
 import { Button, Meter, Panel, PhaseTitle, Stat } from "../../ui/kit";
 import type { SimOut } from "../site/api";
@@ -29,19 +30,8 @@ function Stars({ n }: { n: number }) {
   );
 }
 
-// The descent readout follows Apollo 11's real profile (the crew's calls in TEC GET 04 06 43 01 →
-// 04 06 45 40), in feet like the real displays, so what you see matches what the crew call out.
+// Feet and ft/s, the units the crew call out.
 const FT = 3.281;
-const DOWN: [number, number][] = [[0, 0], [5, 1.5], [30, 2.5], [40, 2.5], [75, 2], [100, 3.5], [160, 6], [200, 4.5], [300, 3.5], [400, 9], [540, 15], [600, 19], [750, 23], [1500, 30]];
-const FORWARD: [number, number][] = [[0, 0], [30, 4], [40, 4], [75, 6], [100, 9], [160, 9], [200, 11], [220, 13], [300, 47], [1500, 60]];
-function rateAt(ft: number, table: [number, number][]) {
-  for (let i = 1; i < table.length; i++) {
-    const [a, va] = table[i - 1];
-    const [b, vb] = table[i];
-    if (ft <= b) return va + ((vb - va) * (ft - a)) / (b - a);
-  }
-  return table[table.length - 1][1];
-}
 
 export function LandingHud() {
   const { plan, complete, actsAs, isHost, state } = useGame();
@@ -78,7 +68,7 @@ export function LandingHud() {
     const i = setInterval(() => setWaited((w) => w + 1), 1000);
     return () => clearInterval(i);
   }, [done]);
-  const anyPilot = state?.players.some((p) => p.role === "pilot" && p.connected) ?? false;
+  const anyPilot = state?.players.some((p) => rolesOf(p).includes("pilot") && p.connected) ?? false;
   const canContinue = isPilot || (isHost && (!anyPilot || waited > 20));
 
   return (
@@ -90,8 +80,8 @@ export function LandingHud() {
           <Panel>
             <div className="grid grid-cols-2 gap-3">
               <Stat label="Altitude (ft)" value={Math.round(tele.alt * FT)} tone="data" />
-              <Stat label="Down (ft/s)" value={rateAt(tele.alt * FT, DOWN).toFixed(1)} tone="data" />
-              <Stat label="Forward (ft/s)" value={rateAt(tele.alt * FT, FORWARD).toFixed(0)} tone="data" />
+              <Stat label="Down (ft/s)" value={Math.max(0, -tele.vs * FT).toFixed(0)} tone="data" />
+              <Stat label="Forward (ft/s)" value={(tele.hs * FT).toFixed(0)} tone="data" />
               <Stat label="Engine" value={`${Math.round(tele.thr * 100)}%`} tone="data" />
             </div>
             <div className="mt-3">

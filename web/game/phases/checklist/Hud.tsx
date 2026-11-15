@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { rolesOf } from "../../core/roles";
 import { MINIGAMES, type MinigameResult } from "../../minigames";
-import { say } from "../../core/comms";
+import { clearComms, say } from "../../core/comms";
 import { useGame, usePhaseData } from "../../core/useGame";
-import { CHECKLIST_DONE } from "../../data/missionComms";
+import { checklistDone } from "../../data/missionComms";
 import { Button, Panel, Stat } from "../../ui/kit";
 import { phaseLabel } from "../../ui/phaseLabel";
 
@@ -22,12 +23,19 @@ export function ChecklistHud() {
     const t = setTimeout(() => setSkip(true), 45000);
     return () => clearTimeout(t);
   }, []);
-  // checklist done: Launch Control goes to the automatic sequence, then the mission's own launch call
+  // checklist done: Launch Control reads the result, then the game moves on to launch by itself
   const finished = !!d.result;
+  const advance = useRef(false);
+  const goLaunch = () => {
+    if (advance.current || !d.result) return;
+    advance.current = true;
+    if (actsAs("commander") || isHost) complete("checklist", d.result.score);
+  };
   useEffect(() => {
-    if (!finished) return;
-    const launch = plan?.voice_lines.find((l) => l.id === "launch_1")?.text;
-    say([...CHECKLIST_DONE, ...(launch ? [{ who: "capcom" as const, text: launch }] : [])], { once: `checklist-done:${plan?.id}` });
+    if (!finished || !d.result) return;
+    say(checklistDone(d.result), { once: `checklist-done:${plan?.id}`, onDone: () => setTimeout(goLaunch, 600) });
+    const fallback = setTimeout(goLaunch, 15000); // never wait on the radio forever
+    return () => clearTimeout(fallback);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the result appears
   }, [finished]);
 
@@ -39,7 +47,7 @@ export function ChecklistHud() {
   const actor = actsAs("commander");
   const wide = style === "switch_panel";
   const result = d.result;
-  const actorName = state?.players.find((p) => p.role === "commander")?.name ?? "The commander";
+  const actorName = state?.players.find((p) => rolesOf(p).includes("commander"))?.name ?? "The commander";
 
   return (
     <div className="absolute inset-0">
@@ -61,7 +69,12 @@ export function ChecklistHud() {
                 <Stat label="Time" value={`${result.seconds}s`} tone="data" />
               </div>
               <div className="mt-4 flex justify-end">
-                {actor || isHost ? <Button onClick={() => complete("checklist", result.score)}>Continue to launch</Button> : <span className="text-xs text-dim">Waiting for the commander.</span>}
+                <span className="mr-auto self-center text-xs text-dim">Launch sequence starts when Launch Control is done.</span>
+                {(actor || isHost) && (
+                  <Button variant="ghost" onClick={() => { clearComms(); goLaunch(); }}>
+                    Skip
+                  </Button>
+                )}
               </div>
             </div>
           ) : actor ? (

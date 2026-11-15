@@ -4,8 +4,8 @@
 import { useFrame } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { commsIdle, say } from "../../core/comms";
-import { EGRESS, FIRST_STEP, SURFACE_CHATTER } from "../../data/missionComms";
+import { say } from "../../core/comms";
+import { egress, firstStep, goalAchieved, taskDone } from "../../data/missionComms";
 import { useGame } from "../../core/useGame";
 import type { MissionPlan, SurfaceTask } from "../../types";
 import { EARTH_DIR, PLAY_RADIUS, SUN_DIR, type Ground } from "./ground";
@@ -14,7 +14,6 @@ import { ROLE_COLOR, rt, useSurface, type Guide } from "./store";
 import { beep, chirp, thud } from "./synth";
 import { Label } from "./Label";
 import { addDust } from "./Trail";
-import { LINES, type Line } from "../../core/voiceLines";
 
 
 function angDiff(a: number, b: number) {
@@ -47,38 +46,22 @@ export function hintLevel(difficulty: MissionPlan["difficulty"], mistakes: numbe
 
 export const REPAIR = { angle: 0, start: 0, held: 0, active: false };
 
-/** The real Apollo 11 EVA loop: down the ladder, the first step, then chatter in quiet stretches. */
+/** Surface radio: the commander's calls on the ladder, then Houston's word when the crew is down. */
 function useEvaComms() {
   const exiting = useSurface((s) => s.exiting);
   const { plan } = useGame();
-  const seed = plan?.seed ?? 0;
   const id = plan?.id;
-  // at the foot of the ladder: describe the surface, then "I'm going to step off" releases the step
+  // at the foot of the ladder: "Stepping off" releases the step
   const atFoot = useSurface((s) => s.atFoot);
   useEffect(() => {
-    if (atFoot) say(EGRESS, { once: `egress:${id}`, onDone: () => void (rt.egressDone = true) });
+    if (atFoot) say(egress(), { once: `egress:${id}`, onDone: () => void (rt.egressDone = true) });
   }, [atFoot, id]);
   const stepped = useRef(false);
   useEffect(() => {
     if (exiting || stepped.current) return;
     stepped.current = true;
-    say(FIRST_STEP, { once: `first-step:${id}` });
+    say(firstStep(), { once: `first-step:${id}` });
   }, [exiting, id]);
-  useEffect(() => {
-    let next = seed % SURFACE_CHATTER.length;
-    let quietSince = Date.now();
-    const iv = setInterval(() => {
-      if (!commsIdle()) {
-        quietSince = Date.now();
-        return;
-      }
-      if (Date.now() - quietSince < 25000 || useSurface.getState().finale) return;
-      say(SURFACE_CHATTER[next]);
-      next = (next + 1) % SURFACE_CHATTER.length;
-      quietSince = Date.now();
-    }, 3000);
-    return () => clearInterval(iv);
-  }, [seed]);
 }
 
 export function Tasks({ ground }: { ground: Ground }) {
@@ -137,8 +120,10 @@ export function Tasks({ ground }: { ground: Ground }) {
     g.patch("surface", { done: [...cur] });
     useSurface.getState().say(t.title + " complete");
     chirp(520, 980, 0.3, 0.12);
-    const line = (LINES as Record<string, Line>)[`task_${t.type}`] ?? LINES.task_generic;
-    say({ who: "capcom", text: line.text });
+    // Houston confirms what was just done, and what comes next
+    const tasks = g.plan?.surface.tasks ?? [];
+    const next = tasks.find((x) => !cur.has(x.id));
+    say(taskDone(t, next), { once: `task:${g.plan?.id}:${t.id}` });
   }, []);
 
   const mistake = useCallback((msg: string) => {
@@ -168,7 +153,7 @@ export function Tasks({ ground }: { ground: Ground }) {
     p.flagPos.y = ground.heightAt(p.flagPos.x, p.flagPos.z);
     setFlag([p.flagPos.x, p.flagPos.y, p.flagPos.z]);
     useSurface.getState().set({ finale: true, prompt: null, progress: null, signal: null, bars: null, guides: [] });
-    say({ who: "capcom", text: LINES.finale.text }, { interrupt: true });
+    say(goalAchieved(plan.goal.text), { once: `goal:${plan.id}` });
     chirp(440, 1320, 0.8, 0.12);
   }, [fin, plan, ground]);
 

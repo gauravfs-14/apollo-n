@@ -350,9 +350,9 @@ interface RadioProfile {
 
 const PROFILES: Record<Speaker, RadioProfile> = {
   // Kept subtle: texture under the voice, not effects on top of it.
-  capcom: { hp: 300, lp: 3400, drive: 1.5, lead: 0.38, quindar: true, squelch: 0.18, waver: 0.93, dropouts: false, hiss: 0.04, hissBand: 2400, drift: 1.4, keyUp: 0.15, pops: 0.2, pop: 0.08 },
-  crew: { hp: 400, lp: 2900, drive: 2.0, lead: 0.18, quindar: false, squelch: 0.3, waver: 0.88, dropouts: false, hiss: 0.07, hissBand: 1800, drift: 1.7, keyUp: 0.25, pops: 0.6, pop: 0.14 },
-  crew2: { hp: 400, lp: 2900, drive: 2.0, lead: 0.18, quindar: false, squelch: 0.3, waver: 0.88, dropouts: false, hiss: 0.07, hissBand: 1900, drift: 1.7, keyUp: 0.25, pops: 0.6, pop: 0.14 },
+  capcom: { hp: 220, lp: 4200, drive: 1.1, lead: 0.38, quindar: true, squelch: 0.18, waver: 0.93, dropouts: false, hiss: 0.04, hissBand: 2400, drift: 1.4, keyUp: 0.15, pops: 0.2, pop: 0.08 },
+  crew: { hp: 300, lp: 3600, drive: 1.3, lead: 0.18, quindar: false, squelch: 0.3, waver: 0.88, dropouts: false, hiss: 0.07, hissBand: 1800, drift: 1.7, keyUp: 0.25, pops: 0.6, pop: 0.14 },
+  crew2: { hp: 300, lp: 3600, drive: 1.3, lead: 0.18, quindar: false, squelch: 0.3, waver: 0.88, dropouts: false, hiss: 0.07, hissBand: 1900, drift: 1.7, keyUp: 0.25, pops: 0.6, pop: 0.14 },
   pao: { hp: 140, lp: 5600, drive: 1.2, lead: 0.06, quindar: false, squelch: 0, waver: 1, dropouts: false, hiss: 0.015, hissBand: 3200, drift: 1.1, keyUp: 0, pops: 0, pop: 0 },
 };
 
@@ -466,12 +466,12 @@ function scheduleRadio(ctx: BaseAudioContext, out: AudioNode, buf: AudioBuffer, 
   // AGC: voice and static share one compressor, so the static ducks under speech
   const agc = ctx.createDynamicsCompressor();
   agc.threshold.value = -30;
-  agc.ratio.value = 6;
+  agc.ratio.value = 3; // gentle: rides the level without squashing the voice
   agc.knee.value = 6;
   agc.attack.value = 0.008;
   agc.release.value = 0.25;
   const makeup = ctx.createGain();
-  makeup.gain.value = 1.35;
+  makeup.gain.value = 1.2;
   agc.connect(makeup).connect(bus);
 
   // voice through the comms band: two filters per edge for the steep skirts of a real radio channel
