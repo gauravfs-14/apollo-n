@@ -4,6 +4,7 @@ import { grade } from "../../core/juice";
 import { useCallback, useMemo } from "react";
 import { usePerk } from "../../data/perks";
 import { useGame, usePhaseData } from "../../core/useGame";
+import { useStore } from "../../core/store";
 import { loadTerrain, missionDateIso, missionTime, type TerrainData } from "../../three/terrain";
 import {
   fetchDirector, fetchScore, fetchSim, landerFromBuild, localScore, localSim, perksFor, suggestSpot,
@@ -75,13 +76,14 @@ export function useSiteActions() {
         ui.getState().set({ error: "Mission computer offline: using on-board estimates." });
       }
       if (my !== token) return;
+      if (useStore.getState().state?.phase !== "site") return;
       patch("site", { report: score });
       ui.getState().set({ busy: null });
       const text = await fetchDirector({
         phase: "landing site probe", spot_score: score.score, slope_degrees: score.slope_deg, sunlight_percent: Math.round(score.sun_pct),
         earth_view_percent: Math.round(score.earth_pct), ice_distance_meters: score.ice_distance_m ?? 0, legs_tolerance_degrees: score.tilt_tolerance_deg,
       });
-      if (my === token && text) patch("site", { director: text });
+      if (my === token && text && useStore.getState().state?.phase === "site") patch("site", { director: text }); // not after the crew moved on
     },
     [isPilot, terrain, ui, patch, siteId, lander, date],
   );
@@ -100,7 +102,7 @@ export function useSiteActions() {
         sim = localSim(await terrain(), p.x, p.z, lander, difficulty, perks, seed, n);
         ui.getState().set({ error: "Mission computer offline: using on-board estimates." });
       }
-      if (my === token) patch("site", { sim });
+      if (my === token && useStore.getState().state?.phase === "site") patch("site", { sim });
       ui.getState().set({ busy: null });
       return sim;
     },
