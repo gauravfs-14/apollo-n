@@ -106,7 +106,7 @@ const AX = { L: { b: HF_B, c: HF_C }, R: { b: mirrorAxis(HF_B), c: mirrorAxis(HF
 // relaxed glove: a loose half-fist, the outer fingers curl a little more than the index
 const REST_CURL = [[0.3, 0.6, 0.4], [0.42, 0.7, 0.45], [0.52, 0.8, 0.5], [0.62, 0.85, 0.5]];
 // waving: fingers together and only softly curved
-const WAVE_CURL = [[0.05, 0.16, 0.12], [0.07, 0.2, 0.14], [0.1, 0.24, 0.16], [0.14, 0.28, 0.18]];
+const WAVE_CURL = [[0.02, 0.05, 0.04], [0.02, 0.06, 0.05], [0.03, 0.07, 0.05], [0.04, 0.08, 0.06]]; // open hand, fingers almost straight
 // swing each finger about C so the four sit side by side (the little finger flares ~30 deg in the scan)
 const FINGER_SWING = [0.02, 0, -0.04, -0.5];
 const qG = new THREE.Quaternion();
@@ -128,7 +128,7 @@ function poseHand(side: "L" | "R", h: Fingers, wave: number, t: number, grip: nu
   h.thumb[1].quaternion.setFromAxisAngle(ax.b, 0.45 * tk + 0.1 * grip);
 }
 const MODEL_HEIGHT = 1.93;
-const WAVE_TWIST = -1.57;
+const WAVE_TWIST = 1.57; // palm out, toward whoever is being waved at
 const HANG_TWIST = 1.5; // palms toward the thighs (left arm -, right arm +)
 const MASK_URL = "/models/crew/accent_mask.webp";
 
@@ -237,7 +237,7 @@ export function Astronaut({ role = "commander", accent, pose = "idle", speed = 1
     if (k2 > 0.001) {
       wU.set(-1, -0.85, 0.3).normalize();
       wF.set(-0.2 - 0.38 * sw, 1, 0.12).normalize();
-      wH.set(-0.2 - 0.38 * sw - 0.3 * swW, 1, 0.22).normalize();
+      wH.set(-0.2 - 0.38 * sw - 0.3 * swW, 1, -0.12).normalize(); // wrist tipped back a little so the open palm faces out
       dU.lerp(wU, k2).normalize(); dF.lerp(wF, k2).normalize(); dH.lerp(wH, k2).normalize();
     }
     poseArm("R", shR, elR, wrR, dU, dF, dH, HANG_TWIST * (1 - k2) + WAVE_TWIST * k2);
