@@ -4,6 +4,7 @@ import { Suspense, useEffect } from "react";
 import { devJump } from "@/game/core/devJump";
 import { connect, disconnect } from "@/game/core/net";
 import { PhaseRunner } from "@/game/core/PhaseRunner";
+import { LoadingScreen } from "@/game/ui/LoadingScreen";
 import { GameShell } from "@/game/ui/GameShell";
 import { useApplyVolume } from "@/game/ui/Settings";
 
@@ -33,7 +34,7 @@ function Play() {
 
 export default function Page() {
   return (
-    <Suspense>
+    <Suspense fallback={<LoadingScreen visible phase="select" status="Contacting Houston…" progress={null} />}>
       <Play />
     </Suspense>
   );

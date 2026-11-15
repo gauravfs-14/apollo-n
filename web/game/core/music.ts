@@ -30,8 +30,13 @@ let override: TrackId | null = null;
 
 function apply() {
   const t = override ?? base;
-  if (t) playMusic(`/audio/music/${t}.mp3`, LEVEL[t] ?? 0.35);
-  else stopMusic();
+  // audio must never take the game down: log and carry on without music
+  try {
+    if (t) playMusic(`/audio/music/${t}.mp3`, LEVEL[t] ?? 0.35);
+    else stopMusic();
+  } catch (e) {
+    console.warn("music unavailable:", e);
+  }
 }
 
 /** The stage's track (menu, or the current phase). */

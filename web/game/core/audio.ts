@@ -55,7 +55,12 @@ export function audioGraph(): { ctx: AudioContext; out: AudioNode } | null {
 function musicCtx() {
   const g = audioGraph();
   if (!g) return null;
-  if (!bus) {
+  // rebuild if the context changed (e.g. Howler re-created after a hot reload): nodes can't cross contexts
+  if (!bus || bus.context !== g.ctx) {
+    if (music && music.gain.context !== g.ctx) {
+      music.el.pause();
+      music = null;
+    }
     bus = g.ctx.createGain();
     bus.gain.value = musicVolume;
     bus.connect(g.out);
