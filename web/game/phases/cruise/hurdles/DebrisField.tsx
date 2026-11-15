@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable react-hooks/purity, react-hooks/refs, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, react-hooks/immutability, react-hooks/preserve-manual-memoization -- timers, refs and three.js state are intentionally imperative here */
+/* eslint-disable react-hooks/immutability -- timers, refs and three.js state are intentionally imperative here */
 // Debris dodge, 3D part: instanced rocks arrive in waves, each wave is a wall with one gap. The ship slides in the
 // X/Y plane. Everything is a pure function of (seed, level, t), so spectators replay it from the actor's clock.
 import { useFrame } from "@react-three/fiber";
@@ -77,7 +77,7 @@ const keys = new Set<string>();
 export function DebrisField({ ship }: { ship: React.RefObject<THREE.Group | null> }) {
   const q = useQuality();
   const mesh = useRef<THREE.InstancedMesh>(null);
-  const waves = useMemo(() => makeWaves(rt.seed, rt.level), []); // eslint-disable-line react-hooks/exhaustive-deps -- fixed per mount (scene remounts per hurdle)
+  const waves = useMemo(() => makeWaves(rt.seed, rt.level), []);  
   const geo = useMemo(() => rockGeometry(), []);
   const mat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#8d8780", roughness: 0.95, metalness: 0.05 }), []);
   const dummy = useMemo(() => new THREE.Object3D(), []);

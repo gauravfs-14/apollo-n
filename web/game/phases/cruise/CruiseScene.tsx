@@ -1,30 +1,31 @@
 "use client";
-/* eslint-disable react-hooks/purity, react-hooks/refs, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, react-hooks/immutability, react-hooks/preserve-manual-memoization -- timers, refs and three.js state are intentionally imperative here */
-// Deep-space cruise: the lander coasts toward the Moon. Earth sits behind and shrinks, the Moon ahead grows with
-// journey progress. During the debris hurdle the camera swings behind the ship and rocks stream past.
+ 
+// Cruise: the crew floats inside the Command Module and its equipment bay. Earth recedes behind, the Moon grows
+// ahead; hurdles are hands-on jobs at stations in the cabin (see cabin/).
 import { Environment, Lightformer } from "@react-three/drei";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { Effects } from "../../core/Effects";
 import { useQuality } from "../../core/perf";
-import { useStore } from "../../core/store";
-import type { BuildParts } from "../../data/parts";
 import { Earth } from "../../three/Earth";
 import { Moon } from "../../three/Moon";
-import { Lander, type LanderParts } from "../../three/ship/Lander";
+import { EquipmentBay } from "../../three/interior/Bay";
+import { CommandModule } from "../../three/interior/Cabin";
 import { Starfield } from "../../three/Starfield";
+import { useStore } from "../../core/store";
+import type { BuildParts } from "../../data/parts";
+import { Lander, type LanderParts } from "../../three/ship/Lander";
+import { CabinCrew } from "./cabin/Crew";
+import { Driver, ARENA_Y } from "./cabin/Driver";
+import { EARTH_DIR, MOON_DIR, SUN_DIR } from "./cabin/layout";
+import { PlayerRig } from "./cabin/Player";
+import { CautionPanel, EngineStation, StormStation } from "./cabin/Stations";
+import { CheckStations, CommsStation, DebrisStation, NavStation, Waypoints } from "./cabin/Stations2";
 import { DebrisField } from "./hurdles/DebrisField";
 import { rt, useDebrisOn } from "./rt";
 
-const SUN = new THREE.Vector3(0.9, 0.3, 0.25).normalize();
-const SUN_ARR: [number, number, number] = [SUN.x, SUN.y, SUN.z];
-const SHIP_SCALE = 0.45;
-
-const SIDE_POS = new THREE.Vector3(14, 1.2, 0);
-const SIDE_LOOK = new THREE.Vector3(0, -2.4, -0.4);
-const CHASE_POS = new THREE.Vector3(0, 2.4, 11);
-const CHASE_LOOK = new THREE.Vector3(0, 0.3, -40);
+const SUN_ARR: [number, number, number] = [SUN_DIR.x, SUN_DIR.y, SUN_DIR.z];
 
 function Planets() {
   const q = useQuality();
@@ -33,97 +34,99 @@ function Planets() {
   useFrame((_, dt) => {
     rt.progress = THREE.MathUtils.damp(rt.progress, rt.progressTarget, 0.8, dt);
     const P = rt.progress;
-    // Earth: starts close behind, drifts away (shrinks). Moon: starts a distant dot, grows toward the right edge.
-    // keep both on fixed screen bearings (Earth left, Moon right); only their distance changes
-    const de = 330 + 510 * P; // Earth: 330 -> 840 m away (shrinks)
-    const dm = 1000 - 570 * P; // Moon: 1000 -> 430 m away (grows)
-    earth.current?.position.set(-de, 1.2 - 0.155 * de, 0.3 * de);
-    moon.current?.position.set(-dm, 1.2 - 0.155 * dm, -0.3 * dm);
+    const de = 320 + 620 * P; // Earth recedes
+    const dm = 1100 - 700 * P; // Moon approaches
+    earth.current?.position.copy(EARTH_DIR).multiplyScalar(de);
+    moon.current?.position.copy(MOON_DIR).multiplyScalar(dm);
   });
   return (
     <>
       <group ref={earth}>
-        <Earth radius={36} sun={SUN_ARR} spin={0.01} lite={q.tier === "low"} />
+        <Earth radius={110} sun={SUN_ARR} spin={0.01} lite={q.tier === "low"} />
       </group>
       <group ref={moon}>
-        <Moon radius={60} rotation={[0.15, 0, 0.1]} quality={q.tier === "low" ? "low" : "medium"} relief={0} />
+        <Moon radius={90} rotation={[0.15, 0, 0.1]} quality={q.tier === "low" ? "low" : "medium"} relief={0} />
       </group>
     </>
   );
 }
 
-function Ship({ shipRef }: { shipRef: React.RefObject<THREE.Group | null> }) {
+/** Exterior view used while the pilot flies the debris field: the lander with rocks streaming past (far above the cabin). */
+function Arena() {
+  const shipRef = useRef<THREE.Group>(null);
   const parts = useStore((s) => (s.state?.phaseData.build as { parts?: BuildParts } | undefined)?.parts);
-  const idle = useRef<THREE.Group>(null);
-  useFrame((st) => {
-    const g = idle.current;
-    if (!g) return;
-    const t = st.clock.elapsedTime;
-    // slow roll while coasting (nose points to -Z)
-    g.rotation.z = rt.debris ? Math.sin(t * 0.6) * 0.05 : t * 0.12;
-    g.rotation.x = rt.debris ? 0 : Math.sin(t * 0.3) * 0.03;
-  });
   const p = useMemo(() => (parts ? ({ ...parts } as Partial<LanderParts>) : undefined), [parts]);
+  const idle = useRef<THREE.Group>(null);
+  useFrame(() => {
+    if (idle.current) idle.current.rotation.z = Math.sin(performance.now() / 1000 * 0.6) * 0.05;
+  });
   return (
-    <group ref={shipRef} scale={SHIP_SCALE}>
-      <group ref={idle}>
-        <group rotation={[-Math.PI / 2, 0, 0]}>
-          <group position={[0, -3.5, 0]}>
-            <Lander parts={p} heat={rt.debris ? 1 : 0.55} />
+    <group position={[0, ARENA_Y, 0]}>
+      <group ref={shipRef} scale={0.45}>
+        <group ref={idle}>
+          <group rotation={[-Math.PI / 2, 0, 0]}>
+            <group position={[0, -3.5, 0]}>
+              <Lander parts={p} heat={1} />
+            </group>
           </group>
         </group>
       </group>
+      <DebrisField ship={shipRef} />
     </group>
   );
 }
 
-function CameraRig() {
-  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
-  const pos = useMemo(() => new THREE.Vector3(), []);
-  const look = useMemo(() => new THREE.Vector3(), []);
-  const cur = useRef({ w: 0 });
-  const shake = useRef(0);
-  const lastHits = useRef(0);
-  useFrame((st, dt) => {
-    const t = st.clock.elapsedTime;
-    cur.current.w = THREE.MathUtils.damp(cur.current.w, rt.debris ? 1 : 0, 2.2, dt);
-    const w = cur.current.w;
-    const side = pos.copy(SIDE_POS).add(look.set(Math.sin(t * 0.07) * 1.2, Math.sin(t * 0.05) * 0.4, Math.cos(t * 0.06) * 1.5));
-    pos.copy(side).lerp(CHASE_POS, w);
-    look.copy(SIDE_LOOK).lerp(CHASE_LOOK, w);
-    if (rt.hits !== lastHits.current) {
-      lastHits.current = rt.hits;
-      shake.current = 0.6;
-    }
-    shake.current = Math.max(0, shake.current - dt * 1.6);
-    if (shake.current > 0) pos.add(look.set((Math.random() - 0.5) * shake.current * 0.5, (Math.random() - 0.5) * shake.current * 0.5, 0));
-    camera.position.copy(pos);
-    camera.lookAt(CHASE_LOOK.x * w + SIDE_LOOK.x * (1 - w), CHASE_LOOK.y * w + SIDE_LOOK.y * (1 - w), CHASE_LOOK.z * w + SIDE_LOOK.z * (1 - w));
-    camera.fov = 40;
-    camera.updateProjectionMatrix();
-  });
-  return null;
-}
+const sunTarget = new THREE.Object3D();
+sunTarget.position.set(0, 0, 4.5);
 
 export function CruiseScene() {
   const q = useQuality();
-  const shipRef = useRef<THREE.Group>(null);
   const debris = useDebrisOn((s) => s.on);
   return (
     <>
       <color attach="background" args={["#000"]} />
-      <CameraRig />
-      <Starfield brightness={1.2} rotation={[0.3, 2.6, 0]} />
-      <directionalLight position={[SUN.x * 400, SUN.y * 400, SUN.z * 400]} intensity={5.5} castShadow={q.shadows} shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} shadow-camera-far={900} shadow-bias={-0.0005} />
-      <ambientLight intensity={0.03} />
-      <Environment resolution={128} frames={1} environmentIntensity={0.9}>
-        <Lightformer form="rect" intensity={4} position={[10, 3, 4]} rotation={[0, -1.2, 0]} scale={[6, 3, 1]} color="#fff3e0" />
-        <Lightformer form="rect" intensity={1.2} position={[-8, 1, -3]} rotation={[0, 1.2, 0]} scale={[8, 4, 1]} color="#5a86d8" />
-      </Environment>
+      <Starfield brightness={1.3} rotation={[0.3, 2.6, 0]} />
       <Planets />
-      <Ship shipRef={shipRef} />
-      {debris && <DebrisField ship={shipRef} />}
-      <Effects bloom={0.55} ao={false} />
+      <primitive object={sunTarget} />
+      <directionalLight
+        target={sunTarget}
+        position={[SUN_DIR.x * 30, SUN_DIR.y * 30, SUN_DIR.z * 30 + 4.5]}
+        intensity={6}
+        color="#fff4e6"
+        castShadow={q.shadows}
+        shadow-mapSize={[q.shadowMapSize, q.shadowMapSize]}
+        shadow-camera-left={-6}
+        shadow-camera-right={6}
+        shadow-camera-top={6}
+        shadow-camera-bottom={-6}
+        shadow-camera-near={1}
+        shadow-camera-far={70}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.03}
+      />
+      <hemisphereLight args={["#bcd0ff", "#403830", 0.18]} />
+      {[1.2, 3.6, 5.7, 7.7].map((z) => (
+        <pointLight key={z} position={[0, 0.9, z]} intensity={z < 3 ? 3 : 5} distance={6.5} decay={2} color="#fff0dc" />
+      ))}
+      <Environment resolution={64} frames={1} environmentIntensity={0.5}>
+        <Lightformer form="rect" intensity={2} position={[0, 4, 3]} scale={[8, 3, 1]} rotation={[Math.PI / 2, 0, 0]} color="#fff3e0" />
+        <Lightformer form="rect" intensity={0.6} position={[-4, 0, 0]} scale={[6, 3, 1]} rotation={[0, Math.PI / 2, 0]} color="#8fb0ff" />
+      </Environment>
+      <CommandModule />
+      <EquipmentBay />
+      <PlayerRig />
+      <Driver />
+      <CabinCrew />
+      <CautionPanel />
+      <EngineStation />
+      <StormStation />
+      <NavStation />
+      <CommsStation />
+      <DebrisStation />
+      <CheckStations />
+      <Waypoints />
+      {debris && <Arena />}
+      <Effects bloom={0.5} ao={false} />
     </>
   );
 }
