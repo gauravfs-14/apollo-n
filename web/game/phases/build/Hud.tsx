@@ -7,6 +7,8 @@ import { SLOTS, SLOT_LABEL, evaluateBuild, partsFor, shipStats, type BuildCheck,
 import { rollPerk } from "../../data/perks";
 import type { Difficulty, Role, ShipSlot } from "../../types";
 import { phaseLabel } from "../../ui/phaseLabel";
+import { useUpgrades } from "../../progress/effects";
+import { upgradeForPart } from "../../progress/upgrades";
 
 const SLOT_ROLE: Record<ShipSlot, Role> = { engine: "engineer", power: "engineer", legs: "pilot", comms: "pilot", payload: "scientist" };
 const ROLE_LABEL: Record<Role, string> = { commander: "Commander", pilot: "Pilot", engineer: "Engineer", scientist: "Scientist" };
@@ -54,7 +56,7 @@ function partChips(p: ShipPart) {
   if (p.drawW) out.push(`-${p.drawW} W`);
   if (p.tiltTolerance) out.push(`${p.tiltTolerance} deg slope`);
   if (p.radioQuality) out.push(`radio ${Math.round(p.radioQuality * 100)}%`);
-  if (p.tags) out.push(...p.tags);
+  if (p.tags) out.push(...p.tags.map((t) => (t === "radar" ? "landing radar" : t)));
   return out;
 }
 
@@ -70,7 +72,9 @@ export function BuildHud() {
 
   const c = plan?.ship.constraints;
   const ev = useMemo(() => (c ? evaluateBuild(parts, c) : null), [parts, c]);
+  const ups = useUpgrades();
   const options = partsFor(slot);
+  const locked = (p: ShipPart) => !!p.premium && !ups.unlockedParts.includes(p.id);
   const hintsOn = mistakes >= HINT_AFTER[plan?.difficulty ?? "normal"];
 
   // crew roles are only chosen after the build, so until someone picks one every player may choose parts
@@ -82,12 +86,14 @@ export function BuildHud() {
     if (!c) return null;
     let top: string | null = null, topScore = -1, low = 101;
     for (const o of options) {
+      if (locked(o)) continue;
       const sc = evaluateBuild({ ...parts, [slot]: o.id }, c).score;
       low = Math.min(low, sc);
       if (sc > topScore) { topScore = sc; top = o.id; }
     }
     return topScore > low ? top : null;
-  }, [options, parts, slot, c]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options, parts, slot, c, ups.unlockedParts]);
 
   if (!plan || !c || !ev) {
     return (
@@ -98,7 +104,7 @@ export function BuildHud() {
   }
 
   const choose = (p: ShipPart) => {
-    if (!canPick(p.slot) || parts[p.slot] === p.id) return;
+    if (!canPick(p.slot) || parts[p.slot] === p.id || locked(p)) return;
     const next = { ...parts, [p.slot]: p.id };
     const sc = evaluateBuild(next, c).score;
     if (ev.stats.complete && lastScore.current !== null && sc < lastScore.current) setMistakes((m) => m + 1);
@@ -117,7 +123,7 @@ export function BuildHud() {
       return;
     }
     // the build score earns a perk (the old supply crate), used later by hurdles and the landing
-    patch("build", { parts, stats: shipStats(parts), final: true, score: ev.score, perk: plan ? rollPerk(ev.score, plan.seed) : undefined });
+    patch("build", { parts, stats: shipStats(parts), final: true, score: ev.score, perk: plan ? (ups.startingPerk ?? rollPerk(ev.score, plan.seed)) : undefined });
     complete("build", ev.score);
     sfx("chime", { volume: 0.5 });
   };
@@ -168,7 +174,7 @@ export function BuildHud() {
 
       {/* bottom dock: slot tabs + 3 cards */}
       <div className="absolute inset-x-0 bottom-5 flex justify-center px-6">
-        <div className="w-full max-w-4xl">
+        <div className="w-full max-w-6xl">
           <div className="mb-2 flex flex-wrap gap-2">
             {SLOTS.map((s) => {
               const chosen = parts[s];
@@ -191,10 +197,12 @@ export function BuildHud() {
               );
             })}
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
             {options.map((p) => {
               const sel = parts[slot] === p.id;
-              const ok = canPick(slot);
+              const lk = locked(p);
+              const ok = canPick(slot) && !lk;
+              const up = lk ? upgradeForPart(p.id) : undefined;
               return (
                 <button
                   key={p.id}
@@ -202,13 +210,18 @@ export function BuildHud() {
                   onClick={() => choose(p)}
                   className={`pointer-events-auto relative rounded-xl border p-3 text-left backdrop-blur-md transition active:scale-[0.99] ${
                     sel ? "border-amber bg-amber/10" : "border-line bg-panel hover:bg-white/10"
-                  } ${ok ? "" : "opacity-50"}`}
+                  } ${ok ? "" : lk ? "cursor-not-allowed" : "opacity-50"}`}
                 >
+                  {lk && up && (
+                    <span className="absolute right-2 top-2 rounded border border-amber/50 bg-black/60 px-1.5 py-0.5 text-[10px] text-amber">
+                      Hangar {up.tiers[0].cost} cr{up.tiers[0].req ? `, level ${up.tiers[0].req}` : ""}
+                    </span>
+                  )}
                   {hintsOn && best === p.id && !sel && <span className="absolute right-2 top-2 rounded bg-go/20 px-1.5 py-0.5 text-[10px] text-go">Good fit</span>}
                   {sel && <span className="absolute right-2 top-2 rounded bg-amber px-1.5 py-0.5 text-[10px] font-medium text-black">Fitted</span>}
-                  <div className="text-sm font-semibold">{p.name}</div>
+                  <div className={`text-sm font-semibold ${lk ? "text-white/55" : ""}`}>{p.name}</div>
                   <div className="text-[11px] text-dim">{p.inspiredBy}</div>
-                  <p className="mt-1.5 text-xs leading-snug text-white/80">{p.desc}</p>
+                  <p className={`mt-1.5 text-xs leading-snug ${lk ? "text-white/45" : "text-white/80"}`}>{p.desc}</p>
                   <div className="mt-2 flex flex-wrap gap-1">
                     {partChips(p).map((t) => (
                       <Chip key={t}>{t}</Chip>

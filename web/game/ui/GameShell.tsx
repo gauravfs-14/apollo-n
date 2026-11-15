@@ -11,6 +11,7 @@ import { useStore } from "../core/store";
 import { PHASE_ORDER, type Player, type Role } from "../types";
 import { Button, Panel } from "./kit";
 import { SettingsPanel } from "./Settings";
+import { useMyTitle, useTitleOf, useTitleSync } from "../progress/titles";
 
 export const ROLE_TEXT: Record<Role, string> = {
   commander: "text-amber",
@@ -56,6 +57,7 @@ function useCopy(text: () => string) {
 }
 
 function PlayerChip({ p, isMe }: { p: Player; isMe: boolean }) {
+  const title = useTitleOf(p.id);
   return (
     <span
       className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs ${isMe ? "bg-white/10" : "bg-white/5"} ${p.connected ? "text-white" : "text-white/40"}`}
@@ -63,6 +65,7 @@ function PlayerChip({ p, isMe }: { p: Player; isMe: boolean }) {
     >
       <span className={`h-1.5 w-1.5 rounded-full ${p.connected ? "bg-go" : "bg-white/30"}`} />
       <span className="max-w-24 truncate">{p.name}</span>
+      {title && <span className="text-[10px] text-amber/90">{title}</span>}
       {rolesOf(p).map((r) => (
         <span key={r} className={`${ROLE_TEXT[r]} ${p.connected ? "" : "opacity-50"}`}>{ROLE_LABEL[r]}</span>
       ))}
@@ -72,6 +75,8 @@ function PlayerChip({ p, isMe }: { p: Player; isMe: boolean }) {
 }
 
 function TopBar({ onMenu }: { onMenu: () => void }) {
+  useTitleSync();
+  const myTitle = useMyTitle();
   const state = useStore((s) => s.state);
   const meId = useStore((s) => s.meId);
   const conn = useStore((s) => s.connection);
@@ -89,7 +94,7 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
             <span className="text-[10px] text-dim">{copied ? "Link copied" : "Copy link"}</span>
           </button>
         ) : (
-          <span className="px-2 text-xs text-dim">Solo mission</span>
+          <span className="px-2 text-xs text-dim">Solo mission{myTitle ? <span className="ml-1.5 text-[10px] text-amber/90">{myTitle}</span> : null}</span>
         )}
         <span className="flex items-center gap-1.5 px-1 text-xs text-white/80" role="status">
           <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
@@ -282,7 +287,7 @@ export function GameShell() {
 
 /** Ship integrity in the top bar; flashes when the ship takes damage. */
 function HpChip() {
-  const { hp } = useMissionHp();
+  const { hp, hpMax } = useMissionHp();
   const phase = useStore((s) => s.state?.phase);
   const [flash, setFlash] = useState(false);
   const prev = useRef(hp);
@@ -296,18 +301,19 @@ function HpChip() {
     prev.current = hp;
   }, [hp]);
   if (!phase || phase === "select") return null;
-  const tone = hp > 60 ? "bg-go" : hp > 30 ? "bg-amber" : "bg-nogo";
+  const frac = hp / hpMax;
+  const tone = frac > 0.6 ? "bg-go" : frac > 0.3 ? "bg-amber" : "bg-nogo";
   return (
     <span
       className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors ${flash ? "bg-nogo/30" : ""}`}
       title="Ship integrity: mistakes cost integrity, and at zero the mission is lost"
-      aria-label={`Ship integrity ${Math.round(hp)} percent`}
+      aria-label={`Ship integrity ${Math.round(hp)} of ${hpMax}`}
     >
       <span className="text-dim">Ship</span>
       <span className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
-        <span className={`block h-full ${tone} transition-[width] duration-500`} style={{ width: `${hp}%` }} />
+        <span className={`block h-full ${tone} transition-[width] duration-500`} style={{ width: `${Math.min(100, frac * 100)}%` }} />
       </span>
-      <span className="num w-8 text-right text-white">{Math.round(hp)}%</span>
+      <span className="num w-8 text-right text-white">{Math.round(hp)}{hpMax === 100 ? "%" : ""}</span>
     </span>
   );
 }

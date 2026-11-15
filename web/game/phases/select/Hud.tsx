@@ -5,10 +5,13 @@ import { api } from "../../core/api";
 import { say } from "../../core/comms";
 import { useGame, usePhaseData } from "../../core/useGame";
 import fallbackPlan from "../../data/fallback-plan.json";
-import { LEVEL_COUNT, fitPlanToLevel, levelDef } from "../../journey/levels";
+import { LEVEL_COUNT, fitPlanToLevel, levelDef, tightenPlan } from "../../journey/levels";
 import { useJourney, useJourneyStore } from "../../journey/progress";
 import type { MissionPlan } from "../../types";
 import { Button } from "../../ui/kit";
+import { getUpgrades, shipPart } from "../../progress/effects";
+import { useProgress } from "../../progress/store";
+import { ProgressScreen, type Tab } from "../../progress/ProgressScreen";
 import { JourneyMap, type NodeState } from "./JourneyMap";
 
 interface SelectData {
@@ -22,6 +25,9 @@ const DIFF_TONE = { easy: "text-go border-go/40", normal: "text-cyan border-cyan
 
 /** The plan stored for this level, else a fresh one from the API (then remembered), else the offline plan. */
 async function loadPlan(level: number): Promise<MissionPlan> {
+  return tightenPlan(await loadRawPlan(level), level);
+}
+async function loadRawPlan(level: number): Promise<MissionPlan> {
   const store = useJourneyStore.getState();
   const id = store.plans[level];
   if (id) {
@@ -57,6 +63,8 @@ export function SelectHud() {
   const [more, setMore] = useState(false);
   const [peek, setPeek] = useState<{ level: number; plan: MissionPlan } | null>(null);
   const started = useRef(false);
+  const prog = useProgress();
+  const [screen, setScreen] = useState<Tab | null>(null);
 
   const hostView = isHost;
   const current = hostView ? j.current : (shared.current ?? 1);
@@ -95,8 +103,10 @@ export function SelectHud() {
       setBusy(true);
       const cached = peek?.level === level ? peek.plan : null;
       const plan = cached ?? (await loadPlan(level));
-      patch("select", { level });
-      action("select", "set_plan", { plan });
+      // the host's hangar sets the shared ship: hull, fuel, hurdle timers, unlocked parts, starting perk
+      const ship = shipPart(getUpgrades());
+      patch("select", { level, ship });
+      action("select", "set_plan", { plan, hpMax: ship.hpMax });
       api(`/missions/${plan.id}/chosen`, {}).catch(() => {});
       const brief = plan.voice_lines.find((v) => v.id === "brief_1");
       if (brief) say({ who: "capcom", text: brief.text }, { interrupt: true });
@@ -129,11 +139,21 @@ export function SelectHud() {
             <span>
               <span className="num text-[#ffcf5a]">{j.stars}</span> of {LEVEL_COUNT * 3} stars
             </span>
+            <span>
+              <span className="num text-amber">{prog.credits}</span> credits
+            </span>
+          </div>
+        )}
+        {hostView && (
+          <div className="pointer-events-auto mt-3 flex gap-2">
+            <Button variant="ghost" className="py-1.5" onClick={() => setScreen("hangar")}>Hangar</Button>
+            <Button variant="ghost" className="py-1.5" onClick={() => setScreen("collection")}>Collection</Button>
           </div>
         )}
       </header>
+      {screen && <ProgressScreen tab={screen} onTab={setScreen} onClose={() => setScreen(null)} />}
 
-      <div className="absolute bottom-3 left-[max(0.5rem,5vw)] top-24 w-[440px] max-w-[46vw]">
+      <div className="absolute bottom-3 left-[max(0.5rem,5vw)] top-40 w-[440px] max-w-[46vw]">
         <JourneyMap stateOf={stateOf} starsOf={starsOf} current={current} selected={selected} onSelect={(n) => hostView && setPicked(n)} crewLevel={crewLevel} />
       </div>
 
