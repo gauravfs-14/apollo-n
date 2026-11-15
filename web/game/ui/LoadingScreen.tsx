@@ -61,8 +61,9 @@ export function LoadingScreen({
       aria-live="polite"
       aria-busy={visible}
       className={`pointer-events-none fixed inset-0 z-[30] overflow-hidden bg-[#05070a] text-white ${visible ? "" : "apollo-paused"}`}
-      // stays mounted: fades out, then visibility:hidden (and paused animations) once the fade is done
-      style={{ opacity: visible ? 1 : 0, visibility: visible ? "visible" : "hidden", transition: visible ? "opacity 200ms" : "opacity 600ms ease-out, visibility 0s linear 600ms" }}
+      // stays mounted. Appears instantly (a fade-in let the next phase flash through between scenes);
+      // fades out, then visibility:hidden (and paused animations) once the fade is done
+      style={{ opacity: visible ? 1 : 0, visibility: visible ? "visible" : "hidden", transition: visible ? "none" : "opacity 600ms ease-out, visibility 0s linear 600ms" }}
     >
       <div className="apollo-stars absolute left-0 top-0 h-px w-px" style={{ boxShadow: stars[0] }} />
       <div className="apollo-stars-slow absolute left-0 top-0 h-[2px] w-[2px] rounded-full" style={{ boxShadow: stars[1] }} />

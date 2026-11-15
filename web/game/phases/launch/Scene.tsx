@@ -122,7 +122,8 @@ export function LaunchScene() {
     if (!st.rumble && t > T.liftoff) { st.rumble = true; traceEvent("liftoff (rocket leaves the pad)"); } // one recorded roar, no stacked layers
 
     // ---- mode cut ----
-    if (!st.cut && t >= T.spaceCut) { st.cut = true; setSpace(true); }
+    // cut to space: the pad's exhaust smoke (9 s particles) must not linger in front of the space camera as haze and dark blobs
+    if (!st.cut && t >= T.spaceCut) { st.cut = true; setSpace(true); smoke.current?.clear(); }
 
     // ---- flames ----
     const ign = clamp01((t - T.ignition) / 2.5);
@@ -222,7 +223,7 @@ export function LaunchScene() {
       const s1 = t >= T.sep1, s2 = t >= T.sep2;
       if (!st.sep1 && s1) {
         st.sep1 = true; sfx("staging", { volume: 0.6 }); traceEvent("first stage separates"); if (!store.skipped) say(LAUNCH_EVENTS.staging);
-        st.s1p.set(0, 0, 0); st.s1v.set(-9, 0.6, 1.8);
+        st.s1p.set(0, 0, 0); st.s1v.set(-9, 0.6, -1.8); /* drifts away from the camera side */
         for (let i = 0; i < 40 * rate; i++) {
           fire.current?.emit(1, { pos: [0, 52 * RS, 0], posJitter: [4, 3, 4], vel: [(R() - 0.5) * 30, (R() - 0.5) * 30, (R() - 0.5) * 30], life: 0.9, size0: 4, size1: 22, color: [1, 0.85, 0.6], glow: 1 });
         }
@@ -253,6 +254,10 @@ export function LaunchScene() {
         const k = t - T.sep2;
         rk.s2.position.set(st.s2v.x * k * 0.5, -k * k * 3.5 - k * 5, st.s2v.z * k);
         rk.s2.rotation.set(k * 0.09, 0, -k * 0.05);
+      }
+      // a spent stage that drifts close to the camera would clip through the near plane as a flashing black shape: hide it
+      for (const stage of [rk.s1, rk.s2]) {
+        if (stage.visible && stage.getWorldPosition(st.tmp).distanceTo(state.camera.position) < 25) stage.visible = false;
       }
       // engines: S-II burns between separations, S-IVB burns after
       flame.current = t < T.sep1 ? (0.9 + Math.random() * 0.1) : 0;

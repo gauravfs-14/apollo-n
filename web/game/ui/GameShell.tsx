@@ -236,7 +236,9 @@ function Connecting() {
   const state = useStore((s) => s.state);
   const conn = useStore((s) => s.connection);
   const router = useRouter();
-  if (state) return null;
+  // the loading screen already says "Contacting Houston…" while we connect; this only adds the cases it can't
+  // (the room doesn't exist, or the connection dropped), so it never flashes over the loader
+  if (state || (conn !== "missing" && conn !== "lost")) return null;
   const missing = conn === "missing";
   return (
     <div className="pointer-events-auto absolute inset-0 z-20 grid place-items-center bg-black/70 backdrop-blur-sm">

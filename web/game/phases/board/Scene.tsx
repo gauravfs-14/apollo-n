@@ -26,6 +26,7 @@ const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const sm = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 const SUN = new THREE.Vector3(-0.75, 0.32, 0.5).normalize();
 const T_ELEV0 = 4.5, T_ELEV1 = 9, T_HATCH = 10.2;
+const PACE = 0.55;
 
 export function BoardScene() {
   const q = useQuality();
@@ -65,7 +66,9 @@ export function BoardScene() {
     const store = useBoardClock.getState();
     const dt = Math.min(rawDt, 0.05);
     if (store.skipped && st.t < BOARD_END - 0.3) st.t = BOARD_END - 0.3;
-    if (isRevealed("board")) st.t += dt; // starts when the scene is on screen
+    // the whole sequence runs at PACE (≈22 s instead of 12) so the walkout, elevator ride and ingress can breathe;
+    // every mark below and in the HUD is on this clock, so they stay in step
+    if (isRevealed("board")) st.t += dt * PACE; // starts when the scene is on screen
     const t = st.t;
     if (((t * 10) | 0) !== (((t - dt) * 10) | 0)) store.set(t);
 
@@ -162,7 +165,7 @@ export function BoardScene() {
       {/* crew */}
       {roles.map((r, i) => (
         <group key={r} ref={(g) => void (crew.current[i] = g)}>
-          <Astronaut role={r} pose={pose} height={1.85} offset={i * 0.7} />
+          <Astronaut role={r} pose={pose} height={1.85} offset={i * 0.7} speed={PACE} />
         </group>
       ))}
 
