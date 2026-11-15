@@ -42,6 +42,66 @@ const J = [
 ];
 // forearm axis (elbow -> wrist), used to split the glove from the forearm
 const WRIST = { L: J[11].p, R: J[12].p };
+
+// ---- fingers ----
+// The glove is modelled with five separate, flat-open fingers. Hand frame (left hand; the right is the x-mirror): f = forearm axis
+// (wrist direction), b = across the palm toward the little finger, c = f x b (the palm faces -c). Each finger is a centre line K->T in
+// the (b, a) plane (cm, measured on the mesh, a = distance along f from the wrist) with joints at fractions of its length.
+// Finger bones are rotation-free in the bind pose and parented to the wrist (finger k: mcp -> pip -> dip; thumb: cmc -> ip).
+const HF = (() => {
+  const e = J[5].p, w = J[11].p;
+  const f = [w[0] - e[0], w[1] - e[1], w[2] - e[2]];
+  const fl = Math.hypot(...f); f.forEach((_, i) => (f[i] /= fl));
+  const b = [1 - f[0] * f[0], -f[0] * f[1], -f[0] * f[2]];
+  const bl = Math.hypot(...b); b.forEach((_, i) => (b[i] /= bl));
+  const c = [f[1] * b[2] - f[2] * b[1], f[2] * b[0] - f[0] * b[2], f[0] * b[1] - f[1] * b[0]];
+  return { w, f, b, c };
+})();
+const hf = (p, mirror) => { // world position -> hand frame (a, b, c) relative to the wrist; mirror: take a right-hand point as a left one
+  const q = [mirror ? -p[0] : p[0], p[1], p[2]], d = [q[0] - HF.w[0], q[1] - HF.w[1], q[2] - HF.w[2]];
+  const dot = (v) => d[0] * v[0] + d[1] * v[1] + d[2] * v[2];
+  return { a: dot(HF.f), b: dot(HF.b), c: dot(HF.c) };
+};
+const cm = 0.01;
+const FINGERS = [
+  { n: "index", K: [-4.7, 9.0], T: [-4.7, 15.3], joints: [0, 0.42, 0.72] },
+  { n: "middle", K: [-0.1, 9.2], T: [-0.2, 15.5], joints: [0, 0.42, 0.72] },
+  { n: "ring", K: [3.6, 9.2], T: [4.0, 14.0], joints: [0, 0.42, 0.72] },
+  { n: "pinky", K: [4.2, 6.6], T: [6.5, 10.6], joints: [0, 0.42, 0.72] },
+  { n: "thumb", K: [-7.2, 3.5], T: [-8.6, 9.6], joints: [0, 0.55] },
+].map((F) => {
+  const dx = (F.T[0] - F.K[0]) * cm, dy = (F.T[1] - F.K[1]) * cm, len = Math.hypot(dx, dy);
+  return { ...F, K: [F.K[0] * cm, F.K[1] * cm], dir: [dx / len, dy / len], len, js: F.joints.map((j) => j * len) };
+});
+{
+  // palm/finger thickness: the centre of the glove (c) at each joint, from the left hand's vertices
+  const m0 = meshNode.getWorldMatrix(), p0 = mesh.listPrimitives()[0].getAttribute("POSITION").getArray();
+  const hv = [];
+  for (let i = 0; i < p0.length; i += 3) {
+    const x = p0[i], y = p0[i + 1], z = p0[i + 2];
+    const q = [m0[0] * x + m0[4] * y + m0[8] * z + m0[12], m0[1] * x + m0[5] * y + m0[9] * z + m0[13], m0[2] * x + m0[6] * y + m0[10] * z + m0[14]];
+    if (q[0] > 0.12 && q[0] < 0.5 && q[1] > 0.8 && q[1] < 1.3 && q[2] > 0.3) { const h = hf(q, false); if (h.a > 0.02) hv.push(h); }
+  }
+  for (const F of FINGERS) {
+    F.world = F.js.map((u) => {
+      const bb = F.K[0] + F.dir[0] * u, aa = F.K[1] + F.dir[1] * u;
+      let sc = 0, n = 0;
+      for (const h of hv) if (Math.hypot(h.b - bb, h.a - aa) < 0.012) { sc += h.c; n++; }
+      return { a: aa, b: bb, c: n ? sc / n : 0 };
+    });
+  }
+  for (const side of ["L", "R"]) {
+    const sg = side === "L" ? 1 : -1, wi = side === "L" ? 11 : 12;
+    for (const F of FINGERS) {
+      let parent = wi;
+      F.world.forEach((q, j) => {
+        const p = [HF.w[0] + q.a * HF.f[0] + q.b * HF.b[0] + q.c * HF.c[0], HF.w[1] + q.a * HF.f[1] + q.b * HF.b[1] + q.c * HF.c[1], HF.w[2] + q.a * HF.f[2] + q.b * HF.b[2] + q.c * HF.c[2]];
+        J.push({ name: `${F.n}${side}${j}`, p: [p[0] * sg, p[1], p[2]], parent });
+        parent = J.length - 1;
+      });
+    }
+  }
+}
 const I = Object.fromEntries(J.map((j, i) => [j.name, i]));
 const nodes = J.map((j) => doc.createNode(j.name));
 J.forEach((j, i) => {
@@ -118,7 +178,32 @@ for (const prim of mesh.listPrimitives()) {
       const ax = [w[0] - e[0], w[1] - e[1], w[2] - e[2]], al = Math.hypot(...ax);
       const t = ((pos[v * 3] - w[0]) * ax[0] + (pos[v * 3 + 1] - w[1]) * ax[1] + (pos[v * 3 + 2] - w[2]) * ax[2]) / al;
       const k = ss(-0.035, 0.035, t);
-      if (k > 0) { joints[v * 4 + 1] = left ? I.wristL : I.wristR; weights[v * 4] = 1 - k; weights[v * 4 + 1] = k; }
+      if (k > 0) {
+        // past the cuff: wrist bone for the palm, finger bones for the fingers (two nearest fingers blended, joints blended with smoothsteps)
+        const side = left ? "L" : "R", wb = left ? I.wristL : I.wristR;
+        const h = hf([pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]], !left);
+        const ds = FINGERS.map((F) => {
+          const rb = h.b - F.K[0], ra = h.a - F.K[1];
+          const u = rb * F.dir[0] + ra * F.dir[1];
+          return { F, u, d: distSeg(h.b, h.a, F.K[0], F.K[1], F.K[0] + F.dir[0] * F.len, F.K[1] + F.dir[1] * F.len) };
+        }).sort((x, y) => x.d - y.d);
+        const fade = 1 - ss(0.022, 0.04, ds[0].d);
+        const gap = ss(0, 1, Math.min(1, (ds[1].d - ds[0].d) / 0.008));
+        const acc = new Map([[b, 1 - k], [wb, k]]);
+        const add = (bone, wgt) => acc.set(bone, (acc.get(bone) ?? 0) + wgt);
+        [[ds[0], 0.5 + 0.5 * gap], [ds[1], 0.5 - 0.5 * gap]].forEach(([e, g]) => {
+          // bones of this finger: wrist, then each joint; weight of bone i = ss(u_i) - ss(u_{i+1})
+          const names = e.F.js.map((_, j) => I[`${e.F.n}${side}${j}`]);
+          const sm = e.F.js.map((ju) => ss(ju - 0.008, ju + 0.008, e.u));
+          const wt = k * fade * g;
+          add(wb, -wt * sm[0]);
+          names.forEach((nb, j) => add(nb, wt * (sm[j] - (sm[j + 1] ?? 0))));
+        });
+        const top = [...acc.entries()].filter(([, x]) => x > 1e-4).sort((x, y) => y[1] - x[1]).slice(0, 4);
+        const tot = top.reduce((q, [, x]) => q + x, 0);
+        top.forEach(([bone, x], q) => { joints[v * 4 + q] = bone; weights[v * 4 + q] = x / tot; });
+        for (let q = top.length; q < 4; q++) { joints[v * 4 + q] = 0; weights[v * 4 + q] = 0; }
+      }
     }
   }
   prim.setAttribute("JOINTS_0", doc.createAccessor().setType("VEC4").setArray(joints).setBuffer(buffer));

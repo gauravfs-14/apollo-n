@@ -39,6 +39,12 @@ export interface AstronautProps extends GroupProps {
   offset?: number;
 }
 
+// per hand: 4 fingers (index..pinky) of [mcp, pip, dip] bones, and the thumb [cmc, ip]
+interface Fingers {
+  f: THREE.Object3D[][];
+  thumb: THREE.Object3D[];
+}
+
 interface Rig {
   hips: THREE.Object3D;
   spine: THREE.Object3D;
@@ -49,6 +55,8 @@ interface Rig {
   elR: THREE.Object3D;
   wrL: THREE.Object3D;
   wrR: THREE.Object3D;
+  fingL: Fingers;
+  fingR: Fingers;
   hipL: THREE.Object3D;
   hipR: THREE.Object3D;
   kneeL: THREE.Object3D;
@@ -86,6 +94,39 @@ function poseArm(
 }
 const dU = new THREE.Vector3(), dF = new THREE.Vector3(), dH = new THREE.Vector3();
 const wU = new THREE.Vector3(), wF = new THREE.Vector3(), wH = new THREE.Vector3();
+// ---- finger posing ----
+// Finger bones have identity bind rotations (children of the wrist), so their axes are the hand-frame axes of the bind pose:
+// B across the palm toward the little finger, C = F x B (the palm faces -C). Positive rotation about B curls a finger toward the palm,
+// positive rotation about C swings it toward the little finger. The right hand uses the same angles about the mirrored axes (-M v).
+const HF_F = new THREE.Vector3(-0.0699, -0.606, 0.7924).normalize();
+const HF_B = new THREE.Vector3(1, 0, 0).addScaledVector(HF_F, -HF_F.x).normalize();
+const HF_C = new THREE.Vector3().crossVectors(HF_F, HF_B);
+const mirrorAxis = (v: THREE.Vector3) => new THREE.Vector3(v.x, -v.y, -v.z);
+const AX = { L: { b: HF_B, c: HF_C }, R: { b: mirrorAxis(HF_B), c: mirrorAxis(HF_C) } };
+// relaxed glove: a loose half-fist, the outer fingers curl a little more than the index
+const REST_CURL = [[0.3, 0.6, 0.4], [0.42, 0.7, 0.45], [0.52, 0.8, 0.5], [0.62, 0.85, 0.5]];
+// waving: fingers together and only softly curved
+const WAVE_CURL = [[0.05, 0.16, 0.12], [0.07, 0.2, 0.14], [0.1, 0.24, 0.16], [0.14, 0.28, 0.18]];
+// swing each finger about C so the four sit side by side (the little finger flares ~30 deg in the scan)
+const FINGER_SWING = [0.02, 0, -0.04, -0.5];
+const qG = new THREE.Quaternion();
+function poseHand(side: "L" | "R", h: Fingers, wave: number, t: number, grip: number) {
+  const ax = AX[side];
+  for (let i = 0; i < 4; i++) {
+    const rest = REST_CURL[i], wv = WAVE_CURL[i];
+    const live = 0.03 * Math.sin(t * 1.3 + i * 0.9 + (side === "L" ? 0 : 2)) * (1 - wave); // a little life in the idle hand
+    for (let j = 0; j < 3; j++) {
+      const a = (rest[j] * (1 - wave) + wv[j] * wave) * (1 + 0.25 * grip) + live;
+      h.f[i][j].quaternion.setFromAxisAngle(ax.b, a);
+      if (j === 0) h.f[i][0].quaternion.premultiply(qG.setFromAxisAngle(ax.c, FINGER_SWING[i] * (1 - 0.3 * wave)));
+    }
+  }
+  // thumb: tucked in alongside the index finger (swung toward the fingers, bent toward the palm), a little looser when waving
+  const tk = 1 - 0.5 * wave;
+  h.thumb[0].quaternion.setFromAxisAngle(ax.b, 0.5 * tk);
+  h.thumb[0].quaternion.premultiply(qG.setFromAxisAngle(ax.c, 0.75 * tk));
+  h.thumb[1].quaternion.setFromAxisAngle(ax.b, 0.45 * tk + 0.1 * grip);
+}
 const MODEL_HEIGHT = 1.93;
 const WAVE_TWIST = -1.57;
 const HANG_TWIST = 1.5; // palms toward the thighs (left arm -, right arm +)
@@ -126,9 +167,14 @@ export function Astronaut({ role = "commander", accent, pose = "idle", speed = 1
       m.material = mat;
       owned.push(mat);
     });
+    const hand = (sd: string): Fingers => ({
+      f: ["index", "middle", "ring", "pinky"].map((n) => [0, 1, 2].map((j) => get(`${n}${sd}${j}`))),
+      thumb: [0, 1].map((j) => get(`thumb${sd}${j}`)),
+    });
     const rig: Rig = {
       hips: get("hips"), spine: get("spine"), head: get("head"),
       shL: get("shoulderL"), shR: get("shoulderR"), elL: get("elbowL"), elR: get("elbowR"), wrL: get("wristL"), wrR: get("wristR"),
+      fingL: hand("L"), fingR: hand("R"),
       hipL: get("hipL"), hipR: get("hipR"), kneeL: get("kneeL"), kneeR: get("kneeR"),
       hipsY: get("hips").position.y,
     };
@@ -195,6 +241,8 @@ export function Astronaut({ role = "commander", accent, pose = "idle", speed = 1
       dU.lerp(wU, k2).normalize(); dF.lerp(wF, k2).normalize(); dH.lerp(wH, k2).normalize();
     }
     poseArm("R", shR, elR, wrR, dU, dF, dH, HANG_TWIST * (1 - k2) + WAVE_TWIST * k2);
+    poseHand("L", rig.fingL, 0, t, cur.walk);
+    poseHand("R", rig.fingR, k2, t, cur.walk);
   });
 
   return (
