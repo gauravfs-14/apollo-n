@@ -11,6 +11,8 @@ import { LoadingScreen } from "../ui/LoadingScreen";
 import { useLoadingHolds, useReveal } from "./loading";
 import { CommsCaption, MissionAudio } from "./MissionAudio";
 import { SkipPrompt } from "./skip";
+import { EventLayer } from "./events";
+import { JuiceLayer } from "./juice";
 import { PHASE_TRACK, setBaseMusic, setMusicOverride } from "./music";
 import { getLoadedPhase, loadPhase, preloadAssets, preloadNext } from "./phases";
 import { PerfOverlay, PerfProbe, QUALITY } from "./perf";
@@ -197,6 +199,8 @@ export function PhaseRunner() {
         <PerfProbe phase={phaseId} />
       </Canvas>
       <div className="pointer-events-none fixed inset-0 z-10">{Hud && <Hud key={phaseId} />}</div>
+      <JuiceLayer />
+      <EventLayer phase={phaseId} />
       <MissionAudio phase={phaseId} />
       <CommsCaption phase={phaseId} />
       <SkipPrompt phase={phaseId} />

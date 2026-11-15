@@ -56,3 +56,6 @@ export const useLanding = create<LandingUi>(() => ({ ready: false, s: null, info
 
 // QA hook: scripts/flight-landing.mjs
 if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") (window as unknown as { __landing: typeof useLanding }).__landing = useLanding;
+
+/** Juice flags shared by the scene and the HUD: attempt number of a PERFECT touchdown (the scene already showed its banner). */
+export const flags = { perfect: -1 };

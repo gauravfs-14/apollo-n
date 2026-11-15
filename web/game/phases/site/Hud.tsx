@@ -8,6 +8,7 @@ import { useSiteActions, useSiteState } from "./actions";
 import { useSiteUi } from "./ui";
 import { phaseLabel } from "../../ui/phaseLabel";
 import { say } from "../../core/comms";
+import { award, miss } from "../../core/juice";
 import { probeReport, simReport } from "../../data/missionComms";
 
 const MODES: { id: OverlayMode; label: string; text: (tilt: number) => string }[] = [
@@ -126,6 +127,16 @@ function Report() {
   const sc = sd.report;
   const sim = sd.sim;
   // Houston reads out what the probe and the test landings actually measured
+  // juice: a good probe pops points (more for a new best), a poor one breaks the streak
+  const bestSpot = useRef(0);
+  useEffect(() => {
+    if (!sc) return;
+    if (sc.score >= 70) {
+      const fresh = sc.score > bestSpot.current;
+      award(Math.round(sc.score / 2) + (fresh && bestSpot.current ? 25 : 0), fresh && bestSpot.current ? "New best spot" : "Good spot", { at: { x: 0.5, y: 0.3 } });
+    } else if (sc.score < 45) miss();
+    bestSpot.current = Math.max(bestSpot.current, sc.score);
+  }, [sc]);
   useEffect(() => {
     if (sc) say(probeReport(sc), { once: `probe:${plan?.id}:${sd.probe?.x}:${sd.probe?.z}`, interrupt: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per probe report

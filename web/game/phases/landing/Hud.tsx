@@ -4,10 +4,12 @@ import { press } from "../../flight/input";
 import { ControlsHelp, TiltPad } from "../../flight/ui";
 import { useSkipVote } from "../../core/skip";
 import { rolesOf } from "../../core/roles";
+import { grade } from "../../core/juice";
 import { useGame } from "../../core/useGame";
 import { Button, Meter, Panel, PhaseTitle, Stat } from "../../ui/kit";
 import { phaseLabel } from "../../ui/phaseLabel";
-import { useLanding } from "./store";
+import { flags, useLanding } from "./store";
+import { useEffect } from "react";
 
 function Stars({ n }: { n: number }) {
   return (
@@ -41,6 +43,14 @@ export function LandingHud() {
   const anyPilot = state?.players.some((p) => rolesOf(p).includes("pilot") && p.connected) ?? false;
   const canContinue = isPilot || (isHost && (!anyPilot || waited > 20));
   const diff = plan?.difficulty ?? "normal";
+
+  // grade banner when the result card shows (a PERFECT touchdown already showed its own, at contact)
+  const att = s?.att ?? 0;
+  const resultScore = result ? Math.max(0, Math.min(100, result.score.total)) : -1;
+  useEffect(() => {
+    if (!showResult || resultScore < 0 || flags.perfect === att) return;
+    grade("landing", resultScore, { title: "Landing grade", once: `landing:${plan?.id}:${att}` });
+  }, [showResult, resultScore, att, plan?.id]);
 
   if (!s || !info) {
     return <div className="absolute inset-0"><PhaseTitle step={phaseLabel("landing")} title="Touchdown" /></div>;

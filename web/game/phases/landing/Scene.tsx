@@ -18,6 +18,8 @@ import {
 } from "../../data/missionComms";
 import { perkEffects, usePerk } from "../../data/perks";
 import { COST } from "../../core/hp";
+import { setEventGuard } from "../../core/events";
+import { award, grade, miss, slowmo, stinger, timeScale, useCameraShake } from "../../core/juice";
 import { flightDamage } from "../../flight/damage";
 import { shipStats } from "../../data/parts";
 import { devDifficulty } from "../../flight/difficulty";
@@ -32,7 +34,7 @@ import {
 import { landerFromBuild, type SimOut } from "../site/api";
 import { Dust, type DustState } from "./Dust";
 import { Plume } from "./Plume";
-import { useLanding, type LandHud } from "./store";
+import { flags, useLanding, type LandHud } from "./store";
 import {
   FT, G, bodyBasis, footPlane, fuelSeconds, landParams, newLand, stepLand, upVec,
   type Ground, type LandInput, type LandParams, type LandSim,
@@ -77,7 +79,7 @@ function Descent({
   const root = useRef<THREE.Group>(null);
   const lights = useRef<THREE.Group>(null);
   const thr = useRef(0);
-  const dust = useRef<DustState>({ x: 0, z: 0, strength: 0 });
+  const dust = useRef<DustState>({ x: 0, z: 0, strength: 0, burst: 0 });
   const [sim] = useState(() => newLand(1, target, ground, P, heading)); // one flight per mount: a quality change must not restart it
   const st = useMemo(() => ({
     ev: new Set<string>(), tgt: null as LandSim | null, tgtAt: 0, lastUi: 0, since: 0, att: 1, prevAlt: 1e9, lastAuto: false,
@@ -137,8 +139,9 @@ function Descent({
   }, [revealed, siteName]);
 
   useFrame((_, dtRaw) => {
-    const dt = Math.min(dtRaw, 0.05);
+    const dt = Math.min(dtRaw, 0.05) * (sim.down ? timeScale() : 1); // slow motion on a perfect touchdown
     const live = isRevealed("landing");
+    setEventGuard("landing", sim.down || sim.alt < 170); // never interrupt the last part of the descent
 
     // ---- the flight
     if (pilot && live) {
@@ -201,6 +204,8 @@ function Descent({
         if (alt < m + 35 && alt > m) pre(`prex${ft}`);
         if (st.prevAlt > m && alt <= m && sim.vy < -0.3) once(`alt${ft}`, () => {
           traceEvent(`${ft} feet, sink ${Math.round(sink)} ft/s`);
+          if (-sim.vy <= P.vSafe * 1.15) award(25 + Math.round(15 * Math.max(0, 1 - ft / 150)), `${ft} ft: sink rate good`, { tone: "cyan" });
+          else miss("Sinking too fast");
           say(altitudeCall(ft, sink, i === CALL_FT.length - 1 && sim.thr > 0.1));
         });
       });
@@ -226,6 +231,16 @@ function Descent({
           : r.reason === "hard" ? [r.vV > P.vSafe * 1.6 ? COST.severe : COST.major, `Hard landing (${(r.vV * FT).toFixed(0)} ft/s)`] : r.reason === "boulder" ? [COST.major, "A foot landed on a boulder"] : null;
         if (hit) flightDamage(hit[0] as number, hit[1] as string, pilot);
         sfx("thunk", { volume: r.reason === "crashed" ? 1 : 0.7 });
+        // juice: a PERFECT landing is soft, level and on the ring; anything clean pays by the score
+        const perfect = r.reason === "ok" && r.vV <= P.vSafe * 0.6 && r.vH <= 0.8 && r.tilt <= r.limit * 0.4 && r.miss <= 15 && !sim.assisted;
+        if (perfect) {
+          flags.perfect = sim.att;
+          slowmo(0.22, 2.6);
+          dust.current.burst = 1;
+          grade("landing", r.score.total, { title: "Touchdown", perfect: true, once: `landing-perfect:${useStore.getState().state?.plan?.id}:${sim.att}` });
+          award(250, "Perfect landing", { tone: "amber", at: { x: 0.5, y: 0.52 } });
+        } else if (r.reason === "ok") { award(60 + Math.round(r.score.total / 2), "Safe touchdown", { at: { x: 0.5, y: 0.5 } }); stinger("great", 0.5); }
+        else if (r.reason === "boulder") miss();
         traceEvent(`touchdown: ${r.reason}, ${(r.vV * FT).toFixed(1)} ft/s down, ${(r.vH * FT).toFixed(1)} ft/s sideways, tilt ${r.tilt.toFixed(1)}, ${Math.round(r.miss)} m off`);
         if (live) {
           if (r.reason === "crashed") say(touchdownReport({ reason: r.reason, downFps: r.vV * FT, fwdFps: r.vH * FT, tiltDeg: r.tilt, missM: r.miss }), { interrupt: true });
@@ -279,11 +294,12 @@ function Descent({
     }
 
     // ---- engine, dust, lights
+    if (!sim.down) dust.current.burst = 0;
     thr.current = sim.down ? 0 : sim.thr * (1 + 0.05 * Math.sin(sim.t * 37));
     dust.current.x = sim.x;
     dust.current.z = sim.z;
     dust.current.strength = sim.down
-      ? (sim.result?.reason === "crashed" ? 0.9 * Math.exp(-st.since * 1.6) : 0)
+      ? (sim.result?.reason === "crashed" ? 0.9 * Math.exp(-st.since * 1.6) : (dust.current.burst ?? 0) > 0 ? 0.8 * Math.exp(-st.since * 1.1) * (dust.current.burst ?? 0) : 0)
       : thr.current * ss(80, 14, alt);
     if (lights.current) lights.current.visible = (sim.down || sim.contact) && Math.sin(sim.t * 9) > -0.35;
 
@@ -345,6 +361,8 @@ function Descent({
       useLanding.setState({ s: hud });
     }
   });
+
+  useCameraShake(0.2);
 
   const pad = P.padR;
   const tgtY = data.heightAt(target.x, target.z);

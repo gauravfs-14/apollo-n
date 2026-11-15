@@ -5,6 +5,7 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
+import { timeScale } from "../../core/juice";
 import { useQuality } from "../../core/perf";
 import type { TerrainData } from "../../three/terrain";
 
@@ -24,6 +25,8 @@ export interface DustState {
   z: number;
   /** 0..1 emission strength (engine throttle x proximity) */
   strength: number;
+  /** 0..1: a one-off puff of dust at touchdown (perfect landing) */
+  burst?: number;
 }
 
 export function Dust({ data, state }: { data: TerrainData; state: React.RefObject<DustState> }) {
@@ -72,7 +75,7 @@ export function Dust({ data, state }: { data: TerrainData; state: React.RefObjec
   );
 
   useFrame((_, dtRaw) => {
-    const dt = Math.min(dtRaw, 0.05);
+    const dt = Math.min(dtRaw, 0.05) * timeScale();
     mat.uniforms.uScale.value = size.height / (2 * Math.tan((camera.fov * Math.PI) / 360));
     const st = state.current;
     if (st && st.strength > 0.02) {
