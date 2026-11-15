@@ -194,7 +194,7 @@ function Collection({ c }: { c: Ctx }) {
             <Pct label="Finds" n={comp.found} of={POIS.length} />
             <Pct label="Awards" n={comp.ach} of={ACHIEVEMENTS.length} />
           </div>
-          <div className="num mt-2 text-[12px] text-dim">Collection {comp.pct}% complete{titles.length ? `, ${titles.length} titles` : ""}</div>
+          <div className="num mt-2 text-[12px] text-dim">Collection {comp.pct}% complete{titles.length ? `, ${titles.length} ${titles.length === 1 ? "title" : "titles"}` : ""}</div>
         </section>
         <section className="rounded-xl border border-line bg-panel p-4 backdrop-blur-md">
           <h3 className="mb-2 text-sm font-semibold">Personal records</h3>

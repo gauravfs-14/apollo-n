@@ -173,7 +173,10 @@ export const useProgressStore = create<Progress>((set, get) => ({
 export function useProgress() {
   const s = useProgressStore();
   const hydrate = s.hydrate;
-  useEffect(() => hydrate(), [hydrate]);
+  useEffect(() => {
+    hydrate();
+    useJourneyStore.getState().hydrate(); // levels cleared gate the upgrades
+  }, [hydrate]);
   return s;
 }
 
