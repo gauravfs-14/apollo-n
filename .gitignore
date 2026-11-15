@@ -13,3 +13,4 @@ api/data/media/
 *.blend1
 assets-src/downloads/
 web/next-env.d.ts
+api/data/leaderboard/
