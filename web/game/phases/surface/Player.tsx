@@ -338,8 +338,13 @@ function stepPhysics(
   rt.pos.y += rt.vel.y * dt;
 
   // steep slopes block uphill motion
-  ground.normalAt(nx, nz, tmpV);
-  if (tmpV.y < 0.64 && rt.grounded) {
+  // measured as the climb over the next 0.8 m along the step, not the point normal: a 0.35 m normal reads the
+  // rim of every small crater as a wall, and could pin the player on a patch they had walked down into
+  const sx = nx - rt.pos.x;
+  const sz = nz - rt.pos.z;
+  const sl = Math.hypot(sx, sz);
+  const climb = sl > 1e-5 ? ground.heightAt(rt.pos.x + (sx / sl) * 0.8, rt.pos.z + (sz / sl) * 0.8) - ground.heightAt(rt.pos.x, rt.pos.z) : 0;
+  if (climb > 0.8 && rt.grounded) {
     nx = rt.pos.x;
     nz = rt.pos.z;
     rt.vel.x = rt.vel.z = 0;
