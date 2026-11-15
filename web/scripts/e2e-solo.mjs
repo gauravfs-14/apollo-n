@@ -78,7 +78,6 @@ async function enter(ph, from, timeout = 30000, settle = 2500) {
   }
 }
 
-let phaseNow = "menu";
 async function step(name, fn) {
   const t = Date.now();
   try {

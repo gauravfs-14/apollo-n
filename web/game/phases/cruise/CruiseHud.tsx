@@ -76,8 +76,7 @@ export function CruiseHud() {
   const { state, plan, isHost, me, patch, complete, actsAs } = useGame();
   const perkOwned = usePerk();
   const fx = perkEffects(perkOwned);
-  const timeMultRef = useRef(1);
-  timeMultRef.current = useUpgrades().hurdleTimeMult;
+  const timeMult = useUpgrades().hurdleTimeMult; // hangar upgrade: longer hurdle timers
   // dev/test only: ?hurdles=nav_correction,comms_blackout plays those hurdles (cruise scripts use it to cover every type)
   const hurdles = useMemo(() => {
     const q = typeof location !== "undefined" && process.env.NODE_ENV !== "production" ? new URLSearchParams(location.search).get("hurdles") : null;
@@ -148,7 +147,7 @@ export function CruiseHud() {
     if (H.idx !== idx || H.type !== hurdle.type) resetH(idx, hurdle.type);
     H.checks = stage === "brief" && H.idx === idx ? Array.from(new Set([...H.checks, ...(data.checks ?? [])])) : (data.checks ?? []);
     if (stage === "play") {
-      if (!H.d.step && H.d.t === undefined) H.d = initD({ type: hurdle.type, level, seed, fx, solo: !!solo, timeMult: timeMultRef.current });
+      if (!H.d.step && H.d.t === undefined) H.d = initD({ type: hurdle.type, level, seed, fx, solo: !!solo, timeMult });
       if (data.hs && data.hs.idx === idx && !actor) adopt(data.hs.d as never);
       if (hurdle.type === "debris_field") {
         rt.seed = seed;

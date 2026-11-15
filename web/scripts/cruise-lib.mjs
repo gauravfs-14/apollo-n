@@ -10,7 +10,7 @@ export async function playCruise(p, { shots = false, jobs = true, out = console.
   const E = (fn, arg) => p.evaluate(fn, arg).catch(() => null); // tolerate a dev hot-reload mid-run
   const shot = (n) => p.screenshot({ path: `${OUT}/cruise-${n}.png` });
   const state = () => E(() => ({ idx: __cruise.H.idx, type: __cruise.H.type, stage: __cruise.H.stage, step: __cruise.H.d.step, t: +(__cruise.H.d.t ?? 0).toFixed(1) }));
-  const use = (id) => E((id) => __cruise.use(id), id);
+  const interact = (id) => E((id) => __cruise.use(id), id);
   const hold = (id, s) => E(([id, s]) => __cruise.hold(id, s), [id, s]);
   const label = (id) => E((id) => __cruise.label(id), id);
   const waitFor = async (fn, arg, ms = 30000) => {
@@ -37,18 +37,18 @@ export async function playCruise(p, { shots = false, jobs = true, out = console.
     for (let k = 0; k < 3; k++) {
       const id = `chk:${h * 3 + k}`;
       out("  check:", await label(id));
-      await use(id);
+      await interact(id);
       await p.waitForTimeout(250);
     }
     await waitFor((h) => __cruise.H.idx === h && __cruise.H.stage === "play", h, 20000);
     await p.waitForTimeout(800);
     await shot(`${h}-1-alarm`);
     const type = s0.type;
-    await use("cw:ack");
+    await interact("cw:ack");
     await step(1);
     if (type === "engine_fault") {
       await goto(-1.0, 0.1, 4.5);
-      await use("eng:door");
+      await interact("eng:door");
       await step(2);
       await p.waitForTimeout(900);
       await shot(`${h}-2-engine-open`);
@@ -62,10 +62,10 @@ export async function playCruise(p, { shots = false, jobs = true, out = console.
       });
       // try the jammed one first on purpose (it must refuse), then fix the rest
       const jam = await E(() => __cruise.H.d.jam);
-      await use(`eng:valve:${jam}`);
+      await interact(`eng:valve:${jam}`);
       out("  jammed valve", jam, "wrong:", await E(() => __cruise.H.d.wrong));
       for (const i of plan.filter((i) => i !== jam)) {
-        await use(`eng:valve:${i}`);
+        await interact(`eng:valve:${i}`);
         await p.waitForTimeout(150);
       }
       await shot(`${h}-3-engine-valves`);
@@ -88,7 +88,7 @@ export async function playCruise(p, { shots = false, jobs = true, out = console.
       await goto(1.0, 0.0, 3.9);
       await waitFor(() => __cruise.H.d.imu?.every(Boolean), null, 30000);
       for (const mark of [1, 2]) {
-        await use("nav:sextant");
+        await interact("nav:sextant");
         await p.waitForTimeout(600);
         await shot(`${h}-2-sextant-${mark}`);
         // line the star up: the same thing a player does with WASD
@@ -121,8 +121,8 @@ export async function playCruise(p, { shots = false, jobs = true, out = console.
     }
     if (type === "comms_blackout") {
       await goto(0.9, 0.9, 6.0);
-      await use("com:amp:0");
-      await use("com:amp:1");
+      await interact("com:amp:0");
+      await interact("com:amp:1");
       await E(async () => {
         const t0 = performance.now();
         while (performance.now() - t0 < 60000) {
@@ -142,7 +142,7 @@ export async function playCruise(p, { shots = false, jobs = true, out = console.
     if (type === "debris_field") {
       await waitFor(() => __cruise.H.d.armed?.every(Boolean), null, 30000);
       await goto(0, 0, 1.4);
-      await use("deb:stick");
+      await interact("deb:stick");
       await p.waitForTimeout(2500);
       await shot(`${h}-2-flying`);
       // fly: a player uses WASD; here a simple tracker keeps the ship in the gaps by sampling the live gap
