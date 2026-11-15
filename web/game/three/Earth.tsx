@@ -218,7 +218,7 @@ export function Earth({ radius = 1, sun = [1, 0.25, 0.6], spin = 0.02, tilt = 0.
             <sphereGeometry args={[1, seg, seg / 2]} />
           </mesh>
           {clouds && (
-            <mesh material={cloudMat} scale={radius * 1.006}>
+            <mesh material={cloudMat} scale={radius * 1.01}>
               <sphereGeometry args={[1, seg, seg / 2]} />
             </mesh>
           )}

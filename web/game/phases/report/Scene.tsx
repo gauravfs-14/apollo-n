@@ -1,7 +1,7 @@
 "use client";
 // Calm closing shot: the Moon's sunlit limb in the foreground, Earth hanging far behind it.
-import { useFrame } from "@react-three/fiber";
-import { useMemo } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { Effects } from "../../core/Effects";
 import { Earth } from "../../three/Earth";
@@ -13,6 +13,15 @@ const EARTH_POS: [number, number, number] = [1500, 620, -7200];
 
 export function ReportScene() {
   const look = useMemo(() => new THREE.Vector3(60, 40, 0), []);
+  // Earth is ~7 km away: with near 0.1 the 24-bit depth buffer resolves ~30 m there and the 2 m cloud shell z-fights
+  // (flickers). The nearest surface (the Moon limb) is >= 80 m from the camera, so a larger near plane is free.
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
+  useEffect(() => {
+    const near = camera.near;
+    camera.near = 20;
+    camera.updateProjectionMatrix();
+    return () => { camera.near = near; camera.updateProjectionMatrix(); };
+  }, [camera]);
   useFrame(({ camera, clock }) => {
     const t = clock.elapsedTime;
     camera.position.set(Math.sin(t * 0.03) * 14, 4 + Math.sin(t * 0.021) * 3, 250);

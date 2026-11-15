@@ -74,7 +74,10 @@ export function LaunchScene() {
 
   // camera setup / restore (the Canvas camera is shared by all phases)
   useEffect(() => {
-    const fov = persp.fov;
+    const fov = persp.fov, near = persp.near;
+    // 24-bit depth with near 0.1 / far 20000 resolves ~10-30 m at the Earth's distance, so the cloud shell (21 m above the
+    // surface) z-fights and streaks. Nothing is closer than ~100 m to the camera here, so a larger near plane costs nothing.
+    persp.near = 4;
     useLaunchClock.getState().reset();
     // dev only: ?lt=<seconds> starts the cinematic at that time (for screenshots)
     const lt = process.env.NODE_ENV !== "production" ? Number(new URLSearchParams(location.search).get("lt")) : 0;
@@ -85,6 +88,7 @@ export function LaunchScene() {
     scene.fog = new THREE.Fog("#b9a28e", 1400, 14000);
     return () => {
       persp.fov = fov;
+      persp.near = near;
       persp.updateProjectionMatrix();
       scene.fog = null;
       stopSfx();
