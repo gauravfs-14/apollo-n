@@ -10,6 +10,7 @@ import type { PhaseId, PhaseModule } from "../types";
 import { LoadingScreen } from "../ui/LoadingScreen";
 import { useLoadingHolds, useReveal } from "./loading";
 import { CommsCaption, MissionAudio } from "./MissionAudio";
+import { SkipPrompt } from "./skip";
 import { PHASE_TRACK, setBaseMusic, setMusicOverride } from "./music";
 import { getLoadedPhase, loadPhase, preloadAssets, preloadNext } from "./phases";
 import { PerfOverlay, PerfProbe, QUALITY } from "./perf";
@@ -198,6 +199,7 @@ export function PhaseRunner() {
       <div className="pointer-events-none fixed inset-0 z-10">{Hud && <Hud key={phaseId} />}</div>
       <MissionAudio phase={phaseId} />
       <CommsCaption phase={phaseId} />
+      <SkipPrompt phase={phaseId} />
       <PhaseLoading visible={loading} phase={phaseId} status={status} onForce={() => setForced(phaseId)} />
       <PerfOverlay />
     </div>

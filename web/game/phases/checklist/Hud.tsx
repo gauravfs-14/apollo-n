@@ -4,6 +4,7 @@ import { rolesOf } from "../../core/roles";
 import { MINIGAMES, type MinigameResult } from "../../minigames";
 import { clearComms, say } from "../../core/comms";
 import { COST, damage } from "../../core/hp";
+import { useSkipVote } from "../../core/skip";
 import { useGame, usePhaseData } from "../../core/useGame";
 import { checklistDone } from "../../data/missionComms";
 import { Button, Panel, Stat } from "../../ui/kit";
@@ -42,6 +43,12 @@ export function ChecklistHud() {
     advance.current = true;
     if (actsAs("commander") || isHost) complete("checklist", d.result.score);
   };
+  // multiplayer: skipping ahead to launch is a crew vote
+  const skipVote = useSkipVote("checklist", () => {
+    clearComms();
+    goLaunch();
+  });
+
   useEffect(() => {
     if (!finished || !d.result) return;
     say(checklistDone(d.result), { once: `checklist-done:${plan?.id}`, onDone: () => setTimeout(goLaunch, 600) });
@@ -82,8 +89,8 @@ export function ChecklistHud() {
               <div className="mt-4 flex justify-end">
                 <span className="mr-auto self-center text-xs text-dim">Launch sequence starts when Launch Control is done.</span>
                 {(actor || isHost) && (
-                  <Button variant="ghost" onClick={() => { clearComms(); goLaunch(); }}>
-                    Skip
+                  <Button variant="ghost" onClick={skipVote.request} disabled={skipVote.disabled}>
+                    {skipVote.label}
                   </Button>
                 )}
               </div>

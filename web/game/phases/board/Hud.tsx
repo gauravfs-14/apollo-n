@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useSkipVote } from "../../core/skip";
 import { useGame } from "../../core/useGame";
 import { Button } from "../../ui/kit";
 import { BOARD_END, boardCaption, useBoardClock } from "./clock";
@@ -7,7 +8,7 @@ import { phaseLabel } from "../../ui/phaseLabel";
 
 export function BoardHud() {
   const t = useBoardClock((s) => s.t);
-  const skip = useBoardClock((s) => s.skip);
+  const skip = useSkipVote("board", useBoardClock.getState().skip); // multiplayer: the crew votes
   const { plan } = useGame();
   const [showSkip, setShowSkip] = useState(false);
   useEffect(() => {
@@ -25,7 +26,7 @@ export function BoardHud() {
       <div className="pointer-events-none absolute inset-x-0 bottom-8 text-center text-sm text-white/90 [text-shadow:0_1px_10px_rgba(0,0,0,0.9)]">{boardCaption(t)}</div>
       {showSkip && t < BOARD_END - 1.5 && (
         <div className="absolute bottom-6 right-6">
-          <Button variant="ghost" onClick={skip}>Skip</Button>
+          <Button variant="ghost" onClick={skip.request} disabled={skip.disabled}>{skip.label}</Button>
         </div>
       )}
     </div>
