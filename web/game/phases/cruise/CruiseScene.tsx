@@ -16,6 +16,7 @@ import { Starfield } from "../../three/Starfield";
 import { useStore } from "../../core/store";
 import type { BuildParts } from "../../data/parts";
 import { Lander, type LanderParts } from "../../three/ship/Lander";
+import { JobStations } from "./cabin/JobStations";
 import { CabinCrew } from "./cabin/Crew";
 import { Driver, ARENA_Y } from "./cabin/Driver";
 import { EARTH_DIR, MOON_DIR, SUN_DIR } from "./cabin/layout";
@@ -124,6 +125,7 @@ export function CruiseScene() {
       <CommsStation />
       <DebrisStation />
       <CheckStations />
+      <JobStations />
       <Waypoints />
       {debris && <Arena />}
       <Effects bloom={0.5} ao={false} />

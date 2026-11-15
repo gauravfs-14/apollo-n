@@ -3,7 +3,7 @@
 import { OUT } from "./e2e-lib.mjs";
 
 /** Play the whole cruise phase on `p` (already in the cruise phase). Returns [{type, score, note}]. */
-export async function playCruise(p, { shots = false, out = console.log } = {}) {
+export async function playCruise(p, { shots = false, jobs = true, out = console.log } = {}) {
   await p.waitForFunction(() => window.__cruise?.H?.type, null, { timeout: 40000 });
   await p.waitForTimeout(3000);
   const flags = { shots };
@@ -32,7 +32,8 @@ export async function playCruise(p, { shots = false, out = console.log } = {}) {
     const s0 = await state();
     out(`\n== hurdle ${h + 1}/${total}: ${s0.type}`);
     if (flags.shots || h === 0) await shot(`${h}-0-checks`);
-    // routine checks: go to each and use it
+    if (h === 0 && jobs) await playJobs(p, out, shots);
+  // routine checks: go to each and use it
     for (let k = 0; k < 3; k++) {
       const id = `chk:${h * 3 + k}`;
       out("  check:", await label(id));
@@ -163,4 +164,66 @@ export async function playCruise(p, { shots = false, out = console.log } = {}) {
   }
 
   return results;
+}
+
+/** Do every optional supply-point job through the same stations a player uses; log the SP the server credited. */
+async function playJobs(p, out, shots) {
+  const E = (fn, arg) => p.evaluate(fn, arg).catch(() => null);
+  const sp = () => E(() => window.__apolloStore.getState().state?.sp ?? null);
+  const hp = () => E(() => window.__apolloStore.getState().state?.hp ?? null);
+  const sp0 = await sp();
+  const hp0 = await hp();
+  out("  -- optional jobs (SP before:", sp0, ")");
+  // quiz: answer from the facts (read the truth value the console is asking about), bet on the last one
+  await E(() => __cruise.use("job:quiz:start"));
+  for (let i = 0; i < 3; i++) {
+    if (i === 2) await E(() => __cruise.use("job:quiz:bet"));
+    const t = await E(() => __cruise.J.qs[__cruise.J.qi].truth);
+    await E((t) => __cruise.use(t ? "job:quiz:true" : "job:quiz:false"), t);
+    await p.waitForTimeout(200);
+  }
+  out("  quiz:", await E(() => __cruise.J.acts.quiz));
+  // photo: shoot when the sweeping bracket is centred
+  await E(() => __cruise.use("job:photo"));
+  if (shots) await p.screenshot({ path: `${OUT}/cruise-job-photo.png` });
+  for (let i = 0; i < 3; i++) {
+    await E(async () => {
+      const J = __cruise.J;
+      const w = [0.2, 0.13, 0.08][J.shot];
+      const n = J.shot;
+      const t0 = performance.now();
+      while (performance.now() - t0 < 8000 && J.shot === n) {
+        if (Math.abs(__cruise.photoPos(J.t, J.shot) - 0.5) < w * 0.25) __cruise.use("job:photo");
+        await new Promise((r) => setTimeout(r, 8));
+      }
+    });
+  }
+  out("  photo:", await E(() => __cruise.J.acts.photo));
+  // diagnostics: arm the x2 bet, mark the failing sensor
+  await E(() => __cruise.use("job:diag:start"));
+  await E(() => __cruise.use("job:diag:arm"));
+  await E(() => __cruise.use(`job:diag:pick:${__cruise.J.faulty}`));
+  out("  diag:", await E(() => __cruise.J.acts.diag));
+  // EVA (standard): work in bursts, rest when the risk gets high
+  await E(() => __cruise.use("job:eva:std"));
+  if (shots) await p.screenshot({ path: `${OUT}/cruise-job-eva.png` });
+  await E(async () => {
+    const J = __cruise.J;
+    const t0 = performance.now();
+    let last = t0;
+    while (performance.now() - t0 < 60000 && J.active === "eva") {
+      const n = performance.now();
+      const dt = Math.min(0.05, (n - last) / 1000);
+      last = n;
+      if (J.risk < 0.55 && !J._rest) __cruise.registry.get("job:eva:work").hold(dt);
+      else {
+        J._rest = J.risk > 0.08;
+      }
+      if (J.risk >= 0.55) J._rest = true;
+      await new Promise((r) => setTimeout(r, 16));
+    }
+  });
+  out("  eva:", await E(() => __cruise.J.acts.eva));
+  await p.waitForTimeout(1500);
+  out("  SP after:", await sp(), "(before", sp0 + ")  integrity:", await hp(), "(before", hp0 + ")");
 }

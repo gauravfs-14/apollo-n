@@ -14,7 +14,8 @@ import { zg } from "../../../three/interior/zerog";
 import { act, click, thunk } from "./act";
 import { COMMS_L, PILOT_POS, SEXTANT_POS, SPOTS, at, frameOf, sw3 } from "./layout";
 import { H, cam, checkItemsLeft, checksFor, isHeld, sx, useHv } from "./model";
-import { checkJobs, helpJob, mainJob } from "./objectives";
+import { checkJobs, helpJob, jobPos, mainJob } from "./objectives";
+import { JOB_ORDER, J, available } from "./jobs";
 
 const play = (type?: string) => H.stage === "play" && (!type || H.type === type);
 const step = () => (H.d.step ?? 0) as number;
@@ -645,6 +646,7 @@ export function Waypoints() {
       if (m?.pos && !m.waiting) jobs.push({ pos: m.pos, tone: m.tone, big: true });
       if (h?.pos && (!H.actor || H.solo === false)) jobs.push({ pos: h.pos, tone: h.tone, big: !H.actor });
     }
+    if (H.stage !== "done" && cam.mode === "walk" && !J.active && jobs.length < 4) for (const id of JOB_ORDER) if (available(id) && jobs.length < 4) jobs.push({ pos: jobPos(id), tone: "cyan", big: false });
     const t = st.clock.elapsedTime;
     sprites.current.forEach((s, i) => {
       if (!s) return;

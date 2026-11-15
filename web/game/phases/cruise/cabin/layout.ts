@@ -38,6 +38,9 @@ export const SPOTS = {
   wheelA: { wall: 0, u: 0.0, z: 7.6, w: 0.5, h: 0.5 },
   wheelB: { wall: 4, u: 0.0, z: 7.85, w: 0.5, h: 0.5 },
   leak: { wall: 5, u: 0.0, z: 5.7, w: 1.0, h: 0.8 },
+  quiz: { wall: 5, u: 0.0, z: 7.25, w: 0.9, h: 0.8 },
+  diag: { wall: 1, u: 0.0, z: 5.05, w: 0.8, h: 0.8 },
+  eva: { wall: 0, u: 0.0, z: 6.75, w: 0.8, h: 0.95 },
   patchPrep: { wall: 5, u: 0.0, z: 4.4, w: 0.6, h: 0.5 },
 } satisfies Record<string, Spot>;
 

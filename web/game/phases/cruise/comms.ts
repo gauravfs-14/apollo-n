@@ -60,3 +60,15 @@ export function hurdleOutcome(type: HurdleType, score: number, note: string, nam
   return cc(`${who}${good ? "nice work" : "copy"}. ${note} ${fix[type]}`.replace(/\s+/g, " ").trim());
 }
 
+
+/** Houston acknowledges what a crew member actually did in an optional job. */
+export function activityResult(id: "quiz" | "photo" | "diag" | "eva", ok: boolean, detail: string, sp: number): CommLine {
+  const t: Record<string, [string, string]> = {
+    quiz: ["Houston copies your answers.", "Houston copies your answers, a few were off."],
+    photo: ["Good pictures coming down.", "Those frames are too blurred to use."],
+    diag: ["That is the failing sensor, good catch.", "That was not the failing sensor."],
+    eva: ["The patch holds, nice work out there.", "Come back inside, the repair is not done."],
+  };
+  const lead = ok ? t[id][0] : t[id][1];
+  return cc(`${lead} ${detail}.${ok && sp > 0 ? ` That is ${sp} supply points for the crew.` : ""}`);
+}

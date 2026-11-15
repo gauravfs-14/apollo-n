@@ -22,6 +22,9 @@ import { act } from "./cabin/act";
 import { checkJobs, helpJob, mainJob, type Job } from "./cabin/objectives";
 import { H, STEP_TEXT, adopt, applyAct, bump, cam, checksFor, initD, resetH, snapshot, useHv } from "./cabin/model";
 import { SEXTANT_FOV } from "./cabin/Stations2";
+import { J, JOBS, JOB_ORDER, available, diagLimit, photoPos, photoWidth, shoot, useJob } from "./cabin/jobs";
+import { jobPos } from "./cabin/objectives";
+import { earn } from "../../core/economy";
 import { checksDone, debrisHit, hurdleOutcome, hurdleStep } from "./comms";
 import { type CruiseData, HURDLE_META, levelOf, useSeconds } from "./flow";
 import { DEBRIS_SECONDS, rt, setDebris } from "./rt";
@@ -115,11 +118,21 @@ export function CruiseHud() {
       finished.current = idx;
       const s = Math.max(0, Math.min(100, Math.round(score)));
       traceEvent(`cruise: ${hurdle?.type} finished ${s}`);
+      if (s >= 60) earn(s >= 85 ? 15 : 8, `${hurdle ? HURDLE_META[hurdle.type].title : "Hurdle"} ${s >= 85 ? "handled cleanly" : "solved"}`);
       patch("cruise", { idx, stage: "done", results: [...results.slice(0, idx), s], lastScore: s, lastNote: note ?? "" });
     },
     [patch, idx, results, hurdle?.type],
   );
   H.finish = finish;
+  // optional supply-point jobs: results live in phaseData.cruise.act_<id>
+  J.plan = plan;
+  J.seed = plan?.seed ?? 1;
+  J.patch = (d) => patch("cruise", d);
+  for (const id of JOB_ORDER) {
+    const r = (data as Record<string, unknown>)[`act_${id}`];
+    if (typeof r === "string") J.acts[id] = r;
+  }
+  useJob((s) => s.v);
 
   // --- set up the model whenever the hurdle or stage changes
   useEffect(() => {
@@ -161,6 +174,10 @@ export function CruiseHud() {
     cam.mode = "walk";
     H.stage = "brief";
     H.d = {};
+    J.streak = 0;
+    J.active = null;
+    J.acts = {};
+    J.lastMsg = "";
   }, []);
 
   // --- network: helpers' actions reach the actor, the actor's stream reaches everyone, check-offs reach everyone
@@ -372,6 +389,9 @@ export function CruiseHud() {
       {cam.mode === "sextant" && <SextantView />}
       {cam.mode === "fly" && <FlyHud />}
 
+      {stage !== "done" && cam.mode === "walk" && <JobsPanel idx={idx} />}
+      <JobOverlay />
+
       {/* journey strip */}
       <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
         <div className="flex items-center gap-3 rounded-xl border border-line bg-panel px-4 py-2 text-xs backdrop-blur-md">
@@ -386,7 +406,7 @@ export function CruiseHud() {
           {avg !== null && <span className="num text-white/80">avg {avg}</span>}
         </div>
       </div>
-      <div className="pointer-events-none absolute bottom-4 left-5 hidden max-w-xs text-[11px] leading-relaxed text-dim lg:block">
+      <div className="pointer-events-none absolute bottom-4 right-5 hidden max-w-xs text-right text-[11px] leading-relaxed text-dim lg:block">
         WASD fly, Space up, C down, Shift boost. Drag the mouse to look (double-click to lock the pointer). E or click to use. F grabs a handhold.
       </div>
 
@@ -587,3 +607,85 @@ function FlyHud() {
     </div>
   );
 }
+
+function JobsPanel({ idx }: { idx: number }) {
+  useTick(250);
+  useJob((s) => s.v);
+  return (
+    <div className="pointer-events-none absolute bottom-16 left-5 w-[23rem] max-w-[calc(100vw-2.5rem)]">
+      <Panel className="space-y-1.5 !p-3">
+        <div className="flex items-baseline justify-between text-xs">
+          <span className="text-dim">Optional jobs: earn supply points</span>
+          {J.streak > 1 && <span className="num text-amber">streak x{J.streak}</span>}
+        </div>
+        {JOB_ORDER.map((id) => {
+          const r = J.acts[id];
+          const meta = JOBS[id];
+          return (
+            <div key={id} className="text-[12px] leading-snug" title={`${meta.reward} ${meta.fail}`}>
+              <div className="flex items-center gap-2">
+                <span className={`inline-block h-2.5 w-2.5 rounded-sm ${r ? (r.startsWith("done") ? "bg-go" : "bg-nogo/60") : J.active === id ? "bg-amber" : "border border-white/40"}`} />
+                <span className={r ? "text-dim" : "text-white"}>{meta.title}</span>
+                <span className="num ml-auto text-cyan">{r ? (r.startsWith("done") ? `+${r.split(":")[1]} SP` : "missed") : id === "quiz" ? "up to 24 SP" : id === "photo" ? "up to 18 SP" : id === "diag" ? "12 SP (x2)" : "40 / 80 SP"}</span>
+              </div>
+              {!r && (
+                <div className="pl-4.5 pl-[18px] text-[11px] text-dim">
+                  {meta.where}: {bearing(jobPos(id))}. {meta.fail}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {J.lastMsg && <div className="border-t border-line pt-1.5 text-xs text-white/80">{J.lastMsg}</div>}
+      </Panel>
+    </div>
+  );
+}
+
+/** On-screen aids while a job is running: the photo frame sweep, the quiz question echo. */
+function JobOverlay() {
+  useTick(40);
+  useJob((s) => s.v);
+  if (J.active === "photo") {
+    const pos = photoPos(J.t, J.shot);
+    const w = photoWidth();
+    return (
+      <div className="pointer-events-none absolute inset-x-0 bottom-28 flex flex-col items-center gap-2">
+        <div className="rounded-md bg-black/70 px-3 py-1.5 text-sm text-white">Frame {Math.min(3, J.shot + 1)} of 3: press E (or click) when the marker is inside the green window.</div>
+        <div className="relative h-4 w-80 overflow-hidden rounded-full bg-white/15">
+          <div className="absolute top-0 h-full bg-go/70" style={{ left: `${(0.5 - w / 2) * 100}%`, width: `${w * 100}%` }} />
+          <div className="absolute top-0 h-full w-1 bg-white" style={{ left: `${pos * 100}%` }} />
+        </div>
+        {J.flash > 0.1 && <div className="text-sm text-go">Sharp.</div>}
+        {J.flash < -0.1 && <div className="text-sm text-nogo">Blurred.</div>}
+      </div>
+    );
+  }
+  if (J.active === "quiz") {
+    return (
+      <div className="pointer-events-none absolute inset-x-0 bottom-28 flex justify-center px-6">
+        <div className="max-w-xl rounded-md bg-black/75 px-4 py-2 text-center text-sm text-white">
+          <div className="mb-1 text-xs text-amber">Question {J.qi + 1} of 3{J.qBet ? ", doubled" : ""}. Press the green TRUE or red FALSE button on the console.</div>
+          {J.qs[J.qi]?.text}
+        </div>
+      </div>
+    );
+  }
+  if (J.active === "diag") {
+    return <div className="pointer-events-none absolute inset-x-0 bottom-28 flex justify-center"><div className="rounded-md bg-black/70 px-3 py-1.5 text-sm text-white">One bar is out of range. Press the button under it. {Math.max(0, Math.ceil(diagLimit() - J.dT))} s left.</div></div>;
+  }
+  if (J.active === "eva") {
+    return (
+      <div className="pointer-events-none absolute inset-x-0 bottom-28 flex flex-col items-center gap-2">
+        <div className="rounded-md bg-black/70 px-3 py-1.5 text-sm text-white">Hold E on the airlock hatch to work. Risk climbs while you work; release to cool down. {J.eMode === "risky" ? "RISKY: 80 SP." : "Standard: 40 SP."}</div>
+        <div className="w-80 space-y-1">
+          <div className="h-2 overflow-hidden rounded-full bg-white/15"><div className="h-full bg-go" style={{ width: `${J.work * 100}%` }} /></div>
+          <div className="h-2 overflow-hidden rounded-full bg-white/15"><div className={`h-full ${J.risk > 0.7 ? "bg-nogo" : "bg-amber"}`} style={{ width: `${Math.min(1, J.risk) * 100}%` }} /></div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
+void shoot;
+void available;

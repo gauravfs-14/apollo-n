@@ -10,6 +10,7 @@ import { registry } from "../../../three/interior/interact";
 import { zg } from "../../../three/interior/zerog";
 import { act } from "./act";
 import { SHELTER_Z } from "./layout";
+import { J, photoPos } from "./jobs";
 import { H, bump, cam, snapshot, sx, tick } from "./model";
 import { rt } from "../rt";
 
@@ -67,6 +68,8 @@ export function Driver() {
       zg,
       cam,
       sx,
+      J,
+      photoPos,
       bump,
       registry,
       /** test hook: use an interactable (press) */
@@ -76,8 +79,11 @@ export function Driver() {
         const it = registry.get(id);
         if (!it?.hold) return false;
         const t0 = performance.now();
+        let last = t0;
         while (performance.now() - t0 < secs * 1000) {
-          it.hold(1 / 60);
+          const n = performance.now();
+          it.hold(Math.min(0.05, (n - last) / 1000)); // real frame time, like a player holding the key
+          last = n;
           await new Promise((r) => setTimeout(r, 16));
         }
         return true;

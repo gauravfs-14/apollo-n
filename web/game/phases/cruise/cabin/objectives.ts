@@ -2,7 +2,8 @@
 import * as THREE from "three";
 import type { HurdleType } from "../../../types";
 import { H, STEP_TEXT, checksFor } from "./model";
-import { ENG, PILOT_POS, SEXTANT_POS, SHELTER_Z, SPOTS, at, sw3 } from "./layout";
+import type { JobId } from "./jobs";
+import { AFT_WINDOW, ENG, PILOT_POS, SEXTANT_POS, SHELTER_Z, SPOTS, at, sw3 } from "./layout";
 
 export interface Job {
   text: string;
@@ -87,3 +88,16 @@ export function checkJobs(idx: number): Job[] {
 }
 
 export const STEPS = (t: HurdleType) => STEP_TEXT[t];
+
+export function jobPos(id: JobId): THREE.Vector3 {
+  switch (id) {
+    case "quiz":
+      return at(SPOTS.quiz, 0, 0.12, 0.3);
+    case "photo":
+      return AFT_WINDOW.clone();
+    case "diag":
+      return at(SPOTS.diag, 0, 0.15, 0.3);
+    case "eva":
+      return at(SPOTS.eva, 0, 0.1, 0.3);
+  }
+}

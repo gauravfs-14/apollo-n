@@ -37,7 +37,7 @@ await host.evaluate(async () => {
 });
 for (const p of [host, guest]) await p.waitForFunction(() => window.__cruise?.H?.type && window.__apolloStore.getState().state.phase === "cruise", null, { timeout: 60000 });
 await host.waitForTimeout(3000);
-const E = (p, fn, arg) => p.evaluate(fn, arg).catch(() => null);
+const E = (p, fn, arg) => p.evaluate(fn, arg).catch((e) => (console.log("  evaluate error:", String(e).split("\n")[0].slice(0, 160)), null));
 const wait = async (fn, arg, ms = 40000) => {
   const t0 = Date.now();
   while (Date.now() - t0 < ms) {
@@ -61,12 +61,14 @@ for (let h = 0; h < Math.min(total, 2); h++) {
   const [actor, other, an, on] = await who();
   const type = await E(host, () => __cruise.H.type);
   console.log(`\n== hurdle ${h + 1}: ${type}, actor=${an}, helper=${on}`);
+  console.log('  H', JSON.stringify(await E(host, () => ({ idx: __cruise.H.idx, stage: __cruise.H.stage, checks: __cruise.H.checks, actor: __cruise.H.actor, n: [...__cruise.registry.keys()].length }))), JSON.stringify(await E(guest, () => ({ idx: __cruise.H.idx, stage: __cruise.H.stage, actor: __cruise.H.actor }))));
   // both players are in each other's cabin
   await host.waitForTimeout(1500);
   await host.screenshot({ path: `${OUT}/cruise-multi-${h}-0-${an === "host" ? "actor" : "helper"}.png` });
   // checks: split between the two players, both clients must see every tick
   await E(actor, (h) => { __cruise.use(`chk:${h * 3}`); __cruise.use(`chk:${h * 3 + 1}`); }, h);
   await E(other, (h) => __cruise.use(`chk:${h * 3 + 2}`), h);
+  console.log('  H after', JSON.stringify(await E(host, () => __cruise.H.checks)), JSON.stringify(await E(guest, () => __cruise.H.checks)));
   check("checks done by both players show on both screens", await wait(() => __cruise.H.checks.length === 3, null, 8000) && (await E(guest, () => __cruise.H.checks.length === 3)));
   await wait((h) => __cruise.H.idx === h && __cruise.H.stage === "play", h, 20000);
   check("both clients enter the problem", (await E(host, () => __cruise.H.stage)) === "play" && (await E(guest, () => __cruise.H.stage)) === "play");
