@@ -17,6 +17,7 @@ import { Dust, type DustState } from "./Dust";
 import { pickOutcome, type Outcome } from "./outcome";
 import { Plume } from "./Plume";
 import { DESCENT, TOTAL, useLanding } from "./store";
+import { LINES } from "../../core/voiceLines";
 
 const A0 = 450; // start altitude above the touchdown point (m)
 const H0 = 300; // start horizontal distance (m)
@@ -101,7 +102,7 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
 
   useEffect(() => {
     useLanding.setState({ t: 0, skipRequested: false, contact: false, ready: true, tele: { alt: A0, vs: 0, hs: 0, thr: 0 } });
-    speak("Powered descent. Radar lock.", "landing_start");
+    speak(LINES.descentStart.text, "landing_start", LINES.descentStart);
     sfx("rocket_roar", { volume: 0.25 });
     return () => {
       stopVoice();
@@ -158,7 +159,7 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
       useLanding.setState({ contact: true });
       sfx("thunk", { volume: 0.7 });
       sfx("hiss", { volume: 0.35 });
-      speak("Contact light. Engine stop.", "landing_contact");
+      speak(LINES.contact.text, "landing_contact", LINES.contact);
     }
     if (lights.current) lights.current.visible = tt >= T_CONTACT && Math.sin(tt * 9) > -0.35;
 
@@ -235,11 +236,8 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
     if (tt >= TOTAL && !flags.current.ended) {
       flags.current.ended = true;
       useLanding.setState({ t: TOTAL });
-      const line =
-        outcome.reason === "ok" ? "Houston, the lander is down and stable."
-        : outcome.reason === "boulder" ? "Houston, we are down. A leg took a hit."
-        : "Houston, the lander has tipped over. Stand by.";
-      if (!ui.skipRequested) speak(line, `landing_${outcome.reason}`);
+      const line = outcome.reason === "ok" ? LINES.landedOk : outcome.reason === "boulder" ? LINES.landedBoulder : LINES.landedTipped;
+      if (!ui.skipRequested) speak(line.text, `landing_${outcome.reason}`, line);
     }
   });
 

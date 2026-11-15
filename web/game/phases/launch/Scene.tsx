@@ -22,6 +22,7 @@ import { Particles, type EmitSpec, type ParticlesApi } from "../../three/ship/fx
 import { Plume } from "../../three/ship/Plume";
 import { Rocket, S1_ENGINES, type RocketRefs } from "../../three/ship/Rocket";
 import { T, useLaunchClock } from "./clock";
+import { LINES } from "../../core/voiceLines";
 
 export const LAUNCH_HDRI = "/hdri/kiara_1_dawn_1k.hdr";
 const RS = 0.9; // rocket scale
@@ -106,7 +107,7 @@ export function LaunchScene() {
     // ---- audio / voice cues ----
     if (!st.spoke && t > T.speak) {
       st.spoke = true;
-      const line = plan?.voice_lines.find((l) => l.id === "launch_1")?.text ?? "All stations report go. You are clear for launch.";
+      const line = plan?.voice_lines.find((l) => l.id === "launch_1")?.text ?? LINES.launchFallback.text;
       speak(line, "launch_1");
     }
     const sec = Math.ceil(T.liftoff - t);
