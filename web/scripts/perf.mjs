@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith("--")).map((a) => a.slice(2).split("=")));
-const ALL = ["select", "build", "drop", "crew", "board", "checklist", "launch", "cruise", "site", "landing", "surface", "report"];
+const ALL = ["select", "build", "crew", "board", "checklist", "launch", "cruise", "site", "landing", "surface", "report"];
 const phases = flags.phases ? flags.phases.split(",") : ALL;
 const qualities = flags.quality ? flags.quality.split(",") : ["high", "low"];
 const seconds = Number(flags.seconds ?? 6);
