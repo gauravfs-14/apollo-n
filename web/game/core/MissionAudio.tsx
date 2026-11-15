@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { cruiseArrival, SITE_BASES } from "../data/missionComms";
 import type { PhaseId } from "../types";
 import { playAmbience, useTransmission } from "./audio";
-import { clearComms, dropQueued, say, setCommVars, type CommLine } from "./comms";
+import { clearComms, dropQueued, say, setCommStyle, setCommVars, type CommLine } from "./comms";
 import { useRevealed } from "./loading";
 import { useStore } from "./store";
 
@@ -29,9 +29,15 @@ export function MissionAudio({ phase }: { phase: PhaseId }) {
   const planNumber = useStore((s) => s.state?.plan?.number);
   const siteId = useStore((s) => (s.state?.phaseData.site as { site_id?: string } | undefined)?.site_id);
 
+  const planSeed = useStore((s) => s.state?.plan?.seed);
+  const planDifficulty = useStore((s) => s.state?.plan?.difficulty);
   useEffect(() => {
     if (planNumber) setCommVars({ N: planNumber });
   }, [planNumber]);
+  // each mission gets its own phrasing, in the tone of its difficulty
+  useEffect(() => {
+    setCommStyle({ seed: planSeed ?? 1, tone: planDifficulty ?? "normal" });
+  }, [planSeed, planDifficulty]);
   useEffect(() => {
     if (siteId) setCommVars({ BASE: SITE_BASES[siteId] ?? "Lunar Base" });
   }, [siteId]);

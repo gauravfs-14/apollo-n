@@ -34,6 +34,16 @@ export interface CommVars {
 }
 
 let vars: CommVars = { N: 1, LM: "Eagle", BASE: "Shackleton Base" };
+
+/** Voice of the mission: which phrasing each line uses (seed) and its tone (difficulty). */
+export type Tone = "easy" | "normal" | "hard";
+let style = { seed: 1, tone: "normal" as Tone };
+export function setCommStyle(s: Partial<typeof style>) {
+  style = { ...style, ...s };
+}
+export function getCommStyle() {
+  return style;
+}
 export function setCommVars(v: Partial<CommVars>) {
   vars = { ...vars, ...v };
 }
