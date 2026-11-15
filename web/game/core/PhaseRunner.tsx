@@ -10,6 +10,8 @@ import { PHASE_TRACK, setBaseMusic, setMusicOverride } from "./music";
 import { getLoadedPhase, loadPhase, preloadAssets, preloadNext } from "./phases";
 import { PerfOverlay, PerfProbe, QUALITY } from "./perf";
 import { useStore, type Quality } from "./store";
+import { prefetchVoice } from "./audio";
+import { allLines } from "./voiceLines";
 
 const DOWN: Record<Quality, Quality> = { high: "medium", medium: "low", low: "low" };
 const UP: Record<Quality, Quality> = { low: "medium", medium: "high", high: "high" };
@@ -50,6 +52,12 @@ export function PhaseRunner() {
   const quality = useStore((s) => s.quality);
   const setQuality = useStore((s) => s.setQuality);
   const [mod, setMod] = useState<PhaseModule | null>(() => getLoadedPhase(phaseId) ?? null);
+
+  // once per mission (state objects are replaced on every server update)
+  const planId = useStore((s) => s.state?.plan?.id);
+  useEffect(() => {
+    prefetchVoice(allLines(useStore.getState().state?.plan));
+  }, [planId]);
 
   useEffect(() => {
     setMusicOverride(null);

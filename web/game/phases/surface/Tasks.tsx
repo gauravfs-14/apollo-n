@@ -13,14 +13,8 @@ import { ROLE_COLOR, rt, useSurface, type Guide } from "./store";
 import { beep, chirp, thud } from "./synth";
 import { Label } from "./Label";
 import { addDust } from "./Trail";
+import { LINES, type Line } from "../../core/voiceLines";
 
-const LINES: Record<string, string> = {
-  navigate_to: "Houston to crew: you are at the rim, good view into the dark. Next objective is open.",
-  deploy_relay: "Houston: relay is up and we have signal. Nice work. Go find that ice.",
-  scan: "Houston: strong reading. That is the signal we were looking for. Outstanding.",
-  collect_sample: "Houston: sample tube sealed and stowed. Copy that, great scoop.",
-  repair: "Houston: panel is aligned and locked. Telemetry is green.",
-};
 
 function angDiff(a: number, b: number) {
   let d = (b - a) % (Math.PI * 2);
@@ -107,7 +101,8 @@ export function Tasks({ ground }: { ground: Ground }) {
     g.patch("surface", { done: [...cur] });
     useSurface.getState().say(t.title + " complete");
     chirp(520, 980, 0.3, 0.12);
-    speak(LINES[t.type] ?? "Houston: task complete.", `surface_${t.id}`);
+    const line = (LINES as Record<string, Line>)[`task_${t.type}`] ?? LINES.task_generic;
+    speak(line.text, `surface_${t.id}`, line);
   }, []);
 
   const mistake = useCallback((msg: string) => {
@@ -137,7 +132,7 @@ export function Tasks({ ground }: { ground: Ground }) {
     p.flagPos.y = ground.heightAt(p.flagPos.x, p.flagPos.z);
     setFlag([p.flagPos.x, p.flagPos.y, p.flagPos.z]);
     useSurface.getState().set({ finale: true, prompt: null, progress: null, signal: null, bars: null, guides: [] });
-    speak("Houston: mission goal achieved. The whole world is watching. Well done, crew.", "surface_finale");
+    speak(LINES.finale.text, "surface_finale", LINES.finale);
     chirp(440, 1320, 0.8, 0.12);
   }, [fin, plan, ground]);
 

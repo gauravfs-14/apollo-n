@@ -160,7 +160,6 @@ export function setMasterVolume(v: number) {
 // - utterances are kept referenced (Chrome drops GC'd ones) and split into
 //   sentences (Chrome cuts off utterances longer than ~15 s)
 // - cancel() then speak() in the same tick is sometimes swallowed by Chrome
-let voiceHowl: Howl | null = null;
 let preferredVoice: SpeechSynthesisVoice | null = null;
 let provider: "system" | "remote" | null = null;
 let providerReq: Promise<void> | null = null;
@@ -250,24 +249,208 @@ function speakSystem(text: string, my: number): Promise<void> {
   });
 }
 
+// ---- Mission radio (ElevenLabs lines) ----
+// Lines are played through a radio chain on the shared AudioContext: comms-band
+// filters, mild saturation, compression and a static bed. Houston (capcom) lines
+// are bracketed by Quindar tones (2525 Hz in, 2475 Hz out), as on Apollo; crew
+// lines come from the Moon, so they sound narrower and noisier.
+export type Speaker = "capcom" | "crew";
+
+const bufCache = new Map<string, Promise<AudioBuffer>>();
+let radio: { stop: () => void } | null = null;
+let noiseBuf: AudioBuffer | null = null;
+let shaperCurves: Record<Speaker, Float32Array<ArrayBuffer>> | null = null;
+
+function loadBuffer(ctx: AudioContext, url: string): Promise<AudioBuffer> {
+  let p = bufCache.get(url);
+  if (!p) {
+    p = fetch(url)
+      .then((r) => r.arrayBuffer())
+      .then((b) => ctx.decodeAudioData(b));
+    p.catch(() => bufCache.delete(url));
+    bufCache.set(url, p);
+    if (bufCache.size > 24) bufCache.delete(bufCache.keys().next().value!);
+  }
+  return p;
+}
+
+function radioCurve(drive: number) {
+  const n = 1024;
+  const c = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    c[i] = Math.tanh(drive * x) / Math.tanh(drive);
+  }
+  return c;
+}
+
+function noise(ctx: AudioContext) {
+  if (!noiseBuf) {
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    let b = 0;
+    for (let i = 0; i < d.length; i++) {
+      b = 0.97 * b + 0.03 * (Math.random() * 2 - 1); // soft, slightly pink hiss
+      d[i] = b * 6 + (Math.random() * 2 - 1) * 0.15;
+    }
+  }
+  return noiseBuf;
+}
+
+function playRadio(buf: AudioBuffer, speaker: Speaker): Promise<void> {
+  const g = audioGraph();
+  if (!g) return Promise.resolve();
+  const { ctx, out } = g;
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  radio?.stop();
+  shaperCurves ??= { capcom: radioCurve(1.6), crew: radioCurve(2.6) };
+  const crew = speaker === "crew";
+  const t0 = ctx.currentTime + 0.05;
+  const lead = crew ? 0.18 : 0.38; // Quindar tone + gap before the voice
+  const vStart = t0 + lead;
+  const vEnd = vStart + buf.duration;
+  const end = vEnd + (crew ? 0.2 : 0.42);
+
+  const bus = ctx.createGain();
+  bus.connect(out);
+  const nodes: AudioScheduledSourceNode[] = [];
+
+  // voice through the comms chain
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const hp = ctx.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = crew ? 450 : 300;
+  const lp = ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = crew ? 2700 : 3400;
+  const shaper = ctx.createWaveShaper();
+  shaper.curve = shaperCurves[speaker];
+  shaper.oversample = "2x";
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -26;
+  comp.ratio.value = 4;
+  comp.attack.value = 0.004;
+  comp.release.value = 0.12;
+  const vox = ctx.createGain();
+  vox.gain.value = 1.15;
+  src.connect(hp).connect(lp).connect(shaper).connect(comp).connect(vox).connect(bus);
+  src.start(vStart);
+  nodes.push(src);
+
+  // static bed while the channel is open
+  const hiss = ctx.createBufferSource();
+  hiss.buffer = noise(ctx);
+  hiss.loop = true;
+  const bp = ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = crew ? 1800 : 2400;
+  bp.Q.value = 0.6;
+  const hg = ctx.createGain();
+  const level = crew ? 0.05 : 0.018;
+  hg.gain.setValueAtTime(0, t0);
+  hg.gain.linearRampToValueAtTime(level, t0 + 0.04);
+  hg.gain.setValueAtTime(level, end - 0.05);
+  hg.gain.linearRampToValueAtTime(0, end);
+  hiss.connect(bp).connect(hg).connect(bus);
+  hiss.start(t0);
+  hiss.stop(end + 0.05);
+  nodes.push(hiss);
+
+  // Quindar tones on Houston's transmissions
+  if (!crew) {
+    for (const [f, at] of [
+      [2525, t0],
+      [2475, vEnd + 0.12],
+    ] as const) {
+      const o = ctx.createOscillator();
+      o.frequency.value = f;
+      const og = ctx.createGain();
+      og.gain.setValueAtTime(0, at);
+      og.gain.linearRampToValueAtTime(0.09, at + 0.006);
+      og.gain.setValueAtTime(0.09, at + 0.244);
+      og.gain.linearRampToValueAtTime(0, at + 0.25);
+      o.connect(og).connect(bus);
+      o.start(at);
+      o.stop(at + 0.26);
+      nodes.push(o);
+    }
+  }
+
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (radio === handle) radio = null;
+      setTimeout(() => bus.disconnect(), 100);
+      resolve();
+    };
+    const timer = setTimeout(finish, (end - ctx.currentTime) * 1000 + 50);
+    const handle = {
+      stop: () => {
+        const t = ctx.currentTime;
+        bus.gain.cancelScheduledValues(t);
+        bus.gain.setValueAtTime(bus.gain.value, t);
+        bus.gain.linearRampToValueAtTime(0, t + 0.04); // no click on interrupt
+        nodes.forEach((n) => {
+          try {
+            n.stop(t + 0.05);
+          } catch {}
+        });
+        finish();
+      },
+    };
+    radio = handle;
+  });
+}
+
+/** Lines that address Houston ("Houston, we are down") are the crew talking. */
+function inferSpeaker(text: string): Speaker {
+  return /^Houston,/.test(text.trim()) ? "crew" : "capcom";
+}
+
+async function fetchLine(text: string, speaker: Speaker, lineId?: string): Promise<string | null> {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 12000);
+  try {
+    const r = await api<{ url: string | null }>("/voice", { line_id: lineId ?? null, text, speaker }, { signal: ctl.signal });
+    return r.url;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** Ask the API to synthesize lines ahead of time (no-op with the system voice). */
+export function prefetchVoice(lines: { text: string; speaker?: Speaker }[]) {
+  loadProvider().then(() => {
+    if (provider !== "remote" || !lines.length) return;
+    api("/voice/prefetch", { lines: lines.map((l) => ({ text: l.text, speaker: l.speaker ?? inferSpeaker(l.text) })) }).catch(() => {});
+  });
+}
+
 /** Speak a mission-control line. Resolves when finished. */
-export async function speak(text: string, lineId?: string): Promise<void> {
+export async function speak(text: string, lineId?: string, opts: { speaker?: Speaker } = {}): Promise<void> {
   const my = ++token;
-  voiceHowl?.stop();
+  radio?.stop();
   if (provider === null) await loadProvider();
   if (my !== token) return;
   if (provider === "remote") {
-    try {
-      const { url } = await api<{ url: string | null }>("/voice", { line_id: lineId ?? null, text });
-      if (my !== token) return;
-      if (url) {
-          return new Promise<void>((resolve) => {
-          voiceHowl = new Howl({ src: [url], html5: true, volume: 1, onend: () => resolve(), onloaderror: () => resolve() });
-          voiceHowl.play();
-        });
+    const speaker = opts.speaker ?? inferSpeaker(text);
+    const url = await fetchLine(text, speaker, lineId);
+    const g = audioGraph();
+    if (my !== token) return;
+    if (url && g) {
+      try {
+        const buf = await loadBuffer(g.ctx, url);
+        if (my !== token) return;
+        return playRadio(buf, speaker);
+      } catch {
+        /* fall through to the system voice */
       }
-    } catch {
-      /* fall through to the system voice */
     }
   }
   return speakSystem(text, my);
@@ -275,6 +458,6 @@ export async function speak(text: string, lineId?: string): Promise<void> {
 
 export function stopVoice() {
   token++;
-  voiceHowl?.stop();
+  radio?.stop();
   if (hasTTS() && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel();
 }

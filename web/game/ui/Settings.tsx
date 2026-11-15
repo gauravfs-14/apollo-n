@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getMusicVolume, setMasterVolume, setMusicVolume, speak } from "../core/audio";
 import { useStore, type QualityMode } from "../core/store";
+import { LINES } from "../core/voiceLines";
 
 const MODES: { id: QualityMode; label: string }[] = [
   { id: "auto", label: "Auto" },
@@ -82,7 +83,7 @@ export function SettingsPanel() {
           className="pointer-events-auto h-1.5 w-full cursor-pointer accent-amber"
         />
         <button
-          onClick={() => void speak("Houston here. Voice check, loud and clear.", "voice_check")}
+          onClick={() => void speak(LINES.voiceCheck.text, "voice_check", LINES.voiceCheck)}
           className="pointer-events-auto mt-2 rounded-md border border-line bg-white/5 px-3 py-1.5 text-xs text-white hover:bg-white/10"
         >
           Test voice
