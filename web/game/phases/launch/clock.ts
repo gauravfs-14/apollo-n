@@ -1,5 +1,6 @@
 "use client";
-// Launch clock shared by the 3D scene and the HUD (countdown, skip, flight panel). Captions come from the comms loop.
+// Launch clock. The mission launch is a cinematic (Scene.tsx/Hud.tsx: countdown, liftoff, cut to space,
+// staging); the player-flown ascent in flight.ts is used by the arcade Launch & Burn challenge only.
 import { create } from "zustand";
 import { newLaunch, type LaunchSim } from "./flight";
 
@@ -11,7 +12,10 @@ export const T = {
   ignition: 3.1, // T-8.9: "ignition sequence start"
   liftoff: 12, // T-0
   spaceCut: 24,
-  s1Burnout: 30, // first stage burns out: stage now
+  sep1: 30, // mission cinematic: first stage separates
+  sep2: 36, // mission cinematic: second stage separates; GO for translunar injection
+  end: 44, // mission cinematic ends
+  s1Burnout: 30, // flown launch (arcade Launch & Burn challenge): first stage burns out, stage now
 } as const;
 
 interface Clock {
