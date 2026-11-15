@@ -15,17 +15,8 @@ export function cleanScore(raw: unknown): number {
   return Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 0;
 }
 
-export const HP_BASE = 100;
-export const HP_CAP = 200;
-
-/** Hull integrity chosen when the mission starts: HP_BASE..HP_CAP (mirrors state.py clean_hp_max). */
-export function cleanHpMax(raw: unknown): number {
-  const v = Number(raw);
-  return Number.isFinite(v) ? Math.max(HP_BASE, Math.min(HP_CAP, v)) : HP_BASE;
-}
-
 export function newState(room: string, mode: GameState["mode"]): GameState {
-  return { room, mode, phase: "select", players: [], scores: {}, phaseData: {}, hp: HP_BASE, hpMax: HP_BASE, failed: null, sp: 0, version: 0 };
+  return { room, mode, phase: "select", players: [], scores: {}, phaseData: {}, hp: 100, failed: null, version: 0 };
 }
 
 export function apply(s: GameState, playerId: string, msg: ClientMsg): GameState | string {
@@ -74,11 +65,6 @@ export function apply(s: GameState, playerId: string, msg: ClientMsg): GameState
         st.phaseData[st.phase] = { ...(st.phaseData[st.phase] ?? {}), ...data };
       } else if (msg.kind === "set_plan") {
         st.plan = data.plan as GameState["plan"];
-        if (st.phase === "select" && "hpMax" in data) {
-          // the host's hull for this mission: integrity starts full at hpMax
-          st.hpMax = cleanHpMax(data.hpMax);
-          st.hp = st.hpMax;
-        }
       } else if (msg.kind === "complete") {
         st.scores[st.phase] = cleanScore(data.score);
         const i = PHASE_ORDER.indexOf(st.phase);
@@ -92,14 +78,6 @@ export function apply(s: GameState, playerId: string, msg: ClientMsg): GameState
           st.failed = String(data.reason ?? "The ship was lost.").slice(0, 160);
           st.phase = "report";
         }
-      } else if (msg.kind === "earn") {
-        // supply points: earned on the journey (activities, quizzes), shared by the crew
-        st.sp = Math.max(0, (st.sp ?? 0) + Math.max(0, Math.min(500, Math.round(Number(data.amount) || 0))));
-      } else if (msg.kind === "spend" || msg.kind === "heal") {
-        const cost = Math.max(0, Math.round(Number(msg.kind === "heal" ? data.cost : data.amount) || 0));
-        if ((st.sp ?? 0) < cost) return "Not enough supply points";
-        st.sp = (st.sp ?? 0) - cost;
-        if (msg.kind === "heal") st.hp = Math.min(st.hpMax ?? 100, (st.hp ?? 100) + Math.max(0, Math.min(100, Number(data.amount) || 0)));
       } else if (msg.kind === "goto") {
         if (!me.isHost) return "Only the host can jump phases";
         const target = data.phase as GameState["phase"];

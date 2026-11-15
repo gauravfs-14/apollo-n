@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable react-hooks/set-state-in-effect -- timers, refs and three.js state are intentionally imperative here */
+/* eslint-disable react-hooks/purity, react-hooks/refs, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, react-hooks/immutability, react-hooks/preserve-manual-memoization -- timers, refs and three.js state are intentionally imperative here */
 // Cruise phase shared model.
 //
 // Shared state (phaseData.cruise), identical on every client:
@@ -69,7 +69,7 @@ export interface HurdleCtx {
 export function useLive(idx: number): Record<string, unknown> {
   const [live, setLive] = useState<Record<string, unknown>>({});
   useEffect(() => {
-    setLive({});  
+    setLive({}); // eslint-disable-line react-hooks/set-state-in-effect -- reset per hurdle
     return onServerEvent((m) => {
       if (m.type !== "event" || m.kind !== "cruise_live") return;
       const d = m.data as Record<string, unknown> | undefined;

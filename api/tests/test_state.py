@@ -230,54 +230,12 @@ def test_damage_fails_mission_at_zero():
     assert s3["hp"] == 100 and s3["failed"] is None and s3["phase"] == "select"
 
 
-def test_hull_upgrade_sets_hp_max_at_mission_start():
-    s = new_state("R", "solo")
-    assert s["hpMax"] == 100
-    s = apply(s, "a", {"type": "join", "id": "a", "name": "A"})
-    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "set_plan", "data": {"plan": {"id": "x"}, "hpMax": 130}})
-    assert s["hpMax"] == 130 and s["hp"] == 130
-    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "complete", "data": {"score": 100}})
-    s = apply(s, "a", {"type": "action", "phase": "build", "kind": "damage", "data": {"amount": 40, "reason": "x"}})
-    assert s["hp"] == 90 and s["hpMax"] == 130
-    # junk and out-of-range values are clamped; hpMax is only honoured while in select
-    s2 = new_state("R", "solo")
-    s2 = apply(s2, "a", {"type": "join", "id": "a", "name": "A"})
-    assert apply(s2, "a", {"type": "action", "phase": "select", "kind": "set_plan", "data": {"hpMax": 9999}})["hpMax"] == 200
-    assert apply(s2, "a", {"type": "action", "phase": "select", "kind": "set_plan", "data": {"hpMax": "bad"}})["hpMax"] == 100
-    assert apply(s2, "a", {"type": "action", "phase": "select", "kind": "set_plan", "data": {"hpMax": 5}})["hpMax"] == 100
-    s2 = apply(s2, "a", {"type": "action", "phase": "select", "kind": "complete", "data": {"score": 100}})
-    s2 = apply(s2, "a", {"type": "action", "phase": "build", "kind": "set_plan", "data": {"hpMax": 150}})
-    assert s2["hpMax"] == 100 and s2["hp"] == 100
-    # reset restores the stock hull
-    s3 = apply(s, "a", {"type": "action", "phase": "build", "kind": "reset"})
-    assert s3["hpMax"] == 100 and s3["hp"] == 100
-
-
 def test_drop_phase_retired():
     s = new_state("R", "solo")
     s = apply(s, "a", {"type": "join", "id": "a", "name": "A"})
     s = apply(s, "a", {"type": "action", "phase": "select", "kind": "complete", "data": {"score": 100}})
     s = apply(s, "a", {"type": "action", "phase": "build", "kind": "complete", "data": {"score": 80}})
     assert s["phase"] == "crew"
-
-
-def test_supply_points_earn_spend_heal():
-    s = new_state("R", "solo")
-    s = apply(s, "a", {"type": "join", "id": "a", "name": "A"})
-    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "earn", "data": {"amount": 30}})
-    assert s["sp"] == 30
-    err = apply(s, "a", {"type": "action", "phase": "select", "kind": "spend", "data": {"amount": 50}})
-    assert err == "Not enough supply points"
-    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "spend", "data": {"amount": 10, "item": "hint"}})
-    assert s["sp"] == 20
-    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "damage", "data": {"amount": 40}})
-    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "heal", "data": {"cost": 15, "amount": 25}})
-    assert s["sp"] == 5 and s["hp"] == 85
-    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "earn", "data": {"amount": 100}})
-    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "heal", "data": {"cost": 10, "amount": 50}})
-    assert s["hp"] == 100  # capped at max integrity
-    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "reset"})
-    assert s["sp"] == 0
 
 
 if __name__ == "__main__":

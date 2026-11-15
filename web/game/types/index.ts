@@ -146,17 +146,13 @@ export interface GameState {
   phaseData: Partial<Record<PhaseId, Record<string, unknown>>>;
   /** Ship integrity 0..100: mistakes cost HP; at 0 the mission fails. */
   hp?: number;
-  /** Hull maximum (100 stock; the reinforced-hull upgrades raise it when the mission starts). hp starts here. */
-  hpMax?: number;
   /** Why the mission failed (set when hp reached 0), else absent. */
   failed?: string | null;
-  /** Supply points for this mission (shared by the crew): earned on the journey, spent on the Moon. */
-  sp?: number;
   version: number;
 }
 
 // ---- Wire messages (WebSocket /ws/rooms/{code}) ----
-export type ActionKind = "patch" | "set_plan" | "complete" | "goto" | "reset" | "damage" | "earn" | "spend" | "heal";
+export type ActionKind = "patch" | "set_plan" | "complete" | "goto" | "reset" | "damage";
 
 export type ClientMsg =
   | { type: "join"; id: string; name: string; rejoin?: boolean }

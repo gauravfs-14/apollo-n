@@ -3,7 +3,6 @@
 // the server lowers state.hp and, at 0, fails the mission and sends everyone to the report.
 //   damage(8, "Wrong valve opened: fuel leak")      // a mistake
 //   const { hp, failed } = useMissionHp();
-import { hit } from "./juice";
 import { send } from "./net";
 import { useStore } from "./store";
 
@@ -22,14 +21,11 @@ export function damage(amount: number, reason: string) {
   const st = useStore.getState().state;
   if (!st || st.failed || amount <= 0) return;
   const k = SCALE[st.plan?.difficulty ?? "normal"] ?? 1;
-  const amt = Math.round(amount * k);
-  send({ type: "action", phase: st.phase, kind: "damage", data: { amount: amt, reason } });
-  hit(amt, reason); // juice: integrity chip shake, red vignette, camera shake (every client also reacts to the hp drop)
+  send({ type: "action", phase: st.phase, kind: "damage", data: { amount: Math.round(amount * k), reason } });
 }
 
 export function useMissionHp() {
   const hp = useStore((s) => s.state?.hp ?? 100);
-  const hpMax = useStore((s) => s.state?.hpMax ?? 100);
   const failed = useStore((s) => s.state?.failed ?? null);
-  return { hp, hpMax, failed };
+  return { hp, failed };
 }

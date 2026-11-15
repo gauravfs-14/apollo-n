@@ -60,29 +60,3 @@ export function fitPlanToLevel(plan: MissionPlan, level: number): MissionPlan {
   while (cruise.length < def.hazards) cruise.push({ ...plan.cruise[cruise.length % plan.cruise.length] });
   return { ...plan, level, difficulty: def.difficulty, cruise: cruise.map((h) => ({ ...h, difficulty: def.tier })) };
 }
-
-/**
- * Late levels ask more of the ship than the stock parts can give, so the hangar upgrades matter:
- * minimum delta-v and battery rise from level 10; the mass limit is kept high enough that an upgraded ship fits.
- * Levels 1-9 are unchanged (winnable with the stock parts). Idempotent.
- */
-const DV_FLOOR: Record<number, number> = { 10: 2750, 11: 2800, 12: 2900, 13: 3050, 14: 3150, 15: 3250 };
-const BAT_FLOOR: Record<number, number> = { 12: 95, 13: 100, 14: 105, 15: 110 };
-export function tightenPlan(plan: MissionPlan, level: number): MissionPlan {
-  const c = plan.ship.constraints;
-  const dv = DV_FLOOR[level], bat = BAT_FLOOR[level];
-  if (!dv && !bat && level < 8) return plan;
-  const massFloor = level >= 12 ? 1550 : level >= 8 ? 1400 : 0;
-  return {
-    ...plan,
-    ship: {
-      ...plan.ship,
-      constraints: {
-        ...c,
-        min_delta_v: Math.max(c.min_delta_v, dv ?? 0),
-        min_battery_hours: Math.max(c.min_battery_hours, bat ?? 0),
-        max_mass_kg: Math.max(c.max_mass_kg, massFloor),
-      },
-    },
-  };
-}

@@ -1,6 +1,5 @@
 // Ship part catalog + build scoring. Pure data/functions, no React.
 // Part ids are "<slot>_<a|b|c>" and match the 3D variants in three/ship/Lander.tsx.
-// Hangar (premium) parts are "<slot>_x<a|b|c>": the last letter picks the closest existing 3D variant.
 import type { MissionPlan, ShipSlot } from "../types";
 
 export interface ShipPart {
@@ -28,8 +27,6 @@ export interface ShipPart {
   /** Short pros/cons shown on the card. */
   pros: string;
   cons: string;
-  /** Hangar part: locked in the build phase until bought (progress/upgrades.ts maps it to its upgrade). */
-  premium?: boolean;
 }
 
 export const SLOTS: ShipSlot[] = ["engine", "power", "payload", "legs", "comms"];
@@ -118,31 +115,6 @@ export const PARTS: ShipPart[] = [
     id: "comms_c", slot: "comms", name: "Whips + small dish", inspiredBy: "Surveyor omni antennas",
     desc: "Simple rods and a tiny dish. Cheap, light, noisy.",
     massKg: 15, drawW: 20, radioQuality: 0.5, pros: "Almost weightless", cons: "Weak signal",
-  },
-  {
-    id: "engine_xc", slot: "engine", name: "Vacuum-optimised bell", inspiredBy: "BE-7 / RL10C extended-nozzle engines",
-    desc: "A long vacuum nozzle tuned for the Moon. The most delta-v of any engine.",
-    massKg: 280, deltaV: 3800, drawW: 60, pros: "Highest delta-v", cons: "Heavy and power-hungry", premium: true,
-  },
-  {
-    id: "power_xb", slot: "power", name: "Long-life cell stack", inspiredBy: "Gateway / Chang'e-4 battery packs",
-    desc: "A large lithium pack with its own heaters. Runs the lander through a long lunar night.",
-    massKg: 205, powerW: 520, batteryHours: 140, pros: "140 h of darkness", cons: "Heavy", premium: true,
-  },
-  {
-    id: "legs_xb", slot: "legs", name: "Wide-stance legs", inspiredBy: "Starship HLS / Blue Moon stance",
-    desc: "Very long splayed legs with wide footpads and stiff dampers.",
-    massKg: 135, tiltTolerance: 26, pros: "Lands on 26 degree slopes", cons: "Heavy", premium: true,
-  },
-  {
-    id: "comms_xa", slot: "comms", name: "Deep-space transceiver", inspiredBy: "Orion S-band / Ka-band terminal",
-    desc: "A dual-band terminal that holds a clean link to Earth from any crater.",
-    massKg: 45, drawW: 70, radioQuality: 0.97, pros: "Best signal", cons: "Draws power", premium: true,
-  },
-  {
-    id: "comms_xb", slot: "comms", name: "Landing radar array", inspiredBy: "Apollo LM landing radar, Blue Ghost radar altimeter",
-    desc: "A radar radio panel. The lander reads its true height and sink rate in the final descent.",
-    massKg: 50, drawW: 80, radioQuality: 0.7, tags: ["radar"], pros: "Height and sink rate readout", cons: "Average radio", premium: true,
   },
 ];
 

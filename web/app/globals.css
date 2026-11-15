@@ -38,6 +38,3 @@ body { font-family: var(--font-geist-sans), system-ui, sans-serif; }
   .apollo-indeterminate { transform: none; width: 100%; opacity: 0.6; }
 }
 .apollo-paused * { animation-play-state: paused !important; }
-
-@keyframes reward-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.reward-line { animation: reward-in 0.35s ease-out both; }

@@ -12,7 +12,6 @@ import { renderShareCard } from "./shareCard";
 import { ROLES } from "../../types";
 import { ROLE_INFO, type CrewData } from "../crew/data";
 import { phaseLabel } from "../../ui/phaseLabel";
-import { useProgressStore, type Summary } from "../../progress/store";
 
 function host(url: string) {
   try {
@@ -63,57 +62,6 @@ function Stars({ n, of, color, size = "h-4 w-4" }: { n: number; of: number; colo
   );
 }
 
-/** Counts up from 0 to `to` over about a second. */
-function useCount(to: number) {
-  const [v, setV] = useState(0);
-  useEffect(() => {
-    let raf = 0;
-    const t0 = performance.now();
-    const tick = (t: number) => {
-      const k = Math.min(1, (t - t0) / 1100);
-      setV(Math.round(to * (1 - Math.pow(1 - k, 3))));
-      if (k < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [to]);
-  return v;
-}
-
-function Rewards({ r }: { r: Summary }) {
-  const shown = useCount(r.total);
-  return (
-    <section className="rounded-xl border border-amber/40 bg-panel p-4 backdrop-blur-md" aria-label="Mission rewards">
-      <div className="flex items-baseline justify-between">
-        <h3 className="text-sm font-semibold">Rewards</h3>
-        <span className="num text-2xl text-amber">+{shown} credits</span>
-      </div>
-      <ul className="mt-2 space-y-1">
-        {r.lines.map((l, i) => (
-          <li key={l.id} className="reward-line grid grid-cols-[1fr_auto] items-baseline gap-2 text-[13px]" style={{ animationDelay: `${i * 120}ms` }}>
-            <span className="text-white/85">{l.label}{l.note ? <span className="ml-1.5 text-[11px] text-dim">{l.note}</span> : null}</span>
-            <span className="num text-go">+{l.amount}</span>
-          </li>
-        ))}
-      </ul>
-      <div className="num mt-2 flex justify-between border-t border-line pt-2 text-[12px] text-dim">
-        <span>Credits in the hangar</span>
-        <span className="text-white/85">{r.creditsAfter}</span>
-      </div>
-      {r.titles.length > 0 && (
-        <div className="mt-2 rounded-lg border border-amber/40 bg-amber/10 px-3 py-1.5 text-[13px] text-amber">New title: {r.titles.join(", ")}</div>
-      )}
-      {r.records.length > 0 && (
-        <ul className="mt-2 space-y-0.5 text-[12.5px]">
-          {r.records.map((x) => (
-            <li key={x.label} className="flex justify-between"><span className="text-cyan">New record: {x.label}</span><span className="num text-white/85">{x.value}</span></li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 export function ReportHud() {
   const { state, plan, isHost, action } = useGame();
   const shared = usePhaseData<{ level?: number }>("select");
@@ -135,52 +83,15 @@ export function ReportHud() {
   const failedReason = state?.failed ?? null;
   const passed = !failedReason && result.total >= PASS_SCORE;
   const lvStars = levelStars(result.total);
-  const [reward, setReward] = useState<Summary | null>(null);
   useEffect(() => {
-    if (recorded.current || !state || !plan) return;
+    if (recorded.current || !passed || !level) return;
     recorded.current = true;
-    const journey = useJourneyStore.getState();
-    const prog = useProgressStore.getState();
-    journey.hydrate();
-    prog.hydrate();
-    // credits first (they need to know whether this is the first clear), then the journey records the win
-    const sd = (state.phaseData.surface ?? {}) as Record<string, unknown>;
-    const discovered = Object.keys(sd).filter((k) => k.startsWith("p_") && sd[k]).map((k) => k.slice(2));
-    const humans = state.players.filter((p) => !p.released).length;
-    const coopTasks = state.mode === "multi" && humans > 1
-      ? Object.keys(sd).filter((k) => k.startsWith("co_") && sd[k] && sd[k] !== "AI crew").length
-      : 0;
-    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
-    setReward(prog.claim({
-      key: `${state.room}|${plan.id}|${JSON.stringify(state.scores)}|${Math.round(state.hp ?? 100)}`,
-      level, passed, total: result.total, stars: lvStars,
-      hp: state.hp ?? 100, hpMax: state.hpMax ?? 100, scores: state.scores as Record<string, number>,
-      discovered, coopTasks, supplyLeft: state.sp ?? 0,
-      sink: num((state.phaseData.landing as Record<string, unknown> | undefined)?.sink),
-      burnErr: num((state.phaseData.launch as Record<string, unknown> | undefined)?.burnErr),
-    }));
-    if (passed && level) journey.recordWin(level, result.total, lvStars);
-  }, [state, plan, passed, level, result.total, lvStars]);
-
-  // weekly crew board: the host posts the result once per finished mission (pass or fail); fails soft with no API
-  const posted = useRef(false);
-  const [rank, setRank] = useState<number | null>(null);
-  useEffect(() => {
-    if (posted.current || !state || !plan || !isHost) return;
-    posted.current = true;
-    const crewNames = state.players.filter((p) => !p.released && p.connected).map((p) => p.name).slice(0, 4);
-    api<{ rank_week: number }>("/leaderboard/mission", {
-      room: state.room,
-      crew: crewNames.length ? crewNames : ["Crew"],
-      score: Math.max(0, Math.min(1000, Math.round(result.total * 10))),
-      ...(level ? { level: Math.min(99, level) } : {}),
-      hp: Math.max(0, Math.min(100, Math.round(((state.hp ?? 100) / (state.hpMax ?? 100)) * 100))),
-    }).then((r) => setRank(r.rank_week)).catch(() => {});
-  }, [state, plan, isHost, result.total, level]);
+    useJourneyStore.getState().hydrate();
+    useJourneyStore.getState().recordWin(level, result.total, lvStars);
+  }, [passed, level, result.total, lvStars]);
 
   if (!plan || !state) return null;
   const hp = Math.round(state.hp ?? 100);
-  const hpMax = state.hpMax ?? 100;
   const lastLevel = !!level && level >= LEVEL_COUNT;
   const again = (next: number | null) => {
     useJourneyStore.getState().setAutoPlay(next);
@@ -224,13 +135,12 @@ export function ReportHud() {
             {failedReason ?? `You scored ${result.total}. Reach ${PASS_SCORE} to pass this level.`}
           </p>
         )}
-        {rank !== null && <div data-testid="weekly-rank" className="num mt-2 text-[12px] text-cyan">Crew rank this week: #{rank}</div>}
         <div className="mt-3 flex items-center gap-3 text-[13px]">
           <span className="text-dim">Ship integrity</span>
           <div className="w-28">
-            <Meter value={hp / hpMax} tone={hp / hpMax > 0.6 ? "go" : hp / hpMax > 0.3 ? "amber" : "nogo"} />
+            <Meter value={hp / 100} tone={hp > 60 ? "go" : hp > 30 ? "amber" : "nogo"} />
           </div>
-          <span className="num text-white/85">{hpMax === 100 ? `${hp}%` : `${hp} / ${hpMax}`}</span>
+          <span className="num text-white/85">{hp}%</span>
           {!passed && <span className="num ml-auto text-white/70">{result.total} pts</span>}
         </div>
 
@@ -264,8 +174,6 @@ export function ReportHud() {
             </div>
           )}
         </section>
-
-        {reward && <Rewards r={reward} />}
 
         <section className="rounded-xl border border-line bg-panel p-4 backdrop-blur-md">
           <h3 className="text-sm font-semibold">What was real</h3>

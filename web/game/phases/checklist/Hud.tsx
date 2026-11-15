@@ -4,7 +4,6 @@ import { rolesOf } from "../../core/roles";
 import { MINIGAMES, type MinigameResult } from "../../minigames";
 import { clearComms, say } from "../../core/comms";
 import { COST, damage } from "../../core/hp";
-import { award, grade, miss } from "../../core/juice";
 import { useSkipVote } from "../../core/skip";
 import { useGame, usePhaseData } from "../../core/useGame";
 import { checklistDone } from "../../data/missionComms";
@@ -35,21 +34,6 @@ export function ChecklistHud() {
     seenMistakes.current = mistakes;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- react to new mistakes only
   }, [mistakes]);
-
-  // juice: every correct step pops points and builds a streak; a wrong one breaks it (shown on every client)
-  const doneN = d.progress?.done ?? 0;
-  const prevDone = useRef(0);
-  const prevMis = useRef(0);
-  useEffect(() => {
-    if (mistakes > prevMis.current) miss("Wrong step");
-    else if (doneN > prevDone.current) award(20, "Correct step", { at: { x: 0.5, y: 0.26 } });
-    prevDone.current = doneN;
-    prevMis.current = mistakes;
-  }, [doneN, mistakes]);
-  const score = d.result?.score;
-  useEffect(() => {
-    if (score !== undefined) grade("checklist", score, { title: "Checklist grade", once: `checklist:${plan?.id}` });
-  }, [score, plan?.id]);
 
   // checklist done: Launch Control reads the result, then the game moves on to launch by itself
   const finished = !!d.result;

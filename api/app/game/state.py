@@ -10,17 +10,6 @@ PHASE_ORDER = [
     "launch", "cruise", "site", "landing", "surface", "report",
 ]
 ROLES = ["commander", "pilot", "engineer", "scientist"]
-HP_BASE = 100  # ship integrity of a stock hull
-HP_CAP = 200  # the reinforced-hull upgrades never go past this
-
-
-def clean_hp_max(raw: Any) -> float:
-    """Hull integrity chosen when the mission starts (reinforced hull upgrade): HP_BASE..HP_CAP. Mirrored in reducer.ts."""
-    try:
-        v = float(raw)
-    except (TypeError, ValueError):
-        return float(HP_BASE)
-    return max(float(HP_BASE), min(float(HP_CAP), v)) if v == v else float(HP_BASE)
 
 
 def clean_name(raw: Any, fallback: str = "Astronaut") -> str:
@@ -87,7 +76,7 @@ def rebalance(st: dict[str, Any]) -> None:
 
 def new_state(room: str, mode: str) -> dict[str, Any]:
     return {"room": room, "mode": mode, "phase": "select", "players": [],
-            "scores": {}, "phaseData": {}, "hp": 100, "hpMax": HP_BASE, "failed": None, "sp": 0, "version": 0}
+            "scores": {}, "phaseData": {}, "hp": 100, "failed": None, "version": 0}
 
 
 def apply(s: dict[str, Any], player_id: str, msg: dict[str, Any]) -> dict[str, Any] | str:
@@ -144,10 +133,6 @@ def apply(s: dict[str, Any], player_id: str, msg: dict[str, Any]) -> dict[str, A
             st["phaseData"][st["phase"]] = {**st["phaseData"].get(st["phase"], {}), **data}
         elif kind == "set_plan":
             st["plan"] = data.get("plan")
-            if st["phase"] == "select" and "hpMax" in data:
-                # the host's hull for this mission: integrity starts full at hpMax
-                st["hpMax"] = clean_hp_max(data["hpMax"])
-                st["hp"] = st["hpMax"]
         elif kind == "complete":
             st["scores"][st["phase"]] = clean_score(data.get("score", 0))
             i = PHASE_ORDER.index(st["phase"])
@@ -165,27 +150,6 @@ def apply(s: dict[str, Any], player_id: str, msg: dict[str, Any]) -> dict[str, A
             if st["hp"] <= 0:
                 st["failed"] = str(data.get("reason") or "The ship was lost.")[:160]
                 st["phase"] = "report"
-        elif kind == "earn":
-            # supply points: earned on the journey (activities, quizzes), shared by the crew
-            try:
-                amount = round(max(0.0, min(500.0, float(data.get("amount", 0) or 0))))
-            except (TypeError, ValueError):
-                amount = 0
-            st["sp"] = max(0, int(st.get("sp", 0)) + amount)
-        elif kind in ("spend", "heal"):
-            try:
-                cost = max(0, round(float((data.get("cost") if kind == "heal" else data.get("amount")) or 0)))
-            except (TypeError, ValueError):
-                return "Bad amount"
-            if int(st.get("sp", 0)) < cost:
-                return "Not enough supply points"
-            st["sp"] = int(st.get("sp", 0)) - cost
-            if kind == "heal":
-                try:
-                    gain = max(0.0, min(100.0, float(data.get("amount", 0) or 0)))
-                except (TypeError, ValueError):
-                    gain = 0.0
-                st["hp"] = min(float(st.get("hpMax", 100)), float(st.get("hp", 100)) + gain)
         elif kind == "goto":
             if not me["isHost"]:
                 return "Only the host can jump phases"

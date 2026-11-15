@@ -94,6 +94,17 @@ check("guest sees host's part picks live", synced);
 await shot(guest, "02-build");
 check("guest cannot lock in the build (no button)", (await guest.page.getByRole("button", { name: /Lock in/ }).count()) === 0);
 await click(host.page.getByRole("button", { name: /Lock in build/ }));
+check("both reach drop", (await waitPhase(guest.page, "drop", 10000)) >= 0 && (await waitPhase(host.page, "drop", 5000)) >= 0);
+
+// ---- drop
+await host.page.waitForFunction(() => [...document.querySelectorAll("button")].some((b) => b.textContent === "Open crate" && !b.disabled), null, { timeout: 45000 });
+await click(host.page.getByRole("button", { name: "Open crate" }));
+await guest.page.getByText(/find$/i).first().waitFor({ timeout: 15000 }).catch(() => {});
+const perkH = (await stateOf(host)).phaseData.drop?.perk;
+check("guest sees the same perk", (await until(async () => (await stateOf(guest)).phaseData.drop?.perk === perkH)) && !!perkH, perkH);
+await host.page.getByRole("button", { name: "Continue", exact: true }).waitFor({ timeout: 15000 });
+check("guest has no Continue (waits for commander)", (await guest.page.getByRole("button", { name: "Continue", exact: true }).count()) === 0);
+await click(host.page.getByRole("button", { name: "Continue", exact: true }));
 
 // ---- crew: roles
 check("both reach crew", (await waitPhase(guest.page, "crew", 10000)) >= 0 && (await waitPhase(host.page, "crew", 5000)) >= 0);
@@ -175,20 +186,36 @@ if (style === "order_steps") await solveOrder(host.page, items);
 else if (style === "quiz") await solveQuiz(host.page, items);
 else if (style === "memory_match") await solveMemory(host.page, items);
 else await solveSwitches(host.page, items);
-await host.page.getByText("CHECKLIST COMPLETE").first().waitFor({ timeout: 30000 });
+await host.page.getByText("CHECKLIST COMPLETE", { exact: true }).waitFor({ timeout: 30000 });
 check("guest sees checklist progress/result", await until(async () => (await stateOf(guest)).phaseData.checklist?.result?.score >= 0, 8000));
 check("guest cannot skip Launch Control (only commander/host)", (await guest.page.getByRole("button", { name: "Skip", exact: true }).count()) === 0);
-// the checklist advances to the launch by itself after the radio call
+await click(host.page.getByRole("button", { name: "Skip", exact: true })); // otherwise the checklist advances by itself after the radio call
 
 // ---- launch / cruise
 check("both reach launch", (await waitPhase(host.page, "launch", 15000)) >= 0 && (await waitPhase(guest.page, "launch", 10000)) >= 0);
-// the launch is a pure cinematic: the crew watches the liftoff, then votes to skip (host asks, guest agrees, both skip together)
-await host.page.waitForFunction(() => (window.__launchClock?.getState().t ?? 0) > 20, null, { timeout: 40000 });
-await shot(host, "04b-launch");
-await shot(guest, "04b-launch");
-await click(host.page.getByRole("button", { name: /^Skip/ }));
-check("guest gets the skip prompt and the launch keeps playing", await until(async () => (await guest.page.getByText("wants to skip").count()) > 0, 8000) && (await getPhase(host.page)) === "launch");
-await click(guest.page.locator("div:has-text('wants to skip') >> button:has-text('Skip')").last());
+// fly it as a crew: the guest (pilot) steers and flies the TLI burn, the host (commander) stages
+{
+  const TARGET = 10900;
+  const read = (pg) => pg.evaluate(() => { const c = window.__launchClock?.getState(); return c ? { t: c.t, ...c.sim } : null; });
+  const t0 = Date.now();
+  let checkedSync = false;
+  while ((await getPhase(host.page)) === "launch" && Date.now() - t0 < 150000) {
+    const g = await read(guest.page);
+    const h = await read(host.page);
+    if (g) {
+      if ((g.s1CutAt >= 0 && g.s1SepAt < 0) || (g.s2CutAt >= 0 && g.s2SepAt < 0)) await host.page.keyboard.press("Space");
+      if (g.burnEndAt < 0 && g.readyAt >= 0 && g.t >= g.readyAt && g.burnAt < 0) await guest.page.keyboard.press("Space");
+      if (g.burnAt >= 0 && g.burnEndAt < 0 && g.v >= TARGET - 40) await guest.page.keyboard.press("Space");
+      if (!checkedSync && g.burnAt >= 0 && h) {
+        checkedSync = true;
+        check("host sees the pilot's flight (burn state and speed within 400 m/s)", h.burnAt >= 0 && Math.abs(h.v - g.v) < 400, `host v ${Math.round(h.v)} pilot v ${Math.round(g.v)}`);
+        await shot(host, "04b-launch-burn");
+        await shot(guest, "04b-launch-burn");
+      }
+    }
+    await host.page.waitForTimeout(40);
+  }
+}
 check("both reach cruise", (await waitPhase(host.page, "cruise", 20000)) >= 0 && (await waitPhase(guest.page, "cruise", 10000)) >= 0);
 await host.page.waitForTimeout(2500);
 const h0 = plan.cruise[0];
@@ -196,21 +223,13 @@ const holderName = (await stateOf(host)).players.find((p) => p.roles.includes(h0
 const actor = holderName === "Guesty" ? guest : host;
 const other = actor === host ? guest : host;
 console.log("hurdle 0 role", h0.role, "actor", actor.tag);
-const E = (pg, fn, arg) => pg.page.evaluate(fn, arg).catch(() => null);
-await until(async () => (await E(host, () => __cruise.H.stage)) === "brief" && (await E(guest, () => __cruise.H.stage)) === "brief", 30000);
-check("both clients are in the cabin on the same hurdle", (await E(host, () => __cruise.H.type)) === (await E(guest, () => __cruise.H.type)) && (await E(host, () => __cruise.H.idx)) === 0);
-// the routine checks are split between the two players: every tick must show on both screens
-await E(actor, () => { __cruise.use("chk:0"); __cruise.use("chk:1"); });
-await E(other, () => __cruise.use("chk:2"));
-check("checks done by both players show on both screens", await until(async () => (await E(host, () => __cruise.H.checks.length)) === 3 && (await E(guest, () => __cruise.H.checks.length)) === 3, 10000));
-check("both clients enter the problem", await until(async () => (await E(host, () => __cruise.H.stage)) === "play" && (await E(guest, () => __cruise.H.stage)) === "play", 20000));
-check("only the acting player can take the lead (actor flag)", (await E(actor, () => __cruise.H.actor)) === true && (await E(other, () => __cruise.H.actor)) === false);
-await E(actor, () => __cruise.use("cw:ack"));
-check("alarm acknowledged on both clients", await until(async () => (await E(host, () => __cruise.H.d.step)) >= 1 && (await E(guest, () => __cruise.H.d.step)) >= 1, 8000));
-check("spectator sees a helper job on screen", await until(async () => await other.page.evaluate(() => document.body.innerText.includes("Help ")), 8000));
+check("only the acting player has Start", (await actor.page.getByRole("button", { name: "Start", exact: true }).count()) === 1 && (await other.page.getByRole("button", { name: "Start", exact: true }).count()) === 0);
+await click(actor.page.getByRole("button", { name: "Start", exact: true }));
+await other.page.waitForTimeout(2500);
+check("spectator sees 'Watching' banner", (await other.page.getByText(/Watching/).count()) >= 1);
 await shot(actor, "05-cruise");
 await shot(other, "05-cruise");
-await forceSkip(host, "cruise hurdles beyond the first are covered by e2e-cruise-multi.mjs");
+await forceSkip(host, "cruise hurdles not scripted");
 
 // ---- site: pilot (guest) probes, host cannot
 check("both reach site", (await waitPhase(host.page, "site", 20000)) >= 0 && (await waitPhase(guest.page, "site", 10000)) >= 0);

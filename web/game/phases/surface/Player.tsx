@@ -273,7 +273,7 @@ function stepPhysics(
   rt.run += ((boost ? 1 : 0) - rt.run) * Math.min(1, dt * 3.5);
   ground.normalAt(rt.pos.x, rt.pos.z, tmpN);
   const slopeSlow = 1 - 0.45 * Math.min(1, Math.max(0, (1 - tmpN.y) * 3.5));
-  const maxV = (WALK_V + (RUN_V - WALK_V) * rt.run) * slopeSlow * rt.speedMul;
+  const maxV = (WALK_V + (RUN_V - WALK_V) * rt.run) * slopeSlow;
   // a lope hop is part of walking, so it keeps full steering/acceleration; a real jump keeps its momentum
   const accel = rt.grounded || s.hop === 1 ? 8 + 6 * (1 - rt.run) : 2.2;
   const tx = mx * maxV;

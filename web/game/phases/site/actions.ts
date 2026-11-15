@@ -1,6 +1,5 @@
 "use client";
 // Shared logic for the site phase (used by both the 3D scene and the HUD).
-import { grade } from "../../core/juice";
 import { useCallback, useMemo } from "react";
 import { usePerk } from "../../data/perks";
 import { useGame, usePhaseData } from "../../core/useGame";
@@ -116,9 +115,8 @@ export function useSiteActions() {
     const sim = sd.sim ?? (await runSim(300));
     if (!sim) return;
     patch("site", { site_id: siteId, x: p.x, z: p.z, score: score.score, safe_pct: sim.safe_pct, sim, confirmed: true });
-    grade("site", Math.round((score.score * sim.safe_pct) / 100), { title: "Landing site grade", once: `site:${plan?.id}` });
     complete("site", Math.round((score.score * sim.safe_pct) / 100));
-  }, [sd.probe, sd.report, sd.sim, isPilot, runSim, patch, complete, siteId, plan?.id]);
+  }, [sd.probe, sd.report, sd.sim, isPilot, runSim, patch, complete, siteId]);
 
   /** Host fallback so nobody is ever stuck: drop on the best-looking spot and confirm. */
   const autoPick = useCallback(async () => {
@@ -137,9 +135,8 @@ export function useSiteActions() {
       sim = localSim(d, s.x, s.z, lander, difficulty, perks, seed, 300);
     }
     patch("site", { site_id: siteId, probe: { x: s.x, z: s.z, id: ++token }, report: sc, score: sc.score, sim, x: s.x, z: s.z, safe_pct: sim.safe_pct, confirmed: true });
-    grade("site", Math.round((sc.score * sim.safe_pct) / 100), { title: "Landing site grade", once: `site:${plan?.id}` });
     complete("site", Math.round((sc.score * sim.safe_pct) / 100));
-  }, [terrain, lander, siteId, date, plan?.seed, plan?.id, difficulty, perks, patch, complete]);
+  }, [terrain, lander, siteId, date, plan?.seed, difficulty, perks, patch, complete]);
 
   return { isPilot, chooseSite, dropProbe, runSim, confirm, autoPick, terrain };
 }

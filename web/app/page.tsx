@@ -9,7 +9,6 @@ import { Button, Panel } from "@/game/ui/kit";
 import { setBaseMusic } from "@/game/core/music";
 import { LEVEL_COUNT } from "@/game/journey/levels";
 import { useJourney } from "@/game/journey/progress";
-import { useProgress } from "@/game/progress/store";
 import { SettingsPanel, useApplyVolume } from "@/game/ui/Settings";
 
 const MenuScene = dynamic(() => import("@/game/ui/MenuScene"), { ssr: false });
@@ -37,7 +36,6 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const journey = useJourney();
-  const prog = useProgress();
   useApplyVolume();
   useEffect(() => setBaseMusic("menu"), []);
 
@@ -94,20 +92,12 @@ export default function Home() {
       <div className="absolute inset-0 flex flex-col justify-between p-6 sm:p-10">
         <header className="flex items-center justify-between text-sm text-white/70">
           <span>NASA data, real news, your crew</span>
-          <div className="pointer-events-auto flex gap-2">
-            <button onClick={() => router.push("/hangar")} className="rounded-lg border border-line bg-black/30 px-3 py-1.5 text-white/90 backdrop-blur transition hover:bg-white/10">
-              Hangar <span className="num ml-1 text-amber">{prog.hydrated ? prog.credits : ""}</span>
-            </button>
-            <button onClick={() => router.push("/hangar?tab=collection")} className="rounded-lg border border-line bg-black/30 px-3 py-1.5 text-white/90 backdrop-blur transition hover:bg-white/10">
-              Collection
-            </button>
           <button
             onClick={() => setShowSettings(true)}
             className="pointer-events-auto rounded-lg border border-line bg-black/30 px-3 py-1.5 text-white/90 backdrop-blur transition hover:bg-white/10"
           >
             Settings
           </button>
-          </div>
         </header>
 
         <section className="max-w-md pb-6 sm:pb-12">
@@ -137,13 +127,6 @@ export default function Home() {
                 <span className="num text-sm opacity-75">
                   {journey.hydrated && Object.keys(journey.done).length > 0 ? `Level ${journey.current} of ${LEVEL_COUNT}` : "Level 1"}
                 </span>
-              </span>
-            </Button>
-
-            <Button variant="ghost" onClick={() => router.push("/challenge")} className="w-full py-2.5 text-left backdrop-blur">
-              <span className="flex items-center justify-between gap-3">
-                <span>Challenges</span>
-                <span className="text-xs text-dim">2 minute landing, 1 minute launch, leaderboards</span>
               </span>
             </Button>
 

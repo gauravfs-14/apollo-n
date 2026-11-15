@@ -26,13 +26,3 @@ Eric (lunar module pilot / recovery), Adam (public affairs). Generated at runtim
 | ambience/suit.mp3 | breathing inside a space helmet with suit fan (loop) |
 Loudness-normalized with ffmpeg (one-shots: -16/-18 LUFS with edge fades; loops: -24 LUFS, mono 64 kbps).
 Check ElevenLabs' terms for your plan before commercial use of generated audio.
-
-## Juice stingers (web/public/audio/stingers, ElevenLabs sound generation, prompt_influence 0.6)
-| File | Prompt (short) |
-|---|---|
-| stingers/great.mp3 | short bright synth and bell chime, two rising notes (1.5 s) |
-| stingers/perfect.mp3 | triumphant cinematic orchestral swell, short victory fanfare (3.5 s) |
-| stingers/alarm.mp3 | spacecraft master alarm, urgent electronic warble (2.5 s) |
-| stingers/resolved.mp3 | relieved soft confirmation chime with low tone (1.5 s) |
-| stingers/streak.mp3 | very short rising sparkle blip, combo tick (0.6 s) |
-Normalized with ffmpeg loudnorm to -18 LUFS, 10 ms fade-in and 250 ms fade-out, stereo 112 kbps.

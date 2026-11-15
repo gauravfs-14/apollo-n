@@ -4,13 +4,10 @@ import { press } from "../../flight/input";
 import { ControlsHelp, TiltPad } from "../../flight/ui";
 import { useSkipVote } from "../../core/skip";
 import { rolesOf } from "../../core/roles";
-import { grade } from "../../core/juice";
 import { useGame } from "../../core/useGame";
-import { useLandingRadar } from "../../progress/effects";
 import { Button, Meter, Panel, PhaseTitle, Stat } from "../../ui/kit";
 import { phaseLabel } from "../../ui/phaseLabel";
-import { flags, useLanding } from "./store";
-import { useEffect } from "react";
+import { useLanding } from "./store";
 
 function Stars({ n }: { n: number }) {
   return (
@@ -44,15 +41,6 @@ export function LandingHud() {
   const anyPilot = state?.players.some((p) => rolesOf(p).includes("pilot") && p.connected) ?? false;
   const canContinue = isPilot || (isHost && (!anyPilot || waited > 20));
   const diff = plan?.difficulty ?? "normal";
-  const radar = useLandingRadar();
-
-  // grade banner when the result card shows (a PERFECT touchdown already showed its own, at contact)
-  const att = s?.att ?? 0;
-  const resultScore = result ? Math.max(0, Math.min(100, result.score.total)) : -1;
-  useEffect(() => {
-    if (!showResult || resultScore < 0 || flags.perfect === att) return;
-    grade("landing", resultScore, { title: "Landing grade", once: `landing:${plan?.id}:${att}` });
-  }, [showResult, resultScore, att, plan?.id]);
 
   if (!s || !info) {
     return <div className="absolute inset-0"><PhaseTitle step={phaseLabel("landing")} title="Touchdown" /></div>;
@@ -76,12 +64,6 @@ export function LandingHud() {
               <Stat label="Forward (ft/s)" value={(s.vf * FT).toFixed(0)} tone="data" />
               <Stat label="Sideways (ft/s)" value={(s.vr * FT).toFixed(0)} tone="data" />
             </div>
-            {radar && (
-              <div data-testid="radar" className="mt-2 flex items-center justify-between rounded-md bg-cyan/10 px-2 py-1 text-[11px] text-cyan">
-                <span>RADAR {s.alt.toFixed(1)} m</span>
-                <span className="num">{sink > 0.3 ? `contact in ${(s.alt / sink).toFixed(0)} s` : "holding"} / {sink.toFixed(1)} m/s</span>
-              </div>
-            )}
             <div className="mt-3 flex items-center gap-3">
               <TiltPad lean={[s.leanF, s.leanR]} slope={[s.slopeF, s.slopeR]} limit={info.limit} vel={[s.vf, s.vr]} />
               <div className="flex-1 space-y-2 text-xs">

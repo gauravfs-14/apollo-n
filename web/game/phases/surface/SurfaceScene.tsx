@@ -11,7 +11,6 @@ import { loadEphemeris, loadTerrain, missionTime, skyAt } from "../../three/terr
 import { createGround, hashStr, setSurfaceSky, type DemSource } from "./ground";
 import { surfaceUniforms } from "./materials";
 import { Player } from "./Player";
-import { Pois } from "./Pois";
 import { Rocks } from "./Rocks";
 import { Sky, SunLight } from "./Sky";
 import { resetRuntime, rt } from "./store";
@@ -118,7 +117,6 @@ export function SurfaceScene() {
       <Player ground={ground} role={me?.role ?? plan?.crew.roles[0]} />
       <Crew ground={ground} />
       <Tasks ground={ground} />
-      <Pois ground={ground} />
       <Footprints ground={ground} />
       <Dust />
       <Effects bloom={0.5} ao={false} />

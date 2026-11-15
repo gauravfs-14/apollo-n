@@ -17,10 +17,7 @@ import {
   altitudeCall, autopilotCall, contactLight, descentStart, driftCall, engineStop, fuelCall, fuelOut, goForLanding, touchdownReport,
 } from "../../data/missionComms";
 import { perkEffects, usePerk } from "../../data/perks";
-import { useUpgrades } from "../../progress/effects";
 import { COST } from "../../core/hp";
-import { setEventGuard } from "../../core/events";
-import { award, grade, miss, slowmo, stinger, timeScale, useCameraShake } from "../../core/juice";
 import { flightDamage } from "../../flight/damage";
 import { shipStats } from "../../data/parts";
 import { devDifficulty } from "../../flight/difficulty";
@@ -35,7 +32,7 @@ import {
 import { landerFromBuild, type SimOut } from "../site/api";
 import { Dust, type DustState } from "./Dust";
 import { Plume } from "./Plume";
-import { flags, useLanding, type LandHud } from "./store";
+import { useLanding, type LandHud } from "./store";
 import {
   FT, G, bodyBasis, footPlane, fuelSeconds, landParams, newLand, stepLand, upVec,
   type Ground, type LandInput, type LandParams, type LandSim,
@@ -72,7 +69,7 @@ function Descent({
   data: TerrainData; ground: Ground; P: LandParams; target: { x: number; z: number }; heading: number;
   parts: Record<string, string>; siteName: string; ringR: number; onFocus: (x: number, z: number) => void; penalty: number;
 }) {
-  const { actsAs, patch } = useGame();
+  const { actsAs } = useGame();
   const pilot = actsAs("pilot");
   const { camera } = useThree();
   const cam = camera as THREE.PerspectiveCamera;
@@ -80,7 +77,7 @@ function Descent({
   const root = useRef<THREE.Group>(null);
   const lights = useRef<THREE.Group>(null);
   const thr = useRef(0);
-  const dust = useRef<DustState>({ x: 0, z: 0, strength: 0, burst: 0 });
+  const dust = useRef<DustState>({ x: 0, z: 0, strength: 0 });
   const [sim] = useState(() => newLand(1, target, ground, P, heading)); // one flight per mount: a quality change must not restart it
   const st = useMemo(() => ({
     ev: new Set<string>(), tgt: null as LandSim | null, tgtAt: 0, lastUi: 0, since: 0, att: 1, prevAlt: 1e9, lastAuto: false,
@@ -140,9 +137,8 @@ function Descent({
   }, [revealed, siteName]);
 
   useFrame((_, dtRaw) => {
-    const dt = Math.min(dtRaw, 0.05) * (sim.down ? timeScale() : 1); // slow motion on a perfect touchdown
+    const dt = Math.min(dtRaw, 0.05);
     const live = isRevealed("landing");
-    setEventGuard("landing", sim.down || sim.alt < 170); // never interrupt the last part of the descent
 
     // ---- the flight
     if (pilot && live) {
@@ -205,8 +201,6 @@ function Descent({
         if (alt < m + 35 && alt > m) pre(`prex${ft}`);
         if (st.prevAlt > m && alt <= m && sim.vy < -0.3) once(`alt${ft}`, () => {
           traceEvent(`${ft} feet, sink ${Math.round(sink)} ft/s`);
-          if (-sim.vy <= P.vSafe * 1.15) award(25 + Math.round(15 * Math.max(0, 1 - ft / 150)), `${ft} ft: sink rate good`, { tone: "cyan" });
-          else miss("Sinking too fast");
           say(altitudeCall(ft, sink, i === CALL_FT.length - 1 && sim.thr > 0.1));
         });
       });
@@ -231,18 +225,7 @@ function Descent({
         const hit = r.reason === "crashed" ? [COST.fatal, "The lander crashed"] : r.reason === "tipped" ? [COST.severe, `Tipped over (${r.tilt.toFixed(0)} deg, legs allow ${r.limit.toFixed(0)})`]
           : r.reason === "hard" ? [r.vV > P.vSafe * 1.6 ? COST.severe : COST.major, `Hard landing (${(r.vV * FT).toFixed(0)} ft/s)`] : r.reason === "boulder" ? [COST.major, "A foot landed on a boulder"] : null;
         if (hit) flightDamage(hit[0] as number, hit[1] as string, pilot);
-        if (pilot && r.reason === "ok") patch("landing", { sink: Math.round(r.vV * 100) / 100 }); // personal record: softest landing
         sfx("thunk", { volume: r.reason === "crashed" ? 1 : 0.7 });
-        // juice: a PERFECT landing is soft, level and on the ring; anything clean pays by the score
-        const perfect = r.reason === "ok" && r.vV <= P.vSafe * 0.6 && r.vH <= 0.8 && r.tilt <= r.limit * 0.4 && r.miss <= 15 && !sim.assisted;
-        if (perfect) {
-          flags.perfect = sim.att;
-          slowmo(0.22, 2.6);
-          dust.current.burst = 1;
-          grade("landing", r.score.total, { title: "Touchdown", perfect: true, once: `landing-perfect:${useStore.getState().state?.plan?.id}:${sim.att}` });
-          award(250, "Perfect landing", { tone: "amber", at: { x: 0.5, y: 0.52 } });
-        } else if (r.reason === "ok") { award(60 + Math.round(r.score.total / 2), "Safe touchdown", { at: { x: 0.5, y: 0.5 } }); stinger("great", 0.5); }
-        else if (r.reason === "boulder") miss();
         traceEvent(`touchdown: ${r.reason}, ${(r.vV * FT).toFixed(1)} ft/s down, ${(r.vH * FT).toFixed(1)} ft/s sideways, tilt ${r.tilt.toFixed(1)}, ${Math.round(r.miss)} m off`);
         if (live) {
           if (r.reason === "crashed") say(touchdownReport({ reason: r.reason, downFps: r.vV * FT, fwdFps: r.vH * FT, tiltDeg: r.tilt, missM: r.miss }), { interrupt: true });
@@ -296,12 +279,11 @@ function Descent({
     }
 
     // ---- engine, dust, lights
-    if (!sim.down) dust.current.burst = 0;
     thr.current = sim.down ? 0 : sim.thr * (1 + 0.05 * Math.sin(sim.t * 37));
     dust.current.x = sim.x;
     dust.current.z = sim.z;
     dust.current.strength = sim.down
-      ? (sim.result?.reason === "crashed" ? 0.9 * Math.exp(-st.since * 1.6) : (dust.current.burst ?? 0) > 0 ? 0.8 * Math.exp(-st.since * 1.1) * (dust.current.burst ?? 0) : 0)
+      ? (sim.result?.reason === "crashed" ? 0.9 * Math.exp(-st.since * 1.6) : 0)
       : thr.current * ss(80, 14, alt);
     if (lights.current) lights.current.visible = (sim.down || sim.contact) && Math.sin(sim.t * 9) > -0.35;
 
@@ -364,8 +346,6 @@ function Descent({
     }
   });
 
-  useCameraShake(0.2);
-
   const pad = P.padR;
   const tgtY = data.heightAt(target.x, target.z);
   return (
@@ -426,15 +406,14 @@ export function Scene() {
     return best;
   }, [sd.probe, data]);
   const fx = perkEffects(usePerk());
-  const up = useUpgrades(); // hangar fuel tank; the arcade lander never reads this
   const P = useMemo(
     () => landParams(diff, {
       limitDeg: sd.sim?.tilt_limit_deg ?? lander.max_tilt_deg,
       deltaV: shipStats(parts as never).deltaV || 2500,
-      fuelMult: fx.hoverTime * up.fuelMult,
+      fuelMult: fx.hoverTime,
       padR: lander.leg_span_m / 2,
     }),
-    [diff, sd.sim?.tilt_limit_deg, lander.max_tilt_deg, lander.leg_span_m, parts, fx.hoverTime, up.fuelMult],
+    [diff, sd.sim?.tilt_limit_deg, lander.max_tilt_deg, lander.leg_span_m, parts, fx.hoverTime],
   );
   // the boulders drawn around the zone are the ones that can damage a foot (same deterministic list as <Boulders/>)
   const seed = plan?.seed ?? 1;
