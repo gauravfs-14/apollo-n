@@ -256,7 +256,9 @@ export function SiteHud() {
 
   async function toggleHint() {
     if (hint) return set({ hint: null });
-    set({ hint: suggestSpot(await terrain()) });
+    const spot = suggestSpot(await terrain());
+    // fly over to it: the suggested area is often off screen
+    set({ hint: spot, flyTo: { x: spot.x, z: spot.z, dist: 1400, id: Date.now() } });
   }
 
   return (
