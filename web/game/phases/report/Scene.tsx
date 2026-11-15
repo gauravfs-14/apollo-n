@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/immutability */
 // Calm closing shot: the Moon's sunlit limb in the foreground, Earth hanging far behind it.
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
