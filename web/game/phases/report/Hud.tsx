@@ -162,6 +162,22 @@ export function ReportHud() {
     if (passed && level) journey.recordWin(level, result.total, lvStars);
   }, [state, plan, passed, level, result.total, lvStars]);
 
+  // weekly crew board: the host posts the result once per finished mission (pass or fail); fails soft with no API
+  const posted = useRef(false);
+  const [rank, setRank] = useState<number | null>(null);
+  useEffect(() => {
+    if (posted.current || !state || !plan || !isHost) return;
+    posted.current = true;
+    const crewNames = state.players.filter((p) => !p.released && p.connected).map((p) => p.name).slice(0, 4);
+    api<{ rank_week: number }>("/leaderboard/mission", {
+      room: state.room,
+      crew: crewNames.length ? crewNames : ["Crew"],
+      score: Math.max(0, Math.min(1000, Math.round(result.total * 10))),
+      ...(level ? { level: Math.min(99, level) } : {}),
+      hp: Math.max(0, Math.min(100, Math.round(((state.hp ?? 100) / (state.hpMax ?? 100)) * 100))),
+    }).then((r) => setRank(r.rank_week)).catch(() => {});
+  }, [state, plan, isHost, result.total, level]);
+
   if (!plan || !state) return null;
   const hp = Math.round(state.hp ?? 100);
   const hpMax = state.hpMax ?? 100;
@@ -208,6 +224,7 @@ export function ReportHud() {
             {failedReason ?? `You scored ${result.total}. Reach ${PASS_SCORE} to pass this level.`}
           </p>
         )}
+        {rank !== null && <div data-testid="weekly-rank" className="num mt-2 text-[12px] text-cyan">Crew rank this week: #{rank}</div>}
         <div className="mt-3 flex items-center gap-3 text-[13px]">
           <span className="text-dim">Ship integrity</span>
           <div className="w-28">
