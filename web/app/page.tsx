@@ -140,6 +140,13 @@ export default function Home() {
               </span>
             </Button>
 
+            <Button variant="ghost" onClick={() => router.push("/challenge")} className="w-full py-2.5 text-left backdrop-blur">
+              <span className="flex items-center justify-between gap-3">
+                <span>Challenges</span>
+                <span className="text-xs text-dim">2 minute landing, 1 minute launch, leaderboards</span>
+              </span>
+            </Button>
+
             <div className="pt-3">
               <div className="mb-1.5 text-sm text-white/70">Crew room</div>
               <div className="flex gap-3">
