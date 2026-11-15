@@ -113,6 +113,34 @@ def fit_difficulty(plan: dict, difficulty: str) -> dict:
     return plan
 
 
+# ---- journey levels (1..15): the level picks the plan difficulty, hazard count and hazard tier.
+# Keep in sync with web/game/journey/levels.ts. Counts stay inside HURDLE_RANGE for the band.
+LEVEL_COUNT = 15
+_LEVEL_BANDS = [(4, "easy"), (9, "normal"), (15, "hard")]
+_LEVEL_TIER = [1, 1, 1, 2, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3]
+
+
+def level_difficulty(level: int) -> str:
+    level = max(1, min(LEVEL_COUNT, level))
+    return next(d for top, d in _LEVEL_BANDS if level <= top)
+
+
+def fit_level(plan: dict, level: int) -> dict:
+    """Scale a plan to a journey level: difficulty band, hazard count and tier (tighter timers)."""
+    level = max(1, min(LEVEL_COUNT, level))
+    d = level_difficulty(level)
+    fit_difficulty(plan, d)
+    if d == "hard":
+        plan["cruise"] = plan["cruise"][: 4 if level <= 12 else 5]
+        while len(plan["cruise"]) < (4 if level <= 12 else 5):
+            plan["cruise"].append(copy.deepcopy(GENERIC_HURDLES[len(plan["cruise"]) % len(GENERIC_HURDLES)]))
+    tier = _LEVEL_TIER[level - 1]
+    for h in plan["cruise"]:
+        h["difficulty"] = tier
+    plan["level"] = level
+    return plan
+
+
 def fallback_entry(difficulty: str, avoid: set[str] | None = None, rng: random.Random | None = None) -> dict:
     """A hand-checked plan renumbered as the next mission. `avoid` = inspired_by urls already shown."""
     rng = rng or random.Random()

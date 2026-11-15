@@ -3,9 +3,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { rolesOf } from "../../core/roles";
 import { api } from "../../core/api";
 import { say } from "../../core/comms";
-import { useGame } from "../../core/useGame";
+import { useGame, usePhaseData } from "../../core/useGame";
 import { Button, Meter } from "../../ui/kit";
-import { RANK_COLOR, computeResult, type Result } from "./score";
+import { LEVEL_COUNT, PASS_SCORE, levelDef, levelStars } from "../../journey/levels";
+import { useJourneyStore } from "../../journey/progress";
+import { computeResult, type Result } from "./score";
 import { renderShareCard } from "./shareCard";
 import { ROLES } from "../../types";
 import { ROLE_INFO, type CrewData } from "../crew/data";
@@ -19,17 +21,19 @@ function host(url: string) {
   }
 }
 
-function summaryTemplate(r: Result, title: string) {
+function summaryTemplate(r: Result, title: string, failed?: string | null) {
+  if (failed) return `${title} was lost. ${failed} Study what went wrong and try the level again.`;
   const best = [...r.rows].filter((x) => x.score !== null).sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
   return `${title} is complete. The crew finished with ${r.total} out of 100 and earned ${r.rank}.${best ? ` The strongest phase was ${best.label.toLowerCase()}.` : ""}`;
 }
 
-function useDebrief(r: Result, title: string) {
+function useDebrief(r: Result, title: string, failed?: string | null) {
   const [text, setText] = useState<string | null>(null);
   const key = JSON.stringify(r.rows.map((x) => x.score));
   useEffect(() => {
     let alive = true;
     const numbers: Record<string, number | string> = { total_score: r.total, rank: r.rank, phases_skipped: r.skipped };
+    if (failed) numbers.mission_lost = failed;
     for (const row of r.rows) if (row.score !== null) numbers[row.label.toLowerCase().replace(/\s+/g, "_")] = Math.round(row.score);
     api<{ text: string }>("/director", {
       phase: "mission report",
@@ -37,34 +41,64 @@ function useDebrief(r: Result, title: string) {
       question: "Give the crew a short debrief of how the mission went.",
     })
       .then((d) => alive && setText(d.text))
-      .catch(() => alive && setText(summaryTemplate(r, title)));
+      .catch(() => alive && setText(summaryTemplate(r, title, failed)));
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, failed]);
   return text;
+}
+
+function Stars({ n, of, color, size = "h-4 w-4" }: { n: number; of: number; color: string; size?: string }) {
+  return (
+    <div className="flex gap-1" aria-label={`${n} of ${of} stars`}>
+      {Array.from({ length: of }, (_, i) => (
+        <svg key={i} viewBox="0 0 24 24" className={size} fill={i < n ? color : "none"} stroke={i < n ? color : "rgb(255 255 255 / 0.3)"} strokeWidth="1.6">
+          <path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z" />
+        </svg>
+      ))}
+    </div>
+  );
 }
 
 export function ReportHud() {
   const { state, plan, isHost, action } = useGame();
+  const shared = usePhaseData<{ level?: number }>("select");
+  const level = plan?.level ?? shared.level;
+  const recorded = useRef(false);
   const result = useMemo(() => computeResult(state?.scores), [state?.scores]);
-  const summary = useDebrief(result, plan?.title ?? "The mission");
+  const summary = useDebrief(result, plan?.title ?? "The mission", state?.failed);
   const spoke = useRef(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (spoke.current || !plan) return;
+    if (spoke.current || !plan || state?.failed) return;
     spoke.current = true;
     // Houston's sign-off for this mission
     const line = plan.voice_lines.find((v) => v.id === "success_1");
     if (line) say({ who: "capcom", text: line.text }, { once: `success:${plan.id}` });
-  }, [plan]);
+  }, [plan, state?.failed]);
+
+  const failedReason = state?.failed ?? null;
+  const passed = !failedReason && result.total >= PASS_SCORE;
+  const lvStars = levelStars(result.total);
+  useEffect(() => {
+    if (recorded.current || !passed || !level) return;
+    recorded.current = true;
+    useJourneyStore.getState().hydrate();
+    useJourneyStore.getState().recordWin(level, result.total, lvStars);
+  }, [passed, level, result.total, lvStars]);
 
   if (!plan || !state) return null;
+  const hp = Math.round(state.hp ?? 100);
+  const lastLevel = !!level && level >= LEVEL_COUNT;
+  const again = (next: number | null) => {
+    useJourneyStore.getState().setAutoPlay(next);
+    action("report", "reset");
+  };
   const crew = state.phaseData.crew as Partial<CrewData> | undefined;
   const multi = state.mode === "multi";
-  const color = RANK_COLOR[result.rank];
 
   const download = async () => {
     setBusy(true);
@@ -87,22 +121,27 @@ export function ReportHud() {
 
       {/* left: result */}
       <div className="pointer-events-auto absolute bottom-20 left-6 top-5 w-[min(25rem,calc(100vw-3rem))] overflow-y-auto pr-1">
-        <div className="num text-[11px] text-amber">{phaseLabel("report")} · Apollo {plan.number}</div>
-        <h2 className="text-2xl font-semibold leading-tight">{plan.title.replace(/^Apollo \d+:\s*/, "")}</h2>
-        <div className="mt-3 flex items-end gap-4">
-          <div className="text-5xl font-bold leading-none" style={{ color }}>
-            {result.rank}
-          </div>
-          <div className="pb-0.5">
+        <div className={`num text-[11px] ${passed ? "text-go" : "text-nogo"}`}>
+          {level ? `LEVEL ${level} / ${levelDef(level).title.toUpperCase()}` : `${phaseLabel("report")} / APOLLO ${plan.number}`}
+        </div>
+        <h2 className="mt-0.5 text-3xl font-semibold leading-tight">{passed ? (lastLevel ? "Journey complete" : "Level complete") : failedReason ? "Mission lost" : "Level not passed"}</h2>
+        {passed ? (
+          <div className="mt-3 flex items-center gap-4">
+            <Stars n={lvStars} of={3} color="#ffcf5a" size="h-9 w-9" />
             <div className="num text-lg">{result.total} / 100</div>
-            <div className="flex gap-0.5" aria-label={`${result.stars} of 5 stars`}>
-              {[0, 1, 2, 3, 4].map((i) => (
-                <svg key={i} viewBox="0 0 24 24" className="h-4 w-4" fill={i < result.stars ? color : "none"} stroke={color} strokeWidth="1.6">
-                  <path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z" />
-                </svg>
-              ))}
-            </div>
           </div>
+        ) : (
+          <p className="mt-2 rounded-lg border border-nogo/40 bg-nogo/10 px-3 py-2 text-[14px] leading-snug text-white/90">
+            {failedReason ?? `You scored ${result.total}. Reach ${PASS_SCORE} to pass this level.`}
+          </p>
+        )}
+        <div className="mt-3 flex items-center gap-3 text-[13px]">
+          <span className="text-dim">Ship integrity</span>
+          <div className="w-28">
+            <Meter value={hp / 100} tone={hp > 60 ? "go" : hp > 30 ? "amber" : "nogo"} />
+          </div>
+          <span className="num text-white/85">{hp}%</span>
+          {!passed && <span className="num ml-auto text-white/70">{result.total} pts</span>}
         </div>
 
         <div className="mt-4 rounded-xl border border-line bg-panel p-3 backdrop-blur-md">
@@ -138,7 +177,6 @@ export function ReportHud() {
 
         <section className="rounded-xl border border-line bg-panel p-4 backdrop-blur-md">
           <h3 className="text-sm font-semibold">What was real</h3>
-          <p className="mt-0.5 text-[12px] text-dim">This mission was written from real news. Every fact below links to its source.</p>
           <a
             href={plan.inspired_by.source_url}
             target="_blank"
@@ -153,7 +191,7 @@ export function ReportHud() {
             </span>
           </a>
           <ul className="mt-2.5 space-y-2.5">
-            {plan.facts.map((f) => (
+            {plan.facts.slice(0, 3).map((f) => (
               <li key={f.id} className="text-[13px] leading-snug text-white/85">
                 {f.text}{" "}
                 <a href={f.source_url} target="_blank" rel="noreferrer" className="num whitespace-nowrap text-[11px] text-cyan hover:underline">
@@ -187,15 +225,26 @@ export function ReportHud() {
 
       {/* actions */}
       <div className="absolute inset-x-0 bottom-5 flex items-center justify-center gap-3">
-        <Button variant="ghost" onClick={download} disabled={busy}>
-          {busy ? "Drawing card..." : "Download share card"}
-        </Button>
+        {passed && (
+          <Button variant="ghost" onClick={download} disabled={busy}>
+            {busy ? "Drawing card..." : "Download share card"}
+          </Button>
+        )}
         {isHost ? (
-          <Button onClick={() => action("report", "reset")}>New mission</Button>
+          <>
+            <Button variant="ghost" onClick={() => again(null)}>
+              Back to map
+            </Button>
+            {level ? (
+              passed ? (
+                !lastLevel && <Button onClick={() => again(level + 1)}>Next level</Button>
+              ) : (
+                <Button onClick={() => again(level)}>Retry level</Button>
+              )
+            ) : null}
+          </>
         ) : (
-          <span className="pointer-events-auto rounded-lg border border-line bg-panel px-4 py-2 text-sm text-dim">
-            Waiting for the commander to start a new mission
-          </span>
+          <span className="pointer-events-auto rounded-lg border border-line bg-panel px-4 py-2 text-sm text-dim">Waiting for the commander to pick what is next</span>
         )}
       </div>
     </div>

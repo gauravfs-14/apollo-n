@@ -7,6 +7,8 @@ import { api } from "@/game/core/api";
 import { PerfOverlay } from "@/game/core/perf";
 import { Button, Panel } from "@/game/ui/kit";
 import { setBaseMusic } from "@/game/core/music";
+import { LEVEL_COUNT } from "@/game/journey/levels";
+import { useJourney } from "@/game/journey/progress";
 import { SettingsPanel, useApplyVolume } from "@/game/ui/Settings";
 
 const MenuScene = dynamic(() => import("@/game/ui/MenuScene"), { ssr: false });
@@ -33,6 +35,7 @@ export default function Home() {
   const [busy, setBusy] = useState<null | "solo" | "multi" | "join">(null);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const journey = useJourney();
   useApplyVolume();
   useEffect(() => setBaseMusic("menu"), []);
 
@@ -101,7 +104,7 @@ export default function Home() {
           <h1 className="text-6xl font-semibold leading-none tracking-tight sm:text-8xl">
             Apollo <span className="text-amber">N</span>
           </h1>
-          <p className="mt-4 max-w-sm text-lg text-white/75">Build the lander, pick your crew, fly to the Moon, and find a safe place to land.</p>
+          <p className="mt-4 max-w-sm text-lg text-white/75">Fifteen missions from the pad to the lunar south pole. Finish one to open the next.</p>
 
           <div className="mt-8 space-y-3">
             <label className="block">
@@ -116,33 +119,43 @@ export default function Home() {
               />
             </label>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Button onClick={() => start("solo")} disabled={busy !== null} className="py-3 text-base">
-                {busy === "solo" ? "Starting..." : "Solo mission"}
-              </Button>
-              <Button variant="ghost" onClick={() => start("multi")} disabled={busy !== null} className="py-3 text-base backdrop-blur">
-                {busy === "multi" ? "Creating..." : "Host crew room"}
-              </Button>
-            </div>
+            <Button onClick={() => start("solo")} disabled={busy !== null} className="w-full py-3.5 text-left text-base">
+              <span className="flex items-center justify-between gap-3">
+                <span>
+                  {busy === "solo" ? "Starting..." : !journey.hydrated || Object.keys(journey.done).length === 0 ? "Start journey" : journey.finished ? "Replay journey" : "Continue journey"}
+                </span>
+                <span className="num text-sm opacity-75">
+                  {journey.hydrated && Object.keys(journey.done).length > 0 ? `Level ${journey.current} of ${LEVEL_COUNT}` : "Level 1"}
+                </span>
+              </span>
+            </Button>
 
-            <form onSubmit={join} className="flex gap-3">
-              <input
-                value={code}
-                onChange={(e) => {
-                  setCode(e.target.value.toUpperCase());
-                  setError(null);
-                }}
-                aria-label="Room code"
-                aria-invalid={!!error && !!code}
-                maxLength={14}
-                placeholder="Room code, e.g. APOLLO-7K3"
-                spellCheck={false}
-                className="num pointer-events-auto min-w-0 flex-1 rounded-lg border border-line bg-black/40 px-3.5 py-2.5 text-white uppercase outline-none backdrop-blur placeholder:normal-case placeholder:text-white/35 focus:border-cyan/70"
-              />
-              <Button type="submit" variant="ghost" disabled={busy !== null || !code.trim()} className="backdrop-blur">
-                Join
-              </Button>
-            </form>
+            <div className="pt-3">
+              <div className="mb-1.5 text-sm text-white/70">Crew room</div>
+              <div className="flex gap-3">
+                <Button variant="ghost" onClick={() => start("multi")} disabled={busy !== null} className="py-2.5 backdrop-blur">
+                  {busy === "multi" ? "Creating..." : "Host a room"}
+                </Button>
+                <form onSubmit={join} className="flex min-w-0 flex-1 gap-3">
+                  <input
+                    value={code}
+                    onChange={(e) => {
+                      setCode(e.target.value.toUpperCase());
+                      setError(null);
+                    }}
+                    aria-label="Room code"
+                    aria-invalid={!!error && !!code}
+                    maxLength={14}
+                    placeholder="Room code"
+                    spellCheck={false}
+                    className="num pointer-events-auto min-w-0 flex-1 rounded-lg border border-line bg-black/40 px-3.5 py-2.5 text-white uppercase outline-none backdrop-blur placeholder:normal-case placeholder:text-white/35 focus:border-cyan/70"
+                  />
+                  <Button type="submit" variant="ghost" disabled={busy !== null || !code.trim()} className="backdrop-blur">
+                    Join
+                  </Button>
+                </form>
+              </div>
+            </div>
 
             {error && (
               <p role="alert" className="rounded-lg border border-nogo/40 bg-nogo/10 px-3 py-2 text-sm text-nogo">

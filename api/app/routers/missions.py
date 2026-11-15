@@ -1,7 +1,7 @@
 """Mission Plan endpoints.
 
 GET  /missions/options?difficulty=normal[&refresh=true]  3 ready mission cards, always instant (pool + fallbacks)
-POST /missions {difficulty, seed?}                       one plan (from the pool; with a seed it is generated live)
+POST /missions {difficulty, seed?, level?}                     one plan (from the pool; with a seed it is generated live)
 POST /missions/{id}/chosen                               the crew picked this one: retire it, refill the pool
 GET  /missions/fallback | /missions/{id}[/card]                 a hand-checked plan | a plan by id
 GET  /missions/pool                                      pool status (debug)
@@ -10,6 +10,7 @@ GET  /missions/pool                                      pool status (debug)
 from __future__ import annotations
 
 import asyncio
+import copy
 import random
 
 from fastapi import APIRouter, HTTPException, Query
@@ -54,10 +55,18 @@ async def options(difficulty: str = "normal", refresh: bool = Query(False)) -> d
 class NewMission(BaseModel):
     difficulty: str = "normal"
     seed: int | None = None
+    level: int | None = None  # journey level 1..15: overrides difficulty and scales hazards
 
 
 @router.post("/missions")
 async def new_mission(body: NewMission) -> dict:
+    if body.level is not None:
+        lvl = max(1, min(planner.LEVEL_COUNT, body.level))
+        d = planner.level_difficulty(lvl)
+        entry = planner.pool.pop_one(d) or planner.fallback_entry(d, rng=random.Random())
+        entry = {**entry, "plan": planner.fit_level(copy.deepcopy(entry["plan"]), lvl)}
+        planner.register(entry)
+        return entry["plan"]
     d = _diff(body.difficulty)
     if body.seed is not None:
         key = f"{d}:{body.seed}"

@@ -91,6 +91,8 @@ export interface MissionPlan {
   number: number; // the N in Apollo N
   seed: number;
   difficulty: Difficulty;
+  /** Journey level 1..15 this plan was made for (absent for dev/jump plans). */
+  level?: number;
   title: string;
   tagline: string;
   goal: { text: string; why: string };
