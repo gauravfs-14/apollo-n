@@ -1,13 +1,14 @@
 // Full solo playthrough through the real UI: menu -> select -> ... -> report.
 // Usage: node scripts/e2e-solo.mjs [--quality=low|medium|high] [--throttle=4] [--fast]
-// Esc-menu "Skip this phase (host)" is used ONLY where a phase can't be scripted (cruise hurdles, surface tasks) and is logged as "forced".
+// Esc-menu "Skip this phase (host)" is used ONLY where a phase can't be scripted (surface tasks) and is logged as "forced".
 // Writes /tmp/e2e/<nn>-<phase>.png and /tmp/e2e/solo.json (errors, timings, perf + memory per phase).
 import fs from "node:fs";
+import { playCruise } from "./cruise-lib.mjs";
 import { BASE, GPU_PROBE, OUT, getPhase, getState, launch, record, solveMemory, solveOrder, solveQuiz, solveSwitches, waitPhase } from "./e2e-lib.mjs";
 
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith("--")).map((a) => a.slice(2).split("=")));
 const parts = await import("../game/data/parts.ts");
-const PHASES = ["select", "build", "drop", "crew", "board", "checklist", "launch", "cruise", "site", "landing", "surface", "report"];
+const PHASES = ["select", "build", "crew", "board", "checklist", "launch", "cruise", "site", "landing", "surface", "report"];
 
 const browser = await launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -142,19 +143,8 @@ await step("build", async () => {
   await click(page.getByRole("button", { name: /Lock in build/ }));
 });
 
-await step("drop", async () => {
-  await enter("drop", "build", 20000, 1500);
-  const open = page.getByRole("button", { name: "Open crate" });
-  await page.waitForFunction(() => [...document.querySelectorAll("button")].some((b) => b.textContent === "Open crate" && !b.disabled), null, { timeout: 15000 });
-  await click(open);
-  await page.getByRole("button", { name: "Continue", exact: true }).waitFor({ timeout: 15000 });
-  await page.waitForTimeout(600);
-  await shot("drop", "-reveal");
-  await click(page.getByRole("button", { name: "Continue", exact: true }));
-});
-
 await step("crew", async () => {
-  await enter("crew", "drop", 15000, 3000);
+  await enter("crew", "build", 15000, 3000);
   const names = { Commander: "Ada", Pilot: "Neil", Engineer: "Gene", Scientist: "Sally" };
   for (const [r, n] of Object.entries(names)) await page.getByLabel(`${r} name`).fill(n);
   await page.waitForTimeout(500);
@@ -219,12 +209,13 @@ await step("launch", async () => {
 
 await step("cruise", async () => {
   await enter("cruise", "launch", 20000, 2500);
-  // play the first hurdle's briefing + start, then (hurdles are skill games) force-skip the phase
-  await click(page.getByRole("button", { name: "Start", exact: true }));
-  await page.waitForTimeout(3000);
+  // the hurdles are hands-on jobs in the cabin: solve every one through the same interactables a player aims at
+  await memSnap("cruise", "cabin");
+  const res = await playCruise(page, { shots: false, out: () => {} });
+  log.cruise = res;
   await shot("cruise", "-hurdle");
   await memSnap("cruise", "hurdle");
-  await forceSkip("cruise", "hurdle minigames (debris dodge, pipes, shield) not scripted");
+  if (res.length === 0 || res.some((r) => r.score === undefined)) log.failed.push({ phase: "cruise", why: "a hurdle did not finish" });
 });
 
 await step("site", async () => {

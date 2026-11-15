@@ -94,17 +94,6 @@ check("guest sees host's part picks live", synced);
 await shot(guest, "02-build");
 check("guest cannot lock in the build (no button)", (await guest.page.getByRole("button", { name: /Lock in/ }).count()) === 0);
 await click(host.page.getByRole("button", { name: /Lock in build/ }));
-check("both reach drop", (await waitPhase(guest.page, "drop", 10000)) >= 0 && (await waitPhase(host.page, "drop", 5000)) >= 0);
-
-// ---- drop
-await host.page.waitForFunction(() => [...document.querySelectorAll("button")].some((b) => b.textContent === "Open crate" && !b.disabled), null, { timeout: 45000 });
-await click(host.page.getByRole("button", { name: "Open crate" }));
-await guest.page.getByText(/find$/i).first().waitFor({ timeout: 15000 }).catch(() => {});
-const perkH = (await stateOf(host)).phaseData.drop?.perk;
-check("guest sees the same perk", (await until(async () => (await stateOf(guest)).phaseData.drop?.perk === perkH)) && !!perkH, perkH);
-await host.page.getByRole("button", { name: "Continue", exact: true }).waitFor({ timeout: 15000 });
-check("guest has no Continue (waits for commander)", (await guest.page.getByRole("button", { name: "Continue", exact: true }).count()) === 0);
-await click(host.page.getByRole("button", { name: "Continue", exact: true }));
 
 // ---- crew: roles
 check("both reach crew", (await waitPhase(guest.page, "crew", 10000)) >= 0 && (await waitPhase(host.page, "crew", 5000)) >= 0);
