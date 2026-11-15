@@ -22,3 +22,19 @@ html, body {
 }
 body { font-family: var(--font-geist-sans), system-ui, sans-serif; }
 .num { font-family: var(--font-geist-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+/* Loading screen motion: transform/opacity only, so it runs on the compositor even when the main thread is busy. */
+@keyframes apollo-orbit { to { transform: rotate(360deg); } }
+@keyframes apollo-drift { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-120px, -40px, 0); } }
+@keyframes apollo-slide { from { transform: translateX(-110%); } to { transform: translateX(330%); } }
+@keyframes apollo-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.apollo-orbit { animation: apollo-orbit 2.6s linear infinite; will-change: transform; }
+.apollo-stars { animation: apollo-drift 60s linear infinite alternate; will-change: transform; }
+.apollo-stars-slow { animation: apollo-drift 120s linear infinite alternate-reverse; will-change: transform; }
+.apollo-indeterminate { animation: apollo-slide 1.4s ease-in-out infinite; will-change: transform; }
+.apollo-fade-in { animation: apollo-fade 600ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .apollo-orbit, .apollo-stars, .apollo-stars-slow, .apollo-indeterminate { animation-duration: 0s; animation-iteration-count: 1; }
+  .apollo-indeterminate { transform: none; width: 100%; opacity: 0.6; }
+}
+.apollo-paused * { animation-play-state: paused !important; }

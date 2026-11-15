@@ -12,6 +12,7 @@ import {
 import { useSiteActions, useSiteState } from "./actions";
 import type { Landing } from "./api";
 import { useSiteUi } from "./ui";
+import { useLoadingHold } from "../../core/loading";
 
 const OK = new THREE.Color("#18d870").multiplyScalar(1.1);
 const BAD = new THREE.Color("#ff2a1f").multiplyScalar(1.1);
@@ -301,6 +302,7 @@ export function Scene() {
     useSiteUi.getState().set({ loaded: !!data });
     return () => useSiteUi.getState().set({ loaded: false, flyTo: null, hover: null, hint: null });
   }, [data]);
+  useLoadingHold(!data || !sky, "Loading real lunar terrain · NASA LOLA, 5 m per pixel");
   if (!data || !sky) return null;
   return (
     <>

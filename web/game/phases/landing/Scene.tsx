@@ -18,6 +18,7 @@ import { pickOutcome, type Outcome } from "./outcome";
 import { Plume } from "./Plume";
 import { DESCENT, TOTAL, useLanding } from "./store";
 import { LINES } from "../../core/voiceLines";
+import { useLoadingHold } from "../../core/loading";
 
 const A0 = 450; // start altitude above the touchdown point (m)
 const H0 = 300; // start horizontal distance (m)
@@ -313,6 +314,7 @@ export function Scene() {
     () => (data ? pickOutcome(sd.sim, sd.probe, plan?.seed ?? 1, data, lander.leg_span_m / 2) : null),
     [data, sd.sim, sd.probe, plan?.seed, lander.leg_span_m],
   );
+  useLoadingHold(!data || !sky || !outcome, "Loading the landing site terrain · NASA LOLA");
   if (!data || !sky || !outcome) return null;
   const focusY = data.heightAt(outcome.x, outcome.z);
   return (

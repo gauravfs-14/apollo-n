@@ -17,6 +17,7 @@ import { resetRuntime, rt } from "./store";
 import { Tasks } from "./Tasks";
 import { Terrain } from "./Terrain";
 import { clearTrail, Dust, Footprints } from "./Trail";
+import { useLoadingHold } from "../../core/loading";
 
 export function SurfaceScene() {
   const { plan, state, me } = useGame();
@@ -104,6 +105,7 @@ export function SurfaceScene() {
     surfaceUniforms.uPlayer.value.copy(rt.pos);
   });
 
+  useLoadingHold(!ground, "Loading the terrain around your landing spot");
   if (!ground) return null;
   return (
     <>
