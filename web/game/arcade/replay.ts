@@ -139,7 +139,7 @@ export function drawReplay(ctx: CanvasRenderingContext2D, r: Replay, k: number, 
     }
     ctx.stroke(); ctx.setLineDash([]);
   }
-  drawLander(ctx, X(f.u), Y(f.y), f.tilt, f.thr, Math.max(2.2, sc * 1.7));
+  drawLander(ctx, X(f.u), Y(f.y), f.tilt, f.thr, Math.max(2.2, Math.min(sc * 1.7, w / 75)));
   if (hud) {
     ctx.font = "12px ui-monospace, Menlo, monospace";
     ctx.fillStyle = "rgba(255,255,255,0.7)";
