@@ -273,7 +273,34 @@ await step("surface", async () => {
   log.surfaceWalk = p0 && p1 ? +Math.hypot(p1.x - p0.x, p1.z - p0.z).toFixed(2) : null;
   await shot("surface", "-walk");
   await memSnap("surface", "walked");
-  await forceSkip("surface", "tasks need walking to scan/collect targets; walking itself verified above");
+  // scripted run through the 12 sequential objectives (teleport + hold E, like surface-run.mjs), then the team photo
+  await page.waitForFunction(() => window.__surface?.layout, null, { timeout: 20000 });
+  const L = await page.evaluate(() => window.__surface.layout);
+  const tp = (x, z) => page.evaluate(([x, z]) => { const rt = window.__surface.rt; rt.pos.set(x, 0, z); rt.vel.set(0, 0, 0); }, [x, z]);
+  const hold = async (ms) => { await page.keyboard.down("KeyE"); await page.waitForTimeout(ms); await page.keyboard.up("KeyE"); await page.waitForTimeout(150); };
+  const tap = () => hold(90);
+  for (let k = 0; k < 4; k++) { await tp(L.pads[k].x, L.pads[k].z); await page.waitForTimeout(250); await hold(1200); }
+  await tp(L.panel.x, L.panel.z); await page.waitForTimeout(300); await tap(); await page.evaluate(() => { window.__surface.repair.angle = 0; }); await page.waitForTimeout(2300);
+  await tp(L.cableA.x, L.cableA.z); await page.waitForTimeout(300); await hold(7500);
+  await tp(L.relayPick.x, L.relayPick.z); await page.waitForTimeout(400); await tap();
+  await tp(L.relayBest.x, L.relayBest.z); await page.waitForTimeout(800); await tap(); await page.waitForTimeout(4000);
+  await tp(L.lrrr.x, L.lrrr.z); await page.waitForTimeout(300); await hold(3400);
+  await page.keyboard.press("KeyF");
+  await tp(L.crateStart.x, L.crateStart.z); await page.waitForTimeout(300); await tap();
+  await tp(L.crateTarget.x, L.crateTarget.z); await page.waitForTimeout(400); await tap();
+  for (let k = 0; k < 3; k++) { await tp(L.stakes[k].x, L.stakes[k].z); await page.waitForTimeout(250); await hold(1800); }
+  await tp(L.rim.x, L.rim.z); await page.evaluate(([x, z]) => { const c = window.__surface.ground.crater; window.__surface.rt.camYaw = Math.atan2(c.x - x, c.z - z); }, [L.rim.x, L.rim.z]); await page.waitForTimeout(300); await hold(1800);
+  await tp(L.scan.main.x + 1, L.scan.main.z); await page.waitForTimeout(300); await hold(2200);
+  await tp(L.core.x, L.core.z); await page.waitForTimeout(400); await hold(3800);
+  await tp(L.rack.x, L.rack.z); await page.waitForTimeout(400); await hold(2000);
+  await shot("surface", "-cards");
+  await tp(L.flag.x, L.flag.z); await page.waitForTimeout(400); await hold(2800);
+  await page.waitForTimeout(400); await tap();
+  const done = () => page.evaluate(() => Object.keys(window.__apolloStore.getState().state.phaseData.surface ?? {}).filter((k) => k.startsWith("d_")).length);
+  const t0 = Date.now();
+  while ((await getPhase(page)) === "surface" && Date.now() - t0 < 25000) await page.waitForTimeout(500);
+  log.surfaceTasksDone = await done().catch(() => null);
+  if ((await getPhase(page)) === "surface") await forceSkip("surface", "scripted tasks did not reach the finale");
 });
 
 await step("report", async () => {
