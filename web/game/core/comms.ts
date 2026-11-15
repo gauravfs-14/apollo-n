@@ -81,6 +81,12 @@ export function say(lines: CommLine | CommLine[], opts: { interrupt?: boolean; o
   void pump();
 }
 
+/** Drop lines that haven't started (e.g. when the phase changes, so stale calls never play over a new scene). */
+export function dropQueued() {
+  const pending = queue.splice(0).map((q) => q.done);
+  pending.forEach((d) => d?.());
+}
+
 /** Drop queued lines and cut the one on air (it fades out in ~40 ms). */
 export function clearComms() {
   gen++;

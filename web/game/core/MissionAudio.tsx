@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { cruiseArrival, SITE_BASES } from "../data/missionComms";
 import type { PhaseId } from "../types";
 import { playAmbience, useTransmission } from "./audio";
-import { clearComms, say, setCommVars, type CommLine } from "./comms";
+import { clearComms, dropQueued, say, setCommVars, type CommLine } from "./comms";
 import { useRevealed } from "./loading";
 import { useStore } from "./store";
 
@@ -41,6 +41,7 @@ export function MissionAudio({ phase }: { phase: PhaseId }) {
     const a = AMBIENCE[phase];
     playAmbience(a ? `/audio/ambience/${a}.mp3` : null, a === "suit" ? AMBIENCE_LEVEL * 0.6 : AMBIENCE_LEVEL);
     if (phase === "select") clearComms(); // a new mission starts clean
+    else dropQueued(); // lines queued for the previous phase no longer match the screen
   }, [phase]);
   // a phase's opening radio waits until its scene is on screen
   useEffect(() => {
