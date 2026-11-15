@@ -5,6 +5,13 @@
 import { Howl, Howler } from "howler";
 import { api } from "./api";
 
+// Howler closes and re-creates its AudioContext the first time a sound plays when the
+// device sample rate isn't 44.1 kHz (a Mobile Safari workaround). Most Macs run at
+// 48 kHz, so that swap stranded the music on a closed context ("cannot connect to an
+// AudioNode belonging to a different audio context") and opened a second output stream,
+// which can click. The game is desktop-only, so keep one context for the whole session.
+(Howler as unknown as { _mobileUnloaded: boolean })._mobileUnloaded = true;
+
 const sfxCache = new Map<string, Howl>();
 
 export function sfx(name: string, opts: { volume?: number; rate?: number } = {}) {
@@ -57,13 +64,19 @@ function musicCtx() {
   if (!g) return null;
   // rebuild if the context changed (e.g. Howler re-created after a hot reload): nodes can't cross contexts
   if (!bus || bus.context !== g.ctx) {
-    if (music && music.gain.context !== g.ctx) {
-      music.el.pause();
-      music = null;
-    }
     bus = g.ctx.createGain();
     bus.gain.value = musicVolume;
     bus.connect(g.out);
+    // the playing track is wired to the old context: carry it over, resuming where it was
+    if (music && music.gain.context !== g.ctx) {
+      const { src, el } = music;
+      const at = el.currentTime;
+      el.pause();
+      music = null;
+      mctx = g.ctx;
+      playMusic(src, musicLevel);
+      if (music) (music as Track).el.currentTime = at;
+    }
   }
   mctx = g.ctx;
   return mctx;
