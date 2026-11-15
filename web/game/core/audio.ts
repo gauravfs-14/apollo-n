@@ -259,6 +259,7 @@ export type Speaker = "capcom" | "crew";
 const bufCache = new Map<string, Promise<AudioBuffer>>();
 let radio: { stop: () => void } | null = null;
 let noiseBuf: AudioBuffer | null = null;
+let whiteBuf: AudioBuffer | null = null;
 let shaperCurves: Record<Speaker, Float32Array<ArrayBuffer>> | null = null;
 
 function loadBuffer(ctx: AudioContext, url: string): Promise<AudioBuffer> {
@@ -284,7 +285,7 @@ function radioCurve(drive: number) {
   return c;
 }
 
-function noise(ctx: AudioContext) {
+function noise(ctx: BaseAudioContext) {
   if (!noiseBuf) {
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
@@ -297,23 +298,51 @@ function noise(ctx: AudioContext) {
   return noiseBuf;
 }
 
-function playRadio(buf: AudioBuffer, speaker: Speaker): Promise<void> {
-  const g = audioGraph();
-  if (!g) return Promise.resolve();
-  const { ctx, out } = g;
-  if (ctx.state === "suspended") ctx.resume().catch(() => {});
-  radio?.stop();
+function white(ctx: BaseAudioContext) {
+  if (!whiteBuf) {
+    whiteBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const d = whiteBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return whiteBuf;
+}
+
+const rand = (a: number, b: number) => a + Math.random() * (b - a);
+
+/** Schedule one radio transmission on `ctx` (realtime or offline). */
+function scheduleRadio(ctx: BaseAudioContext, out: AudioNode, buf: AudioBuffer, speaker: Speaker) {
   shaperCurves ??= { capcom: radioCurve(1.6), crew: radioCurve(2.6) };
   const crew = speaker === "crew";
   const t0 = ctx.currentTime + 0.05;
   const lead = crew ? 0.18 : 0.38; // Quindar tone + gap before the voice
   const vStart = t0 + lead;
   const vEnd = vStart + buf.duration;
-  const end = vEnd + (crew ? 0.2 : 0.42);
+  const squelchAt = crew ? vEnd + 0.08 : vEnd + 0.42; // after Houston's closing Quindar tone
+  const squelchLen = crew ? 0.26 : 0.16;
+  const end = squelchAt + squelchLen + 0.04;
 
   const bus = ctx.createGain();
   bus.connect(out);
   const nodes: AudioScheduledSourceNode[] = [];
+
+  /** Band-limited noise burst with a soft attack (a bare step would sound like a speaker click). */
+  const burst = (at: number, len: number, level: number, freq: number, q: number, attack = 0.003) => {
+    const n = ctx.createBufferSource();
+    n.buffer = white(ctx);
+    const f = ctx.createBiquadFilter();
+    f.type = "bandpass";
+    f.frequency.value = freq;
+    f.Q.value = q;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(level, at + attack);
+    g.gain.exponentialRampToValueAtTime(level * 0.05, at + len);
+    g.gain.linearRampToValueAtTime(0, at + len + 0.01);
+    n.connect(f).connect(g).connect(bus);
+    n.start(at, rand(0, 0.8));
+    n.stop(at + len + 0.02);
+    nodes.push(n);
+  };
 
   // voice through the comms chain
   const src = ctx.createBufferSource();
@@ -333,7 +362,20 @@ function playRadio(buf: AudioBuffer, speaker: Speaker): Promise<void> {
   comp.attack.value = 0.004;
   comp.release.value = 0.12;
   const vox = ctx.createGain();
-  vox.gain.value = 1.15;
+  // signal fading: the voice level wavers a little; crew lines also drop out briefly
+  const base = 0.95;
+  vox.gain.setValueAtTime(base, vStart);
+  for (let t = vStart + 0.15; t < vEnd; t += rand(0.12, 0.22)) vox.gain.linearRampToValueAtTime(base * rand(crew ? 0.82 : 0.9, 1.04), t);
+  if (crew && buf.duration > 2) {
+    for (let i = 0; i < (buf.duration > 4 ? 2 : 1); i++) {
+      const d = rand(vStart + 0.5, vEnd - 0.4);
+      vox.gain.setValueAtTime(base, d);
+      vox.gain.linearRampToValueAtTime(base * 0.3, d + 0.03);
+      vox.gain.setValueAtTime(base * 0.3, d + rand(0.06, 0.12));
+      vox.gain.linearRampToValueAtTime(base, d + 0.16);
+    }
+  }
+  vox.gain.linearRampToValueAtTime(base, vEnd);
   src.connect(hp).connect(lp).connect(shaper).connect(comp).connect(vox).connect(bus);
   src.start(vStart);
   nodes.push(src);
@@ -347,15 +389,31 @@ function playRadio(buf: AudioBuffer, speaker: Speaker): Promise<void> {
   bp.frequency.value = crew ? 1800 : 2400;
   bp.Q.value = 0.6;
   const hg = ctx.createGain();
-  const level = crew ? 0.05 : 0.018;
+  const level = crew ? 0.11 : 0.06;
   hg.gain.setValueAtTime(0, t0);
   hg.gain.linearRampToValueAtTime(level, t0 + 0.04);
+  // the static drifts up and down like a fading signal
+  for (let t = t0 + 0.2; t < squelchAt - 0.1; t += rand(0.15, 0.35)) hg.gain.linearRampToValueAtTime(level * rand(0.5, crew ? 2.2 : 1.6), t);
+  hg.gain.linearRampToValueAtTime(level, squelchAt);
   hg.gain.setValueAtTime(level, end - 0.05);
   hg.gain.linearRampToValueAtTime(0, end);
   hiss.connect(bp).connect(hg).connect(bus);
   hiss.start(t0);
   hiss.stop(end + 0.05);
   nodes.push(hiss);
+
+  // mic key-up: a short rush of noise as the channel opens
+  burst(t0, crew ? 0.12 : 0.08, crew ? 0.5 : 0.3, 2200, 0.7, 0.004);
+
+  // crackle: short filtered pops while the line is open, more of it from the Moon
+  const pops = Math.round(buf.duration * (crew ? 3 : 0.9));
+  for (let i = 0; i < pops; i++) {
+    const at = rand(vStart, vEnd);
+    burst(at, rand(0.004, 0.018), crew ? rand(0.15, 0.4) : rand(0.08, 0.2), rand(1800, 4200), 1.2, 0.0015);
+  }
+
+  // squelch tail: the "kssh" when the transmitter unkeys
+  burst(squelchAt, squelchLen, crew ? 0.6 : 0.35, 2800, 0.8, 0.004);
 
   // Quindar tones on Houston's transmissions
   if (!crew) {
@@ -377,6 +435,16 @@ function playRadio(buf: AudioBuffer, speaker: Speaker): Promise<void> {
     }
   }
 
+  return { bus, nodes, end };
+}
+
+function playRadio(buf: AudioBuffer, speaker: Speaker): Promise<void> {
+  const g = audioGraph();
+  if (!g) return Promise.resolve();
+  const { ctx, out } = g;
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  radio?.stop();
+  const { bus, nodes, end } = scheduleRadio(ctx, out, buf, speaker);
   return new Promise((resolve) => {
     let done = false;
     const finish = () => {
@@ -404,6 +472,18 @@ function playRadio(buf: AudioBuffer, speaker: Speaker): Promise<void> {
     };
     radio = handle;
   });
+}
+
+/** Dev/test: render a voice file through the radio chain offline; returns mono samples. */
+export async function renderRadio(url: string, speaker: Speaker, sampleRate = 44100) {
+  const tmp = new OfflineAudioContext(1, sampleRate, sampleRate);
+  const buf = await tmp.decodeAudioData(await (await fetch(url)).arrayBuffer());
+  const off = new OfflineAudioContext(1, Math.ceil((buf.duration + 1.2) * sampleRate), sampleRate);
+  scheduleRadio(off, off.destination, buf, speaker);
+  return (await off.startRendering()).getChannelData(0);
+}
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+  (window as unknown as { __renderRadio: typeof renderRadio }).__renderRadio = renderRadio;
 }
 
 /** Lines that address Houston ("Houston, we are down") are the crew talking. */
