@@ -25,7 +25,7 @@ export function cleanHpMax(raw: unknown): number {
 }
 
 export function newState(room: string, mode: GameState["mode"]): GameState {
-  return { room, mode, phase: "select", players: [], scores: {}, phaseData: {}, hp: HP_BASE, hpMax: HP_BASE, failed: null, version: 0 };
+  return { room, mode, phase: "select", players: [], scores: {}, phaseData: {}, hp: HP_BASE, hpMax: HP_BASE, failed: null, sp: 0, version: 0 };
 }
 
 export function apply(s: GameState, playerId: string, msg: ClientMsg): GameState | string {
@@ -92,6 +92,14 @@ export function apply(s: GameState, playerId: string, msg: ClientMsg): GameState
           st.failed = String(data.reason ?? "The ship was lost.").slice(0, 160);
           st.phase = "report";
         }
+      } else if (msg.kind === "earn") {
+        // supply points: earned on the journey (activities, quizzes), shared by the crew
+        st.sp = Math.max(0, (st.sp ?? 0) + Math.max(0, Math.min(500, Math.round(Number(data.amount) || 0))));
+      } else if (msg.kind === "spend" || msg.kind === "heal") {
+        const cost = Math.max(0, Math.round(Number(msg.kind === "heal" ? data.cost : data.amount) || 0));
+        if ((st.sp ?? 0) < cost) return "Not enough supply points";
+        st.sp = (st.sp ?? 0) - cost;
+        if (msg.kind === "heal") st.hp = Math.min(st.hpMax ?? 100, (st.hp ?? 100) + Math.max(0, Math.min(100, Number(data.amount) || 0)));
       } else if (msg.kind === "goto") {
         if (!me.isHost) return "Only the host can jump phases";
         const target = data.phase as GameState["phase"];

@@ -3,6 +3,7 @@
 // pause/settings menu and the multiplayer lobby card. Sits above every phase HUD.
 import { useRouter } from "next/navigation";
 import { useMissionHp } from "../core/hp";
+import { useSupply } from "../core/economy";
 import { rolesOf } from "../core/roles";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { disconnect, send } from "../core/net";
@@ -102,6 +103,7 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
           </div>
         )}
         <HpChip />
+        <SpChip />
         <button onClick={onMenu} className="rounded-md px-2 py-1 text-xs text-white/80 hover:bg-white/10 hover:text-white" aria-label="Open menu (Esc)">
           Menu
         </button>
@@ -306,6 +308,34 @@ function HpChip() {
         <span className={`block h-full ${tone} transition-[width] duration-500`} style={{ width: `${hp}%` }} />
       </span>
       <span className="num w-8 text-right text-white">{Math.round(hp)}%</span>
+    </span>
+  );
+}
+
+/** Supply points in the top bar: earned on the journey, spent on the Moon for hints and repairs. */
+function SpChip() {
+  const sp = useSupply();
+  const phase = useStore((s) => s.state?.phase);
+  const [pop, setPop] = useState(false);
+  const prev = useRef(sp);
+  useEffect(() => {
+    if (sp > prev.current) {
+      setPop(true);
+      const t = setTimeout(() => setPop(false), 600);
+      prev.current = sp;
+      return () => clearTimeout(t);
+    }
+    prev.current = sp;
+  }, [sp]);
+  if (!phase || phase === "select") return null;
+  return (
+    <span
+      className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors ${pop ? "bg-amber/25" : ""}`}
+      title="Supply points: earn them on the journey, spend them on the Moon for hints and repairs"
+      aria-label={`${sp} supply points`}
+    >
+      <span className="text-dim">SP</span>
+      <span className="num text-amber">{sp}</span>
     </span>
   );
 }

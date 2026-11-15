@@ -261,6 +261,25 @@ def test_drop_phase_retired():
     assert s["phase"] == "crew"
 
 
+def test_supply_points_earn_spend_heal():
+    s = new_state("R", "solo")
+    s = apply(s, "a", {"type": "join", "id": "a", "name": "A"})
+    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "earn", "data": {"amount": 30}})
+    assert s["sp"] == 30
+    err = apply(s, "a", {"type": "action", "phase": "select", "kind": "spend", "data": {"amount": 50}})
+    assert err == "Not enough supply points"
+    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "spend", "data": {"amount": 10, "item": "hint"}})
+    assert s["sp"] == 20
+    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "damage", "data": {"amount": 40}})
+    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "heal", "data": {"cost": 15, "amount": 25}})
+    assert s["sp"] == 5 and s["hp"] == 85
+    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "earn", "data": {"amount": 100}})
+    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "heal", "data": {"cost": 10, "amount": 50}})
+    assert s["hp"] == 100  # capped at max integrity
+    s = apply(s, "a", {"type": "action", "phase": "select", "kind": "reset"})
+    assert s["sp"] == 0
+
+
 if __name__ == "__main__":
     fails = 0
     for name, fn in sorted(globals().items()):

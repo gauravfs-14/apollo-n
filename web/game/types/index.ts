@@ -150,11 +150,13 @@ export interface GameState {
   hpMax?: number;
   /** Why the mission failed (set when hp reached 0), else absent. */
   failed?: string | null;
+  /** Supply points for this mission (shared by the crew): earned on the journey, spent on the Moon. */
+  sp?: number;
   version: number;
 }
 
 // ---- Wire messages (WebSocket /ws/rooms/{code}) ----
-export type ActionKind = "patch" | "set_plan" | "complete" | "goto" | "reset" | "damage";
+export type ActionKind = "patch" | "set_plan" | "complete" | "goto" | "reset" | "damage" | "earn" | "spend" | "heal";
 
 export type ClientMsg =
   | { type: "join"; id: string; name: string; rejoin?: boolean }
