@@ -20,63 +20,120 @@ export function sfx(name: string, opts: { volume?: number; rate?: number } = {})
   return id;
 }
 
-// ---- Music ----
-// One looping track at a time, streamed (html5) so only the current stage's file
-// downloads. Tracks crossfade and keep playing at full level under voice lines.
-// Browsers block autoplay until a user gesture: a blocked track starts on unlock.
 /** Stop every playing sound effect (not music or voice). */
 export function stopSfx() {
   sfxCache.forEach((h) => h.stop());
 }
 
-let music: Howl | null = null;
-let musicSrc: string | null = null;
-let musicLevel = 0.35; // per-track mix level
+// ---- Music ----
+// One looping track at a time. Each track is an <audio> element (streams, so only
+// the current stage's file downloads) routed through Web Audio gain nodes, so
+// fades are sample-accurate ramps (Howler's html5 fades step the volume, which
+// can click). If the browser blocks playback until a gesture (Firefox/Zen,
+// Safari), the track starts on the next click or key press.
+interface Track { src: string; el: HTMLAudioElement; gain: GainNode }
+let mctx: AudioContext | null = null;
+let bus: GainNode | null = null;
+let music: Track | null = null;
 let musicVolume = typeof window !== "undefined" ? Number(localStorage.getItem("apollo.musicVolume") ?? 0.6) : 0.6;
+let masterVolume = 1;
+let musicLevel = 0.35;
+let waiting = false;
 
-const musicTarget = () => musicLevel * musicVolume;
+function musicCtx() {
+  if (!mctx) {
+    mctx = new AudioContext();
+    bus = mctx.createGain();
+    bus.gain.value = masterVolume * musicVolume;
+    bus.connect(mctx.destination);
+  }
+  return mctx;
+}
+
+function ramp(g: GainNode, to: number, seconds: number) {
+  const t = g.context.currentTime;
+  g.gain.cancelScheduledValues(t);
+  g.gain.setValueAtTime(g.gain.value, t);
+  g.gain.linearRampToValueAtTime(to, t + seconds);
+}
+
+function startTrack(tr: Track) {
+  const ctx = musicCtx();
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  tr.el
+    .play()
+    .then(() => music === tr && ramp(tr.gain, musicLevel, 2))
+    .catch(() => waitForGesture());
+}
+
+function waitForGesture() {
+  if (waiting) return;
+  waiting = true;
+  const go = () => {
+    waiting = false;
+    window.removeEventListener("pointerdown", go, true);
+    window.removeEventListener("keydown", go, true);
+    if (music) startTrack(music);
+  };
+  window.addEventListener("pointerdown", go, true);
+  window.addEventListener("keydown", go, true);
+}
+
+function retire(tr: Track, seconds: number) {
+  ramp(tr.gain, 0, seconds);
+  setTimeout(() => {
+    tr.el.pause();
+    tr.el.removeAttribute("src");
+    tr.el.load();
+    tr.gain.disconnect();
+  }, seconds * 1000 + 100);
+}
 
 export function playMusic(src: string, level = 0.35) {
-  if (musicSrc === src) return;
-  const prev = music;
-  if (prev) {
-    prev.fade(prev.volume(), 0, 1500);
-    setTimeout(() => prev.unload(), 1600);
-  }
-  musicSrc = src;
+  if (typeof window === "undefined" || music?.src === src) return;
+  const ctx = musicCtx();
+  if (music) retire(music, 1.5);
   musicLevel = level;
-  const h = new Howl({ src: [src], loop: true, volume: 0, html5: true });
-  const start = () => {
-    if (music !== h) return;
-    h.play();
-    h.fade(0, musicTarget(), 2000);
-  };
-  h.once("playerror", () => h.once("unlock", start));
-  music = h;
-  start();
+  const el = new Audio(src);
+  el.loop = true;
+  el.preload = "auto";
+  const gain = ctx.createGain();
+  gain.gain.value = 0;
+  ctx.createMediaElementSource(el).connect(gain).connect(bus!);
+  music = { src, el, gain };
+  startTrack(music);
+}
+
+if (typeof window !== "undefined") {
+  (window as unknown as { __music: () => object | null }).__music = () =>
+    music && {
+      src: music.src.split("/").pop(),
+      playing: !music.el.paused,
+      gain: +(music.gain.gain.value * (bus?.gain.value ?? 0)).toFixed(3),
+      ctx: mctx?.state,
+    };
 }
 
 export function stopMusic() {
-  const prev = music;
+  if (!music) return;
+  retire(music, 1);
   music = null;
-  musicSrc = null;
-  if (!prev) return;
-  prev.fade(prev.volume(), 0, 1000);
-  setTimeout(() => prev.unload(), 1100);
 }
 
 /** 0..1, user setting (separate from master volume). */
 export function setMusicVolume(v: number) {
   musicVolume = v;
   localStorage.setItem("apollo.musicVolume", String(v));
-  music?.volume(musicTarget());
+  if (bus) ramp(bus, masterVolume * musicVolume, 0.1);
 }
 export function getMusicVolume() {
   return musicVolume;
 }
 
 export function setMasterVolume(v: number) {
+  masterVolume = v;
   Howler.volume(v);
+  if (bus) ramp(bus, masterVolume * musicVolume, 0.1);
 }
 
 // ---- Voice ----
