@@ -7,6 +7,7 @@ import { perfStats } from "../../core/perf";
 import { useGame } from "../../core/useGame";
 import { Lander, getDefaultParts, type LanderParts } from "../../three/ship/Lander";
 import { Crew } from "./Crew";
+import { ExploreAr } from "./explore/ExploreAr";
 import { loadEphemeris, loadTerrain, missionTime, skyAt } from "../../three/terrain";
 import { createGround, hashStr, setSurfaceSky, type DemSource } from "./ground";
 import { surfaceUniforms } from "./materials";
@@ -117,6 +118,7 @@ export function SurfaceScene() {
       <Player ground={ground} role={me?.role ?? plan?.crew.roles[0]} />
       <Crew ground={ground} />
       <Tasks ground={ground} />
+      <ExploreAr ground={ground} />
       <Footprints ground={ground} />
       <Dust />
       <Effects bloom={0.5} ao={false} />

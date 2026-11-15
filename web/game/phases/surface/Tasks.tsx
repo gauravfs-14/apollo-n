@@ -12,6 +12,7 @@ import { EARTH_DIR, PLAY_RADIUS, SUN_DIR, type Ground } from "./ground";
 import { barsFromMargin, layoutTasks, type TaskSpots } from "./layout";
 import { ROLE_COLOR, rt, useSurface, type Guide } from "./store";
 import { beep, chirp, thud } from "./synth";
+import { useAr } from "./explore/arStore";
 import { Label } from "./Label";
 import { addDust } from "./Trail";
 
@@ -145,31 +146,20 @@ export function Tasks({ ground }: { ground: Ground }) {
   useEffect(() => {
     if (!fin || !plan) return;
     const p = prog.current;
-    if (p.finaleT >= 0) return;
+    if (p.finaleT >= 0 || p.finaleDone) return;
     p.finaleT = 0;
     rt.locked = true;
     rt.focus = null;
     p.flagPos.set(rt.pos.x + Math.sin(rt.rotY) * 3.2, 0, rt.pos.z + Math.cos(rt.rotY) * 3.2);
     p.flagPos.y = ground.heightAt(p.flagPos.x, p.flagPos.z);
     setFlag([p.flagPos.x, p.flagPos.y, p.flagPos.z]);
+    useAr.setState({ flag: [p.flagPos.x, p.flagPos.y, p.flagPos.z] });
     useSurface.getState().set({ finale: true, prompt: null, progress: null, signal: null, bars: null, guides: [] });
     say(goalAchieved(plan.goal.text), { once: `goal:${plan.id}` });
     chirp(440, 1320, 0.8, 0.12);
   }, [fin, plan, ground]);
 
-  const finishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (!fin) return;
-    const g = latest.current;
-    finishTimer.current = setTimeout(() => {
-      const st = useSurface.getState();
-      const cur = new Set((latest.current.state?.phaseData.surface?.done as string[] | undefined) ?? []);
-      if (plan) latest.current.complete("surface", surfaceScore(plan, cur, st.elapsed, st.mistakes));
-    }, g.isHost || g.state?.mode === "solo" ? 9000 : 16000);
-    return () => {
-      if (finishTimer.current) clearTimeout(finishTimer.current);
-    };
-  }, [fin, plan]);
+  // the finale ends in the HUD's choice: explore freely or file the report (see Hud). Nothing auto-completes.
 
   useFrame((_, dtRaw) => {
     const dt = Math.min(dtRaw, 0.05);
@@ -178,6 +168,14 @@ export function Tasks({ ground }: { ground: Ground }) {
     const p = prog.current;
     if (!plan || rt.exiting) return;
 
+    // the player chose to keep exploring: hand control back
+    if (p.finaleT >= 0 && hud.explore) {
+      p.finaleT = -1;
+      p.finaleDone = true;
+      rt.locked = false;
+      rt.focus = null;
+      hud.set({ finale: false });
+    }
     // finale orbit
     if (p.finaleT >= 0) {
       p.finaleT += dt;

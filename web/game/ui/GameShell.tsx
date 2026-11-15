@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { disconnect, send } from "../core/net";
 import { useStore } from "../core/store";
 import { PHASE_ORDER, type Player, type Role } from "../types";
+import { useSurface } from "../phases/surface/store";
 import { Button, Panel } from "./kit";
 import { SettingsPanel } from "./Settings";
 
@@ -139,6 +140,7 @@ function PauseMenu({ onClose }: { onClose: () => void }) {
   const me = state?.players.find((p) => p.id === meId);
   const [copied, copy] = useCopy(() => (state ? inviteUrl(state.room) : ""));
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const exploreFinish = useSurface((s) => s.finish);
   const idx = state ? PHASE_ORDER.indexOf(state.phase) : -1;
   const next = idx >= 0 ? PHASE_ORDER[idx + 1] : undefined;
 
@@ -165,6 +167,11 @@ function PauseMenu({ onClose }: { onClose: () => void }) {
             {state?.mode === "multi" && (
               <Button variant="ghost" className="w-full" onClick={copy}>
                 {copied ? "Invite link copied" : "Copy invite link"}
+              </Button>
+            )}
+            {exploreFinish && (
+              <Button className="w-full" onClick={() => { exploreFinish(); onClose(); }}>
+                Finish mission and file the report
               </Button>
             )}
             {me?.isHost && next && (

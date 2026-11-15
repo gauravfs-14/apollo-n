@@ -55,6 +55,8 @@ export interface SurfaceHud {
   repair: null | { angle: number; aligned: number };
   boundary: boolean;
   ready: boolean;
+  explore: boolean; // free exploration after the mission (no timer, no score pressure)
+  finish: (() => void) | null; // ends the mission to the report (host/solo), set by the HUD
   set: (p: Partial<SurfaceHud>) => void;
   say: (text: string) => void;
   reset: () => void;
@@ -77,11 +79,15 @@ const initial = {
   finale: false,
   repair: null,
   boundary: false,
+  explore: false,
+  finish: null,
 };
 
 export const useSurface = create<SurfaceHud>((set) => ({
   ...initial,
   ready: false,
+  explore: false,
+  finish: null,
   set: (p) => set(p),
   say: (text) => set((s) => ({ message: text, messageId: s.messageId + 1 })),
   reset: () => set({ ...initial }),

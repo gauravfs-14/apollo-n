@@ -1,6 +1,8 @@
 """Surface field notes: facts for the points of interest on the Moon.
 
 GET /surface/poi?site_id=site_a&x=0&z=0[&web=true]
+GET /surface/explore?lat=-89.77&lon=-157.4  (free exploration: heritage hardware with bearings, NASA pictures, SerpApi extras)
+GET /surface/explore/item?id=apollo15&lat=&lon=  (lazy SerpApi enrichment of one item)
 
 Curated NASA/mission facts (every one with a source link) come first. For each point of interest one SerpApi
 Google query adds up to two web results from trusted science domains ("Further reading"). Queries are
@@ -11,14 +13,17 @@ Real numbers (distance and direction to hardware, shadow, Sun and Earth visibili
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import math
+import random
 import re
+from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.services import cache, serp
+from app.services import cache, nasa, serp
 from app.sim import terrain as T
 
 router = APIRouter(prefix="/surface", tags=["surface"])
@@ -231,3 +236,112 @@ async def poi(site_id: str = Query(...), x: float = 0.0, z: float = 0.0, web: bo
     out = {"site_id": site_id, "lat": round(lat, 3), "lon": round(lon, 3), "web": served_web, "pois": pois}
     cache.put("surface_poi", key, out)
     return out
+
+
+# ---- free exploration -------------------------------------------------------------------------------------------
+
+HERITAGE_FILE = Path(__file__).resolve().parents[2] / "data" / "heritage.json"
+KIND_LABEL = {"impactor": "impact site", "crash": "crash site", "lander": "lander", "crewed": "crewed landing", "rover": "rover", "sample": "sample return"}
+
+
+def _sites() -> list[dict]:
+    """Every known heritage site as one list: the curated south polar relics plus the sites in heritage.json."""
+    out = []
+    relics = {r["name"]: r for r in T._relics()}
+    for prefix, pid, title, facts, q in HERITAGE:
+        r = next((v for k, v in relics.items() if k.startswith(prefix)), None)
+        if r:
+            out.append({"id": pid, "title": title, "kind": r.get("kind", "lander"), "lat": r["lat"], "lon": r["lon"], "approx": bool(r.get("approx")),
+                        "left": [], "facts": list(facts), "nasa_q": q, "serp_q": q})
+    data = json.loads(HERITAGE_FILE.read_text())
+    for s in data["sites"]:
+        src = s["source"]
+        out.append({**s, "approx": False, "facts": [{**F(t, src["name"], src["url"])} for t in s["facts"]]})
+    return out
+
+
+def _bearing(lat: float, lon: float, lat2: float, lon2: float) -> float:
+    """Game-frame heading (0 = +Z, clockwise toward +X) from the player to a site, via the polar plane (conformal, so exact at the pole)."""
+    ax, ay = _plane(lat, lon)
+    bx, by = _plane(lat2, lon2)
+    return math.degrees(math.atan2(bx - ax, -(by - ay))) % 360
+
+
+async def _nasa_image(query: str) -> dict | None:
+    try:
+        return await nasa.image_for(query, random.Random(7))
+    except Exception as e:
+        log.warning("nasa image failed: %s", type(e).__name__)
+        return None
+
+
+async def _serp_image(query: str) -> dict | None:
+    """First Google Images result from a trusted domain (thumbnail + page) for a query; cached 30 days, failures are not cached."""
+    hit = cache.get("surface_serp_img", query, 30 * 24 * HOUR)
+    if hit:
+        return hit
+    try:
+        async with _gate:
+            data = await serp._search({"engine": "google_images", "q": query})
+    except Exception as e:
+        log.warning("serp image failed: %s %s", type(e).__name__, e)
+        return None
+    for r in data.get("images_results", []):
+        if r.get("thumbnail") and r.get("link") and _trusted(r["link"]):
+            out = {"url": r["thumbnail"], "title": serp._clean(r.get("title")), "credit": serp._clean(r.get("source")) or "Web", "page": r["link"]}
+            cache.put("surface_serp_img", query, out)
+            return out
+    return None
+
+
+async def _enrich(site: dict) -> dict:
+    """SerpApi extras for one item: trusted web snippets and, when NASA has no picture, a Google Images thumbnail."""
+    web, img = await asyncio.gather(_web(site["serp_q"]), _serp_image(site["serp_q"]))
+    return {"web": web, "image": img}
+
+
+def _card(site: dict, lat: float, lon: float) -> dict:
+    d = _gc_km(lat, lon, site["lat"], site["lon"])
+    return {"id": site["id"], "title": site["title"], "agency": site.get("agency"), "year": site.get("year"), "kind": site["kind"],
+            "kind_label": KIND_LABEL.get(site["kind"], site["kind"]), "lat": site["lat"], "lon": site["lon"], "approx": site["approx"],
+            "distance_km": round(d, 1), "bearing_deg": round(_bearing(lat, lon, site["lat"], site["lon"]), 1),
+            "left": site["left"], "facts": list(site["facts"]), "image": None}
+
+
+@router.get("/explore")
+async def explore(lat: float = Query(..., ge=-90, le=90), lon: float = Query(..., ge=-180, le=180), enrich: int = Query(6, ge=0, le=12)) -> dict:
+    """Heritage sites sorted by distance with bearings, one NASA picture each, and SerpApi enrichment for the nearest few."""
+    key = f"{round(lat, 1)}|{round(lon, 1)}|{enrich}"
+    hit = cache.get("surface_explore", key, 6 * HOUR)
+    if hit is not None:
+        return hit
+    cards = sorted((_card(s, lat, lon) for s in _sites()), key=lambda c: c["distance_km"])
+    by_id = {s["id"]: s for s in _sites()}
+    nasa_imgs = await asyncio.gather(*(_nasa_image(by_id[c["id"]]["nasa_q"]) for c in cards))
+    for c, img in zip(cards, nasa_imgs):
+        c["image"] = img
+    served_web = False
+    if enrich:
+        ex = await asyncio.gather(*(_enrich(by_id[c["id"]]) for c in cards[:enrich]))
+        for c, e in zip(cards, ex):
+            c["facts"].extend(e["web"])
+            c["image"] = c["image"] or e["image"]
+            served_web = served_web or bool(e["web"])
+    env = [{"id": pid, "title": title, "facts": facts} for pid, (title, facts, _q) in ENV.items()]
+    out = {"lat": round(lat, 3), "lon": round(lon, 3), "web": served_web, "sites": cards, "env": env}
+    cache.put("surface_explore", key, out)
+    return out
+
+
+@router.get("/explore/item")
+async def explore_item(id: str = Query(...), lat: float = -90.0, lon: float = 0.0) -> dict:
+    """Lazy SerpApi enrichment of one heritage site or environment tag (cached), for items beyond the nearest few."""
+    site = next((s for s in _sites() if s["id"] == id), None)
+    if site:
+        e = await _enrich(site)
+        if not e["image"]:
+            e["image"] = await _nasa_image(site["nasa_q"])
+        return {"id": id, **e}
+    if id in ENV:
+        return {"id": id, "web": await _web(ENV[id][2]), "image": None}
+    raise HTTPException(404, "unknown item")

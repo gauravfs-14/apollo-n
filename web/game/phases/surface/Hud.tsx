@@ -1,9 +1,12 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGame } from "../../core/useGame";
 import { Button, Meter, Panel, PhaseTitle } from "../../ui/kit";
 import type { MissionPlan } from "../../types";
+import { ArLayer } from "./explore/ArLayer";
+import { useAr } from "./explore/arStore";
+import { loadHeritage } from "./explore/heritage";
 import { ROLE_COLOR, rt, useSurface } from "./store";
 import { activeTasks, finished, hintLevel, surfaceScore } from "./Tasks";
 import { phaseLabel } from "../../ui/phaseLabel";
@@ -46,7 +49,45 @@ export function Hud() {
 
   useEffect(() => {
     useSurface.getState().reset();
+    useAr.getState().reset();
   }, []);
+  // score time stops when the goal is reached; exploring afterwards costs nothing
+  const frozen = useRef<number | null>(null);
+  useEffect(() => {
+    if (h.finale && !h.explore && frozen.current === null) frozen.current = useSurface.getState().elapsed;
+  }, [h.finale, h.explore]);
+  const canEnd = state?.mode === "solo" || isHost;
+  const finish = useCallback(() => {
+    if (plan) complete("surface", surfaceScore(plan, done, frozen.current ?? h.elapsed, h.mistakes));
+  }, [plan, done, complete, h.elapsed, h.mistakes]);
+  useEffect(() => {
+    useSurface.setState({ finish: h.explore && canEnd ? finish : null });
+    return () => useSurface.setState({ finish: null });
+  }, [h.explore, canEnd, finish]);
+  const [choice, setChoice] = useState(false);
+  useEffect(() => {
+    if (!h.finale || h.explore) return;
+    const t = setTimeout(() => setChoice(true), 6500);
+    return () => clearTimeout(t);
+  }, [h.finale, h.explore]);
+  const siteId = ((state?.phaseData.site ?? state?.phaseData.landing) as { site_id?: string } | undefined)?.site_id ?? plan?.destination.candidate_sites[0]?.id ?? "site_a";
+  const report = (state?.phaseData.site as { report?: { lat?: number; lon?: number } } | undefined)?.report;
+  const startExplore = async () => {
+    useSurface.setState({ explore: true });
+    let lat = report?.lat;
+    let lon = report?.lon;
+    if (lat == null || lon == null) {
+      try {
+        const meta = await fetch(`/terrain/${siteId}/meta.json`).then((r) => r.json());
+        lat = meta.center.lat;
+        lon = meta.center.lon;
+      } catch {
+        lat = -89.77;
+        lon = 0;
+      }
+    }
+    void loadHeritage(lat as number, lon as number);
+  };
   useEffect(() => {
     if (!h.message) return;
     setToast(h.message);
@@ -59,7 +100,7 @@ export function Hud() {
   const hint = hintLevel(plan.difficulty, h.mistakes);
   const fin = finished(plan, done);
   const limit = LIMIT[plan.difficulty];
-  const canFinish = h.elapsed > limit && !fin;
+  const canFinish = h.elapsed > limit && !fin && !h.explore;
   const mm = Math.floor(h.elapsed / 60);
   const ss = String(Math.floor(h.elapsed % 60)).padStart(2, "0");
 
@@ -72,8 +113,29 @@ export function Hud() {
         </div>
       </div>
       <PhaseTitle step={phaseLabel("surface")} title={plan.title} subtitle={plan.goal.text} />
+      <ArLayer />
       <Compass />
 
+      {h.explore && (
+        <div className="absolute right-5 top-5 w-72">
+          <Panel>
+            <div className="text-[11px] tracking-wide text-dim">FREE EXPLORATION</div>
+            <div className="mt-1 text-sm">The mission is done. Walk as far as you like. Look at a tag and press E for more.</div>
+            <div className="mt-3 flex gap-2">
+              <Button variant="ghost" className="flex-1" onClick={() => useAr.setState((a) => ({ atlas: !a.atlas }))}>
+                Atlas
+              </Button>
+              {canEnd ? (
+                <Button className="flex-1 whitespace-nowrap" onClick={finish}>
+                  Finish mission
+                </Button>
+              ) : null}
+            </div>
+            {!canEnd && <div className="mt-2 text-xs text-dim">The host ends the mission for everyone.</div>}
+          </Panel>
+        </div>
+      )}
+      {!h.explore && (
       <div className="absolute right-5 top-5 w-72">
         <Panel>
           <div className="mb-2 flex items-center justify-between">
@@ -118,6 +180,7 @@ export function Hud() {
           )}
         </Panel>
       </div>
+      )}
 
       {h.exiting && (
         <div className="absolute inset-x-0 bottom-14 flex justify-center">
@@ -180,12 +243,25 @@ export function Hud() {
           <div className="text-xs tracking-widest text-amber">MISSION GOAL REACHED</div>
           <div className="max-w-2xl text-2xl font-semibold">{plan.goal.text}</div>
           <div className="mt-1 max-w-xl text-sm text-dim">{plan.goal.why}</div>
+          {choice && (
+            <div className="pointer-events-auto mt-4 flex flex-col items-center gap-2">
+              <div className="flex gap-3">
+                <Button onClick={startExplore}>Explore the Moon</Button>
+                {canEnd && (
+                  <Button variant="ghost" onClick={finish}>
+                    Finish mission
+                  </Button>
+                )}
+              </div>
+              {!canEnd && <div className="text-xs text-dim">The host ends the mission for everyone.</div>}
+            </div>
+          )}
         </div>
       )}
 
       {!h.exiting && !h.finale && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11px] text-dim">
-          WASD / arrows move - Shift sprint - Space jump - E interact - drag to look - wheel to zoom
+          WASD / arrows move - Shift sprint - Space jump - E {h.explore ? "open a tag" : "interact"} - drag to look - wheel to zoom
         </div>
       )}
 

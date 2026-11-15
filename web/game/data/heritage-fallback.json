@@ -1,0 +1,839 @@
+{
+ "sites": [
+  {
+   "id": "mip",
+   "title": "Chandrayaan-1 Moon Impact Probe",
+   "agency": null,
+   "year": null,
+   "kind": "impactor",
+   "lat": -89.76,
+   "lon": -39.4,
+   "approx": false,
+   "left": [],
+   "facts": [
+    {
+     "text": "On 14 November 2008 India's Moon Impact Probe left the Chandrayaan-1 orbiter and fell to the surface near Shackleton crater, the first Indian object to reach the Moon.",
+     "source_name": "Wikipedia: Moon Impact Probe",
+     "source_url": "https://en.wikipedia.org/wiki/Moon_Impact_Probe",
+     "via": "curated"
+    },
+    {
+     "text": "It carried a video camera, a radar altimeter and a mass spectrometer that sampled the thin lunar atmosphere during the descent of about 25 minutes.",
+     "source_name": "Wikipedia: Moon Impact Probe",
+     "source_url": "https://en.wikipedia.org/wiki/Moon_Impact_Probe",
+     "via": "curated"
+    },
+    {
+     "text": "The probe was not built to survive: it hit the surface and the impact point is only known from its tracking.",
+     "source_name": "List of artificial objects on the Moon",
+     "source_url": "https://en.wikipedia.org/wiki/List_of_artificial_objects_on_the_Moon",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "lcross",
+   "title": "LCROSS Centaur impact, Cabeus",
+   "agency": null,
+   "year": null,
+   "kind": "impactor",
+   "lat": -84.678,
+   "lon": -48.6926,
+   "approx": false,
+   "left": [],
+   "facts": [
+    {
+     "text": "On 9 October 2009 the spent Centaur rocket stage of NASA's LCROSS mission hit the permanently shadowed floor of Cabeus crater to throw up material for analysis.",
+     "source_name": "NASA: LCROSS",
+     "source_url": "https://science.nasa.gov/mission/lcross/",
+     "via": "curated"
+    },
+    {
+     "text": "The plume contained water: about 5.6 percent of the ejected soil was water ice (Colaprete et al., Science 2010).",
+     "source_name": "Colaprete et al. 2010, Science",
+     "source_url": "https://doi.org/10.1126/science.1186986",
+     "via": "curated"
+    },
+    {
+     "text": "The impactor weighed about 2,300 kg and struck at roughly 2.5 km/s, about 2.5 times faster than a rifle bullet.",
+     "source_name": "NASA: LCROSS",
+     "source_url": "https://science.nasa.gov/mission/lcross/",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "lcross_shep",
+   "title": "LCROSS shepherding spacecraft impact",
+   "agency": null,
+   "year": null,
+   "kind": "impactor",
+   "lat": -84.729,
+   "lon": -49.36,
+   "approx": false,
+   "left": [],
+   "facts": [
+    {
+     "text": "About four minutes behind the Centaur, the LCROSS shepherding spacecraft flew through the debris plume, measured it, and sent the data to Earth before it hit too.",
+     "source_name": "NASA: LCROSS",
+     "source_url": "https://science.nasa.gov/mission/lcross/",
+     "via": "curated"
+    },
+    {
+     "text": "Its spectrometers found water vapor and ice grains, plus hydrogen gas, carbon monoxide and other volatiles.",
+     "source_name": "Colaprete et al. 2010, Science",
+     "source_url": "https://doi.org/10.1126/science.1186986",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "athena",
+   "title": "Athena (IM-2) lander",
+   "agency": null,
+   "year": null,
+   "kind": "lander",
+   "lat": -84.79,
+   "lon": 29.2,
+   "approx": true,
+   "left": [],
+   "facts": [
+    {
+     "text": "Intuitive Machines' Athena landed near Mons Mouton in the south polar region on 6 March 2025, closer to the pole than any earlier lander.",
+     "source_name": "Wikipedia: IM-2",
+     "source_url": "https://en.wikipedia.org/wiki/IM-2",
+     "via": "curated"
+    },
+    {
+     "text": "It came to rest on its side in a crater and its battery ran out within a day, so the mission ended early. The position here is approximate.",
+     "source_name": "Wikipedia: IM-2",
+     "source_url": "https://en.wikipedia.org/wiki/IM-2",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "odysseus",
+   "title": "Odysseus (IM-1) lander",
+   "agency": null,
+   "year": null,
+   "kind": "lander",
+   "lat": -80.13,
+   "lon": 1.44,
+   "approx": false,
+   "left": [],
+   "facts": [
+    {
+     "text": "Odysseus touched down near Malapert A on 22 February 2024: the first US landing since Apollo 17 in 1972 and the first by a private company.",
+     "source_name": "NASA: LRO spots Odysseus",
+     "source_url": "https://www.nasa.gov/image-article/lro-spots-odysseus/",
+     "via": "curated"
+    },
+    {
+     "text": "It caught a footpad on the ground and tipped onto its side. NASA's Lunar Reconnaissance Orbiter photographed it two days later.",
+     "source_name": "NASA: LRO spots Odysseus",
+     "source_url": "https://www.nasa.gov/image-article/lro-spots-odysseus/",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "vikram2",
+   "title": "Chandrayaan-2 Vikram crash site",
+   "agency": null,
+   "year": null,
+   "kind": "crash",
+   "lat": -70.88,
+   "lon": 22.78,
+   "approx": false,
+   "left": [],
+   "facts": [
+    {
+     "text": "On 7 September 2019 India's Vikram lander lost contact about 2 km above the surface during its final descent and crashed.",
+     "source_name": "NASA: LRO spots Vikram crash site",
+     "source_url": "https://www.nasa.gov/image-article/nasa-lro-spots-chandrayaan-2-vikram-crash-site/",
+     "via": "curated"
+    },
+    {
+     "text": "LRO found the debris field months later; the first lead came from an amateur, engineer Shanmuga Subramanian.",
+     "source_name": "NASA: LRO spots Vikram crash site",
+     "source_url": "https://www.nasa.gov/image-article/nasa-lro-spots-chandrayaan-2-vikram-crash-site/",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "vikram3",
+   "title": "Chandrayaan-3 Vikram lander",
+   "agency": null,
+   "year": null,
+   "kind": "lander",
+   "lat": -69.373,
+   "lon": 32.319,
+   "approx": false,
+   "left": [],
+   "facts": [
+    {
+     "text": "On 23 August 2023 India made the first soft landing near the lunar south polar region, at 69.4 degrees south.",
+     "source_name": "Wikipedia: Chandrayaan-3",
+     "source_url": "https://en.wikipedia.org/wiki/Chandrayaan-3",
+     "via": "curated"
+    },
+    {
+     "text": "The Pragyan rover drove about 100 m from the lander and measured sulfur in the soil with its X-ray spectrometer.",
+     "source_name": "Wikipedia: Chandrayaan-3",
+     "source_url": "https://en.wikipedia.org/wiki/Chandrayaan-3",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "luna25",
+   "title": "Luna 25 crash site",
+   "agency": null,
+   "year": null,
+   "kind": "crash",
+   "lat": -57.865,
+   "lon": 61.36,
+   "approx": false,
+   "left": [],
+   "facts": [
+    {
+     "text": "Russia's Luna 25, its first lunar probe since 1976, crashed on 19 August 2023 after an orbit maneuver went wrong, aiming for the south polar region.",
+     "source_name": "Wikipedia: Luna 25",
+     "source_url": "https://en.wikipedia.org/wiki/Luna_25",
+     "via": "curated"
+    },
+    {
+     "text": "LRO later photographed a new crater about 10 m wide at the crash site.",
+     "source_name": "List of artificial objects on the Moon",
+     "source_url": "https://en.wikipedia.org/wiki/List_of_artificial_objects_on_the_Moon",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "apollo11",
+   "title": "Apollo 11 - Tranquility Base",
+   "agency": "NASA",
+   "year": 1969,
+   "kind": "crewed",
+   "lat": 0.674,
+   "lon": 23.473,
+   "approx": false,
+   "left": [
+    "Lunar Module Eagle descent stage",
+    "Laser retroreflector (100 prisms)",
+    "Passive seismometer",
+    "US flag",
+    "Plaque: We came in peace for all mankind",
+    "Silicon disc of goodwill messages"
+   ],
+   "facts": [
+    {
+     "text": "Armstrong and Aldrin spent 21 h 36 min on the surface on 20-21 July 1969, with one moonwalk of about 2 h 31 min.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 11",
+     "source_url": "https://www.hq.nasa.gov/alsj/a11/a11.html",
+     "via": "curated"
+    },
+    {
+     "text": "The laser reflector they placed is still used: observatories on Earth time laser echoes to measure the Moon's distance to the millimeter.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 11",
+     "source_url": "https://www.hq.nasa.gov/alsj/a11/a11.html",
+     "via": "curated"
+    },
+    {
+     "text": "The ascent engine blast knocked the flag over; the descent stage still stands as the launch pad.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 11",
+     "source_url": "https://www.hq.nasa.gov/alsj/a11/a11.html",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "apollo12",
+   "title": "Apollo 12 - Ocean of Storms",
+   "agency": "NASA",
+   "year": 1969,
+   "kind": "crewed",
+   "lat": -3.013,
+   "lon": -23.422,
+   "approx": false,
+   "left": [
+    "Lunar Module Intrepid descent stage",
+    "ALSEP science station with a nuclear power unit",
+    "US flag"
+   ],
+   "facts": [
+    {
+     "text": "Conrad and Bean landed about 155 m from the Surveyor 3 probe, a precision landing that proved Apollo could target a spot.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 12",
+     "source_url": "https://www.hq.nasa.gov/alsj/a12/a12.html",
+     "via": "curated"
+    },
+    {
+     "text": "They cut off Surveyor 3's camera and parts and brought them home to study how materials aged on the Moon.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 12",
+     "source_url": "https://www.hq.nasa.gov/alsj/a12/a12.html",
+     "via": "curated"
+    },
+    {
+     "text": "Their ALSEP was the first to run on a radioisotope generator and sent data until 1977.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 12",
+     "source_url": "https://www.hq.nasa.gov/alsj/a12/a12.html",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "apollo14",
+   "title": "Apollo 14 - Fra Mauro",
+   "agency": "NASA",
+   "year": 1971,
+   "kind": "crewed",
+   "lat": -3.645,
+   "lon": -17.471,
+   "approx": false,
+   "left": [
+    "Lunar Module Antares descent stage",
+    "ALSEP science station",
+    "Laser retroreflector (100 prisms)",
+    "Two golf balls",
+    "Modular equipment cart"
+   ],
+   "facts": [
+    {
+     "text": "Shepard and Mitchell climbed toward Cone crater hauling a two-wheeled equipment cart nicknamed the lunar rickshaw.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 14",
+     "source_url": "https://www.hq.nasa.gov/alsj/a14/a14.html",
+     "via": "curated"
+    },
+    {
+     "text": "At the end Shepard hit two golf balls with a makeshift 6-iron head.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 14",
+     "source_url": "https://www.hq.nasa.gov/alsj/a14/a14.html",
+     "via": "curated"
+    },
+    {
+     "text": "They returned 42 kg of rock from the Fra Mauro formation, ejecta from the Imbrium impact.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 14",
+     "source_url": "https://www.hq.nasa.gov/alsj/a14/a14.html",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "apollo15",
+   "title": "Apollo 15 - Hadley Rille",
+   "agency": "NASA",
+   "year": 1971,
+   "kind": "crewed",
+   "lat": 26.132,
+   "lon": 3.634,
+   "approx": false,
+   "left": [
+    "Lunar Module Falcon descent stage",
+    "Lunar Roving Vehicle",
+    "Laser retroreflector (300 prisms)",
+    "ALSEP science station",
+    "Fallen Astronaut memorial",
+    "US flag"
+   ],
+   "facts": [
+    {
+     "text": "Scott and Irwin drove the first Lunar Roving Vehicle about 28 km over three moonwalks beside the Hadley Rille canyon.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 15",
+     "source_url": "https://www.hq.nasa.gov/alsj/a15/a15.html",
+     "via": "curated"
+    },
+    {
+     "text": "Their retroreflector has 300 prisms, three times larger than the Apollo 11 and 14 arrays, and is the most used by ranging stations.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 15",
+     "source_url": "https://www.hq.nasa.gov/alsj/a15/a15.html",
+     "via": "curated"
+    },
+    {
+     "text": "They left a small aluminum figure, Fallen Astronaut, with a plaque naming astronauts and cosmonauts who died in the space race.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 15",
+     "source_url": "https://www.hq.nasa.gov/alsj/a15/a15.html",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "apollo16",
+   "title": "Apollo 16 - Descartes Highlands",
+   "agency": "NASA",
+   "year": 1972,
+   "kind": "crewed",
+   "lat": -8.973,
+   "lon": 15.5,
+   "approx": false,
+   "left": [
+    "Lunar Module Orion descent stage",
+    "Lunar Roving Vehicle",
+    "ALSEP science station",
+    "Far Ultraviolet Camera/Spectrograph",
+    "US flag"
+   ],
+   "facts": [
+    {
+     "text": "Young and Duke were the first to land in the lunar highlands, expecting volcanic rock; the samples turned out to be impact breccias.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 16",
+     "source_url": "https://www.hq.nasa.gov/alsj/a16/a16.html",
+     "via": "curated"
+    },
+    {
+     "text": "They brought back 95 kg of samples and drove the rover about 27 km.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 16",
+     "source_url": "https://www.hq.nasa.gov/alsj/a16/a16.html",
+     "via": "curated"
+    },
+    {
+     "text": "Duke left a photo of his family on the surface; it is still there, bleached by sunlight.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 16",
+     "source_url": "https://www.hq.nasa.gov/alsj/a16/a16.html",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "apollo17",
+   "title": "Apollo 17 - Taurus-Littrow",
+   "agency": "NASA",
+   "year": 1972,
+   "kind": "crewed",
+   "lat": 20.191,
+   "lon": 30.772,
+   "approx": false,
+   "left": [
+    "Lunar Module Challenger descent stage",
+    "Lunar Roving Vehicle",
+    "ALSEP science station",
+    "Plaque: Here man completed his first explorations of the Moon",
+    "US flag"
+   ],
+   "facts": [
+    {
+     "text": "Cernan and Schmitt, a geologist, were the last humans on the Moon, leaving on 14 December 1972.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 17",
+     "source_url": "https://www.hq.nasa.gov/alsj/a17/a17.html",
+     "via": "curated"
+    },
+    {
+     "text": "They drove about 36 km, the farthest of any crew, and found orange volcanic glass soil at Shorty crater.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 17",
+     "source_url": "https://www.hq.nasa.gov/alsj/a17/a17.html",
+     "via": "curated"
+    },
+    {
+     "text": "They returned 110 kg of samples, the most of any mission.",
+     "source_name": "Apollo Lunar Surface Journal: Apollo 17",
+     "source_url": "https://www.hq.nasa.gov/alsj/a17/a17.html",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "surveyor1",
+   "title": "Surveyor 1",
+   "agency": "NASA",
+   "year": 1966,
+   "kind": "lander",
+   "lat": -2.474,
+   "lon": -43.34,
+   "approx": false,
+   "left": [
+    "Surveyor lander (still on the surface)"
+   ],
+   "facts": [
+    {
+     "text": "On 2 June 1966 it made the first US soft landing on the Moon, proving the ground could carry a spacecraft.",
+     "source_name": "Wikipedia: Surveyor 1",
+     "source_url": "https://en.wikipedia.org/wiki/Surveyor_1",
+     "via": "curated"
+    },
+    {
+     "text": "It sent back more than 11,000 pictures before the lunar night ended its mission.",
+     "source_name": "Wikipedia: Surveyor 1",
+     "source_url": "https://en.wikipedia.org/wiki/Surveyor_1",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "surveyor3",
+   "title": "Surveyor 3",
+   "agency": "NASA",
+   "year": 1967,
+   "kind": "lander",
+   "lat": -2.995,
+   "lon": -23.341,
+   "approx": false,
+   "left": [
+    "Surveyor lander (camera and parts were taken home by Apollo 12)"
+   ],
+   "facts": [
+    {
+     "text": "Apollo 12's crew walked to it in November 1969 and cut off the TV camera and other parts for study on Earth.",
+     "source_name": "Wikipedia: Surveyor 3",
+     "source_url": "https://en.wikipedia.org/wiki/Surveyor_3",
+     "via": "curated"
+    },
+    {
+     "text": "It is the only spacecraft on the Moon that humans have visited.",
+     "source_name": "Wikipedia: Surveyor 3",
+     "source_url": "https://en.wikipedia.org/wiki/Surveyor_3",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "surveyor5",
+   "title": "Surveyor 5",
+   "agency": "NASA",
+   "year": 1967,
+   "kind": "lander",
+   "lat": 1.461,
+   "lon": 23.199,
+   "approx": false,
+   "left": [
+    "Surveyor lander"
+   ],
+   "facts": [
+    {
+     "text": "Its alpha-scattering instrument made the first chemical analysis of lunar soil on the spot, showing it was basalt-like.",
+     "source_name": "Wikipedia: Surveyor 5",
+     "source_url": "https://en.wikipedia.org/wiki/Surveyor_5",
+     "via": "curated"
+    },
+    {
+     "text": "It landed in Mare Tranquillitatis, near where Apollo 11 would land two years later.",
+     "source_name": "Wikipedia: Surveyor 5",
+     "source_url": "https://en.wikipedia.org/wiki/Surveyor_5",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "surveyor6",
+   "title": "Surveyor 6",
+   "agency": "NASA",
+   "year": 1967,
+   "kind": "lander",
+   "lat": 0.474,
+   "lon": -1.436,
+   "approx": false,
+   "left": [
+    "Surveyor lander (moved 2.4 m from its first spot)"
+   ],
+   "facts": [
+    {
+     "text": "On 17 November 1967 it fired its engines for 2.5 seconds, lifted about 4 m and landed 2.4 m away, the first liftoff from another world.",
+     "source_name": "Wikipedia: Surveyor 6",
+     "source_url": "https://en.wikipedia.org/wiki/Surveyor_6",
+     "via": "curated"
+    },
+    {
+     "text": "The hop let engineers photograph its own landing footprints and measure the soil.",
+     "source_name": "Wikipedia: Surveyor 6",
+     "source_url": "https://en.wikipedia.org/wiki/Surveyor_6",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "surveyor7",
+   "title": "Surveyor 7",
+   "agency": "NASA",
+   "year": 1968,
+   "kind": "lander",
+   "lat": -40.979,
+   "lon": -11.513,
+   "approx": false,
+   "left": [
+    "Surveyor lander"
+   ],
+   "facts": [
+    {
+     "text": "The last Surveyor landed in the highlands beside Tycho crater in January 1968.",
+     "source_name": "Wikipedia: Surveyor 7",
+     "source_url": "https://en.wikipedia.org/wiki/Surveyor_7",
+     "via": "curated"
+    },
+    {
+     "text": "Two laser beams fired from Earth were seen by its camera, the first lasers detected on the Moon.",
+     "source_name": "Wikipedia: Surveyor 7",
+     "source_url": "https://en.wikipedia.org/wiki/Surveyor_7",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "luna9",
+   "title": "Luna 9",
+   "agency": "USSR",
+   "year": 1966,
+   "kind": "lander",
+   "lat": 7.08,
+   "lon": -64.37,
+   "approx": false,
+   "left": [
+    "Landing capsule"
+   ],
+   "facts": [
+    {
+     "text": "On 3 February 1966 it made the first soft landing on the Moon and sent the first pictures from the surface.",
+     "source_name": "Wikipedia: Luna 9",
+     "source_url": "https://en.wikipedia.org/wiki/Luna_9",
+     "via": "curated"
+    },
+    {
+     "text": "Its landing proved the surface was solid enough for a lander, not deep dust.",
+     "source_name": "Wikipedia: Luna 9",
+     "source_url": "https://en.wikipedia.org/wiki/Luna_9",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "lunokhod1",
+   "title": "Lunokhod 1",
+   "agency": "USSR",
+   "year": 1970,
+   "kind": "rover",
+   "lat": 38.238,
+   "lon": -35.007,
+   "approx": false,
+   "left": [
+    "Lunokhod 1 rover",
+    "Luna 17 landing stage",
+    "French laser retroreflector"
+   ],
+   "facts": [
+    {
+     "text": "The first remote-controlled rover on another world drove 10.5 km over 11 months, steered by a crew on Earth.",
+     "source_name": "Wikipedia: Lunokhod 1",
+     "source_url": "https://en.wikipedia.org/wiki/Lunokhod_1",
+     "via": "curated"
+    },
+    {
+     "text": "LRO photographed it in 2010 and a laser echo from its reflector was received that April, after decades of being lost.",
+     "source_name": "Wikipedia: Lunokhod 1",
+     "source_url": "https://en.wikipedia.org/wiki/Lunokhod_1",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "lunokhod2",
+   "title": "Lunokhod 2",
+   "agency": "USSR",
+   "year": 1973,
+   "kind": "rover",
+   "lat": 25.851,
+   "lon": 30.453,
+   "approx": false,
+   "left": [
+    "Lunokhod 2 rover",
+    "Luna 21 landing stage",
+    "French laser retroreflector"
+   ],
+   "facts": [
+    {
+     "text": "It drove about 39 km in four months in Le Monnier crater, a distance record for another world that stood for decades.",
+     "source_name": "Wikipedia: Lunokhod 2",
+     "source_url": "https://en.wikipedia.org/wiki/Lunokhod_2",
+     "via": "curated"
+    },
+    {
+     "text": "It stopped after the lid fell on dust-covered radiators and overheated it.",
+     "source_name": "Wikipedia: Lunokhod 2",
+     "source_url": "https://en.wikipedia.org/wiki/Lunokhod_2",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "luna16",
+   "title": "Luna 16",
+   "agency": "USSR",
+   "year": 1970,
+   "kind": "sample",
+   "lat": -0.68,
+   "lon": 56.3,
+   "approx": false,
+   "left": [
+    "Descent stage (the return capsule brought 101 g of soil to Earth)"
+   ],
+   "facts": [
+    {
+     "text": "In September 1970 it drilled into Mare Fecunditatis and returned 101 g of soil, the first robotic sample return from another world.",
+     "source_name": "Wikipedia: Luna 16",
+     "source_url": "https://en.wikipedia.org/wiki/Luna_16",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "luna24",
+   "title": "Luna 24",
+   "agency": "USSR",
+   "year": 1976,
+   "kind": "sample",
+   "lat": 12.75,
+   "lon": 62.2,
+   "approx": false,
+   "left": [
+    "Descent stage (the return capsule brought 170 g of core to Earth)"
+   ],
+   "facts": [
+    {
+     "text": "The last Soviet lunar mission drilled a 2 m core in Mare Crisium and returned 170 g of it in August 1976.",
+     "source_name": "Wikipedia: Luna 24",
+     "source_url": "https://en.wikipedia.org/wiki/Luna_24",
+     "via": "curated"
+    },
+    {
+     "text": "After it, no spacecraft softly landed on the Moon for 37 years until Chang'e 3.",
+     "source_name": "Wikipedia: Luna 24",
+     "source_url": "https://en.wikipedia.org/wiki/Luna_24",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "change3",
+   "title": "Chang'e 3 and Yutu",
+   "agency": "CNSA",
+   "year": 2013,
+   "kind": "rover",
+   "lat": 44.121,
+   "lon": -19.512,
+   "approx": false,
+   "left": [
+    "Chang'e 3 lander",
+    "Yutu rover"
+   ],
+   "facts": [
+    {
+     "text": "On 14 December 2013 China made the first soft landing on the Moon in 37 years, in Mare Imbrium.",
+     "source_name": "Wikipedia: Chang'e 3",
+     "source_url": "https://en.wikipedia.org/wiki/Chang%27e_3",
+     "via": "curated"
+    },
+    {
+     "text": "Yutu's ground-penetrating radar found distinct layers of lava flows beneath the surface.",
+     "source_name": "Wikipedia: Chang'e 3",
+     "source_url": "https://en.wikipedia.org/wiki/Chang%27e_3",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "change4",
+   "title": "Chang'e 4 and Yutu-2",
+   "agency": "CNSA",
+   "year": 2019,
+   "kind": "rover",
+   "lat": -45.446,
+   "lon": 177.599,
+   "approx": false,
+   "left": [
+    "Chang'e 4 lander",
+    "Yutu-2 rover"
+   ],
+   "facts": [
+    {
+     "text": "On 3 January 2019 it made the first soft landing on the far side of the Moon, in Von Karman crater, with a relay satellite to reach Earth.",
+     "source_name": "Wikipedia: Chang'e 4",
+     "source_url": "https://en.wikipedia.org/wiki/Chang%27e_4",
+     "via": "curated"
+    },
+    {
+     "text": "Yutu-2 has driven for years, longer than any earlier lunar rover, and found unusual mantle-like rock.",
+     "source_name": "Wikipedia: Chang'e 4",
+     "source_url": "https://en.wikipedia.org/wiki/Chang%27e_4",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "change5",
+   "title": "Chang'e 5",
+   "agency": "CNSA",
+   "year": 2020,
+   "kind": "sample",
+   "lat": 43.058,
+   "lon": -51.916,
+   "approx": false,
+   "left": [
+    "Lander (the ascender took 1.7 kg of samples home)",
+    "Fabric flag of China"
+   ],
+   "facts": [
+    {
+     "text": "In December 2020 it returned 1,731 g of the youngest lunar rock yet, from lava about 2 billion years old.",
+     "source_name": "Wikipedia: Chang'e 5",
+     "source_url": "https://en.wikipedia.org/wiki/Chang%27e_5",
+     "via": "curated"
+    },
+    {
+     "text": "It was the first lunar sample return since Luna 24 in 1976.",
+     "source_name": "Wikipedia: Chang'e 5",
+     "source_url": "https://en.wikipedia.org/wiki/Chang%27e_5",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "change6",
+   "title": "Chang'e 6",
+   "agency": "CNSA",
+   "year": 2024,
+   "kind": "sample",
+   "lat": -41.639,
+   "lon": -153.986,
+   "approx": false,
+   "left": [
+    "Lander (the ascender took 1.9 kg of far-side samples home)"
+   ],
+   "facts": [
+    {
+     "text": "In June 2024 it brought back the first samples from the far side of the Moon, from Apollo basin inside the South Pole-Aitken basin.",
+     "source_name": "Wikipedia: Chang'e 6",
+     "source_url": "https://en.wikipedia.org/wiki/Chang%27e_6",
+     "via": "curated"
+    }
+   ]
+  },
+  {
+   "id": "slim",
+   "title": "SLIM",
+   "agency": "JAXA",
+   "year": 2024,
+   "kind": "lander",
+   "lat": -13.316,
+   "lon": 25.251,
+   "approx": false,
+   "left": [
+    "SLIM lander (resting on its nose)",
+    "Two small probes, LEV-1 and LEV-2"
+   ],
+   "facts": [
+    {
+     "text": "On 19 January 2024 Japan's lander came down within about 55 m of its target, a pinpoint landing near Shioli crater.",
+     "source_name": "Wikipedia: SLIM",
+     "source_url": "https://en.wikipedia.org/wiki/Smart_Lander_for_Investigating_Moon",
+     "via": "curated"
+    },
+    {
+     "text": "It tipped onto its nose and its solar cells faced the wrong way, yet it worked for days and woke up again after lunar nights.",
+     "source_name": "Wikipedia: SLIM",
+     "source_url": "https://en.wikipedia.org/wiki/Smart_Lander_for_Investigating_Moon",
+     "via": "curated"
+    }
+   ]
+  }
+ ]
+}
