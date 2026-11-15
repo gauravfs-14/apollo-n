@@ -1,16 +1,17 @@
 "use client";
-// Cinematic timeline shared by the 3D scene and the HUD (countdown, captions, skip).
+// Cinematic timeline shared by the 3D scene and the HUD (countdown, skip). Captions come from the comms loop.
 import { create } from "zustand";
 
+// Timed to the real Apollo 11 count (PAO tape 15/1): ignition sequence at T-8.9 s,
+// liftoff at zero; the ascent leaves room for the staging and TLI calls (game/data/missionComms.ts).
 export const T = {
-  speak: 0.4,
-  countStart: 1, // T-10
-  ignition: 8, // T-3
-  liftoff: 11, // T-0
-  spaceCut: 24,
-  sep1: 30,
-  sep2: 36,
-  end: 44,
+  countStart: 11, // T-10
+  ignition: 12.1, // T-8.9: "ignition sequence start"
+  liftoff: 21, // T-0
+  spaceCut: 35,
+  sep1: 46, // "Staging and ignition"
+  sep2: 60,
+  end: 88, // after "That Saturn gave us a magnificent ride"
 } as const;
 
 interface Clock {
@@ -28,15 +29,3 @@ export const useLaunchClock = create<Clock>((set) => ({
   skip: () => set({ skipped: true }),
   reset: () => set({ t: 0, skipped: false }),
 }));
-
-export const captionAt = (t: number): string => {
-  if (t < T.countStart) return "Mission control: all stations, final poll.";
-  if (t < T.ignition) return "Countdown.";
-  if (t < T.liftoff) return "Main engine start.";
-  if (t < T.liftoff + 1.5) return "Liftoff.";
-  if (t < T.spaceCut) return "Clearing the tower. Rolling to the flight path.";
-  if (t < T.sep1) return "Going through max-Q. Above the atmosphere.";
-  if (t < T.sep2) return "First stage separation. Second stage burning.";
-  if (t < T.end - 1) return "Translunar injection. The Moon is ahead.";
-  return "On course for the Moon.";
-};

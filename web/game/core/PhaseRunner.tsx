@@ -9,6 +9,7 @@ import { create } from "zustand";
 import type { PhaseId, PhaseModule } from "../types";
 import { LoadingScreen } from "../ui/LoadingScreen";
 import { useLoadingHolds } from "./loading";
+import { CommsCaption, MissionAudio } from "./MissionAudio";
 import { PHASE_TRACK, setBaseMusic, setMusicOverride } from "./music";
 import { getLoadedPhase, loadPhase, preloadAssets, preloadNext } from "./phases";
 import { PerfOverlay, PerfProbe, QUALITY } from "./perf";
@@ -189,6 +190,8 @@ export function PhaseRunner() {
         <PerfProbe phase={phaseId} />
       </Canvas>
       <div className="pointer-events-none fixed inset-0 z-10">{Hud && <Hud key={phaseId} />}</div>
+      <MissionAudio phase={phaseId} />
+      <CommsCaption />
       <PhaseLoading visible={loading} phase={phaseId} status={status} onForce={() => setForced(phaseId)} />
       <PerfOverlay />
     </div>

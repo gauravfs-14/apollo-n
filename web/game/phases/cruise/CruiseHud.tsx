@@ -2,7 +2,8 @@
 /* eslint-disable react-hooks/purity, react-hooks/refs, react-hooks/set-state-in-effect, react-hooks/exhaustive-deps, react-hooks/immutability, react-hooks/preserve-manual-memoization -- timers, refs and three.js state are intentionally imperative here */
 // Cruise HUD: runs plan.cruise hurdles in order. Briefing -> play -> score card, driven by phaseData.cruise.
 import { useCallback, useEffect, useRef } from "react";
-import { speak, stopVoice } from "../../core/audio";
+import { commsIdle, say } from "../../core/comms";
+import { CRUISE_CHATTER, HURDLE_MISS, HURDLE_OK } from "../../data/missionComms";
 import { setMusicOverride } from "../../core/music";
 import { usePhaseData, useGame } from "../../core/useGame";
 import { perkEffects, PERKS, type PerkId } from "../../data/perks";
@@ -61,7 +62,6 @@ export function CruiseHud() {
     rt.progress = 0;
     setDebris(false);
     rt.playing = false;
-    stopVoice();
   }, []);
 
   // debris layer lifetime: whole hurdle (brief + play)
@@ -85,11 +85,38 @@ export function CruiseHud() {
     rt.playing = debrisOn && stage === "play";
   }, [debrisOn, stage]);
 
-  // story: spoken once per briefing
+  // story: Houston calls it up once per briefing (cuts any chatter on the loop)
+  const lastTalk = useRef(0);
   useEffect(() => {
-    if (hurdle && stage === "brief") speak(hurdle.story, `cruise_${idx}`);
-    return () => stopVoice();
+    if (!hurdle || stage !== "brief") return;
+    say({ who: "capcom", text: hurdle.story }, { once: `story:${plan?.id}:${idx}` }); // waits its turn: never cuts the crew off
+    lastTalk.current = Date.now();
   }, [hurdle, idx, stage]);
+
+  // Houston acknowledges each result
+  useEffect(() => {
+    if (stage !== "done") return;
+    const pool = (data.lastScore ?? 0) >= 60 ? HURDLE_OK : HURDLE_MISS;
+    say(pool[(idx + seed) % pool.length], { once: `ack:${plan?.id}:${idx}` });
+    lastTalk.current = Date.now();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per result
+  }, [stage, idx]);
+
+  // the real coast chatter fills quiet stretches (never during a hurdle)
+  useEffect(() => {
+    let next = seed % CRUISE_CHATTER.length;
+    const iv = setInterval(() => {
+      if (stageRef.current === "play" || !commsIdle() || Date.now() - lastTalk.current < 24000) return;
+      say(CRUISE_CHATTER[next]);
+      next = (next + 1) % CRUISE_CHATTER.length;
+      lastTalk.current = Date.now();
+    }, 3000);
+    return () => clearInterval(iv);
+  }, [seed]);
+  const stageRef = useRef(stage);
+  useEffect(() => {
+    stageRef.current = stage;
+  }, [stage]);
 
   useEffect(() => {
     setMusicOverride(stage === "play" ? "hurdle" : null);

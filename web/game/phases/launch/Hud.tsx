@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "../../core/useGame";
 import { Button } from "../../ui/kit";
-import { T, captionAt, useLaunchClock } from "./clock";
+import { T, useLaunchClock } from "./clock";
 import { phaseLabel } from "../../ui/phaseLabel";
 
 export function LaunchHud() {
@@ -33,7 +33,6 @@ export function LaunchHud() {
       <div className="pointer-events-none absolute left-1/2 top-16 -translate-x-1/2 text-center [text-shadow:0_1px_12px_rgba(0,0,0,0.8)]">
         <div className={`num text-4xl tracking-wider ${counting && tMinus <= 5 ? "text-amber" : "text-white"}`}>{t >= T.countStart ? clock : "T-10"}</div>
       </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-8 text-center text-sm text-white/90 [text-shadow:0_1px_10px_rgba(0,0,0,0.9)]">{captionAt(t)}</div>
       {showSkip && t < T.end - 2 && (
         <div className="absolute bottom-6 right-6">
           <Button variant="ghost" onClick={skip}>Skip</Button>

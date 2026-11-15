@@ -1,5 +1,6 @@
 #!/bin/sh
 # Procedurally synthesizes P2's sfx with ffmpeg (no external assets, no licensing). Output: web/public/audio/sfx/
+# rocket_roar, ignition and staging are ElevenLabs sound effects (see assets-src/credits/audio.md), not generated here.
 set -e
 O="$(cd "$(dirname "$0")" && pwd)/../../web/public/audio/sfx"; mkdir -p "$O"
 F="ffmpeg -y -loglevel error"
@@ -12,13 +13,12 @@ $F -f lavfi -i "aevalsrc='(sin(2*PI*150*t)+0.5*sin(2*PI*300*t))*0.35*exp(-6*t)':
 $F -f lavfi -i "anoisesrc=d=1.4:c=white:r=44100:a=0.5" -af "highpass=f=2500,lowpass=f=9000,afade=t=in:d=0.1,afade=t=out:st=0.5:d=0.9" $M $O/hiss.mp3
 $F -f lavfi -i "anoisesrc=d=0.5:c=brown:r=44100:a=0.9" -af "lowpass=f=300,afade=t=out:st=0.05:d=0.45" $M $O/thunk.mp3
 $F -f lavfi -i "anoisesrc=d=3:c=brown:r=44100:a=0.9" -af "lowpass=f=140,afade=t=in:d=1.2,afade=t=out:st=1.8:d=1.2" $M $O/rumble.mp3
-$F -f lavfi -i "anoisesrc=d=20:c=pink:r=44100:a=0.9" -af "lowpass=f=1400,highpass=f=40,tremolo=f=38:d=0.25,afade=t=in:d=3,afade=t=out:st=14:d=6" $M $O/rocket_roar.mp3
 $F -f lavfi -i "anoisesrc=d=1.6:c=white:r=44100:a=0.7" -af "highpass=f=600,lowpass=f=5000,afade=t=in:d=0.25,afade=t=out:st=0.3:d=1.3" $M $O/whoosh.mp3
-$F -f lavfi -i "anoisesrc=d=5:c=brown:r=44100:a=0.8" -af "lowpass=f=900,afade=t=in:d=4,afade=t=out:st=4.2:d=0.8" $M $O/ignition.mp3
 $F -f lavfi -i "aevalsrc='(sin(2*PI*90*t)*0.8)*exp(-12*t)':d=0.5:s=44100" $M $O/boom.mp3
 
 # Edge fades on every file: a waveform that starts or stops abruptly is heard as a speaker click.
-for f in $O/*.mp3; do
+for f in clank click beep chime buzz hiss thunk rumble whoosh boom; do
+  f="$O/$f.mp3"
   # decoded length (the mp3 header length includes encoder padding)
   d=$(ffmpeg -v error -i "$f" -f s16le -ac 1 -ar 44100 - | wc -c | awk '{print $1 / 88200}')
   st=$(python3 -c "print(max(0, $d - 0.03))")

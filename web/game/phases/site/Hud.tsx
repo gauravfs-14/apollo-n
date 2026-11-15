@@ -7,6 +7,8 @@ import { suggestSpot, type Breakdown } from "./api";
 import { useSiteActions, useSiteState } from "./actions";
 import { useSiteUi } from "./ui";
 import { phaseLabel } from "../../ui/phaseLabel";
+import { say } from "../../core/comms";
+import { SITE_CONFIRMED } from "../../data/missionComms";
 
 const MODES: { id: OverlayMode; label: string; text: (tilt: number) => string }[] = [
   { id: "none", label: "Off", text: () => "Natural view. Black areas are in shadow from the low Sun right now." },
@@ -123,6 +125,12 @@ function Report() {
   const { plan } = useGame();
   const sc = sd.report;
   const sim = sd.sim;
+  useEffect(() => {
+    if (sd.director) say({ who: "capcom", text: sd.director }, { once: `director:${sd.director}` });
+  }, [sd.director]);
+  useEffect(() => {
+    if (sim) say(SITE_CONFIRMED, { once: `doi:${plan?.id}` });
+  }, [sim, plan?.id]);
   const tone = !sc ? "default" : sc.score >= 70 ? "go" : sc.score >= 45 ? "default" : "nogo";
   if (!sd.probe)
     return (

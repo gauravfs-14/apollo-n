@@ -1,8 +1,9 @@
 "use client";
 import { create } from "zustand";
 
-export const TOTAL = 24; // seconds, whole cinematic
-export const DESCENT = 19; // touchdown moment
+// Long enough for the real descent loop: GO for landing, the 1202 alarm, the altitude calls.
+export const TOTAL = 53; // seconds, whole cinematic
+export const DESCENT = 45; // touchdown moment
 
 interface LandingUi {
   t: number;

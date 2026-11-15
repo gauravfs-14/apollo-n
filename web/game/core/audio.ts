@@ -3,6 +3,7 @@
 // Voice: asks the API for a cached audio URL (ElevenLabs later). If the API has
 // no voice provider, falls back to the browser's system speech synthesis.
 import { Howl, Howler } from "howler";
+import { create } from "zustand";
 import { api } from "./api";
 
 // Howler closes and re-creates its AudioContext the first time a sound plays when the
@@ -137,7 +138,61 @@ export function playMusic(src: string, level = 0.35) {
   startTrack(music);
 }
 
+// ---- Ambience ----
+// Room tone under the action (control room, cabin hum, suit breathing). Beds are short
+// loops, decoded once and crossfaded into themselves so the seam is never heard.
+let amb: { src: string; gain: GainNode; timer: ReturnType<typeof setTimeout> | null } | null = null;
+const AMB_XF = 1.5;
+
+export function playAmbience(src: string | null, level = 0.25) {
+  if (typeof window === "undefined" || amb?.src === src) return;
+  const g = audioGraph();
+  if (!g) return;
+  const { ctx, out } = g;
+  if (amb) {
+    const old = amb;
+    if (old.timer) clearTimeout(old.timer);
+    ramp(old.gain, 0, 1.2);
+    setTimeout(() => old.gain.disconnect(), 1400);
+    amb = null;
+  }
+  if (!src) return;
+  const gain = ctx.createGain();
+  gain.gain.value = 0;
+  gain.connect(out);
+  const me = { src, gain, timer: null as ReturnType<typeof setTimeout> | null };
+  amb = me;
+  loadBuffer(ctx, src)
+    .then((buf) => {
+      if (amb !== me) return;
+      ramp(gain, level, 2);
+      // schedule overlapping copies: each fades in while the previous fades out
+      let next = ctx.currentTime + 0.05;
+      const step = Math.max(1, buf.duration - AMB_XF);
+      const schedule = () => {
+        if (amb !== me) return;
+        while (next < ctx.currentTime + step + 1) {
+          const s = ctx.createBufferSource();
+          s.buffer = buf;
+          const xg = ctx.createGain();
+          xg.gain.setValueAtTime(0, next);
+          xg.gain.linearRampToValueAtTime(1, next + AMB_XF);
+          xg.gain.setValueAtTime(1, next + buf.duration - AMB_XF);
+          xg.gain.linearRampToValueAtTime(0, next + buf.duration);
+          s.connect(xg).connect(gain);
+          s.start(next);
+          s.stop(next + buf.duration + 0.05);
+          next += step;
+        }
+        me.timer = setTimeout(schedule, step * 500);
+      };
+      schedule();
+    })
+    .catch(() => {});
+}
+
 if (typeof window !== "undefined") {
+  (window as unknown as { __ambience: () => string | null }).__ambience = () => amb?.src.split("/").pop() ?? null;
   (window as unknown as { __music: () => object | null }).__music = () =>
     music && {
       src: music.src.split("/").pop(),
@@ -268,37 +323,84 @@ function speakSystem(text: string, my: number): Promise<void> {
 }
 
 // ---- Mission radio (ElevenLabs lines) ----
-// Lines are played through a radio chain on the shared AudioContext: comms-band
-// filters, mild saturation, compression and a static bed. Houston (capcom) lines
-// are bracketed by Quindar tones (2525 Hz in, 2475 Hz out), as on Apollo; crew
-// lines come from the Moon, so they sound narrower and noisier.
-export type Speaker = "capcom" | "crew";
+// Lines are played through a radio chain on the shared AudioContext. Each speaker
+// has a profile: Houston (capcom) is a clean-ish ground line bracketed by Quindar
+// tones (2525 Hz in, 2475 Hz out), as on Apollo; the crew talk from space, so their
+// lines are narrower and noisier; the PAO commentator is a broadcast feed. Voice and
+// static share one AGC compressor, so the static ducks while someone talks and swells
+// in the pauses, the "pumping" heard on real air-to-ground recordings.
+export type Speaker = "capcom" | "crew" | "crew2" | "pao";
+
+interface RadioProfile {
+  hp: number; // band edges, Hz
+  lp: number;
+  drive: number; // saturation
+  lead: number; // channel open (key-up, Quindar) before the voice, s
+  quindar: boolean;
+  squelch: number; // squelch tail level (0 = none)
+  waver: number; // lowest voice level while fading (1 = steady)
+  dropouts: boolean;
+  hiss: number; // static level
+  hissBand: number;
+  drift: number; // how far the static drifts up
+  keyUp: number; // key-up rush level
+  pops: number; // crackles per second
+  pop: number; // crackle level
+}
+
+const PROFILES: Record<Speaker, RadioProfile> = {
+  capcom: { hp: 300, lp: 3400, drive: 1.6, lead: 0.38, quindar: true, squelch: 0.35, waver: 0.9, dropouts: false, hiss: 0.06, hissBand: 2400, drift: 1.6, keyUp: 0.3, pops: 0.9, pop: 0.14 },
+  crew: { hp: 450, lp: 2700, drive: 2.6, lead: 0.18, quindar: false, squelch: 0.6, waver: 0.82, dropouts: true, hiss: 0.11, hissBand: 1800, drift: 2.2, keyUp: 0.5, pops: 3, pop: 0.28 },
+  crew2: { hp: 420, lp: 2800, drive: 2.4, lead: 0.18, quindar: false, squelch: 0.55, waver: 0.84, dropouts: true, hiss: 0.1, hissBand: 1900, drift: 2.1, keyUp: 0.45, pops: 2.6, pop: 0.25 },
+  pao: { hp: 140, lp: 5600, drive: 1.25, lead: 0.06, quindar: false, squelch: 0, waver: 0.97, dropouts: false, hiss: 0.025, hissBand: 3200, drift: 1.2, keyUp: 0, pops: 0.15, pop: 0.05 },
+};
 
 const bufCache = new Map<string, Promise<AudioBuffer>>();
 let radio: { stop: () => void } | null = null;
 let noiseBuf: AudioBuffer | null = null;
 let whiteBuf: AudioBuffer | null = null;
-let shaperCurves: Record<Speaker, Float32Array<ArrayBuffer>> | null = null;
+const shaperCurves = new Map<number, Float32Array<ArrayBuffer>>();
 
 function loadBuffer(ctx: AudioContext, url: string): Promise<AudioBuffer> {
   let p = bufCache.get(url);
   if (!p) {
     p = fetch(url)
       .then((r) => r.arrayBuffer())
-      .then((b) => ctx.decodeAudioData(b));
+      .then((b) => ctx.decodeAudioData(b))
+      .then((b) => trimSilence(ctx, b));
     p.catch(() => bufCache.delete(url));
     bufCache.set(url, p);
-    if (bufCache.size > 24) bufCache.delete(bufCache.keys().next().value!);
+    if (bufCache.size > 60) bufCache.delete(bufCache.keys().next().value!);
   }
   return p;
 }
 
+/** TTS clips carry silence at both ends; trim it so lines (and countdown numbers) start on cue. */
+function trimSilence(ctx: BaseAudioContext, b: AudioBuffer): AudioBuffer {
+  const d = b.getChannelData(0);
+  const th = 0.012;
+  let s = 0;
+  while (s < d.length && Math.abs(d[s]) < th) s++;
+  let e = d.length - 1;
+  while (e > s && Math.abs(d[e]) < th) e--;
+  s = Math.max(0, s - Math.round(b.sampleRate * 0.03)); // keep a breath of lead-in
+  e = Math.min(d.length - 1, e + Math.round(b.sampleRate * 0.08)); // and the word's decay
+  if (e - s < b.sampleRate * 0.1 || (s === 0 && e === d.length - 1)) return b;
+  const out = ctx.createBuffer(b.numberOfChannels, e - s + 1, b.sampleRate);
+  for (let c = 0; c < b.numberOfChannels; c++) out.copyToChannel(b.getChannelData(c).subarray(s, e + 1), c);
+  return out;
+}
+
 function radioCurve(drive: number) {
-  const n = 1024;
-  const c = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const x = (i / (n - 1)) * 2 - 1;
-    c[i] = Math.tanh(drive * x) / Math.tanh(drive);
+  let c = shaperCurves.get(drive);
+  if (!c) {
+    const n = 1024;
+    c = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      c[i] = Math.tanh(drive * x) / Math.tanh(drive);
+    }
+    shaperCurves.set(drive, c);
   }
   return c;
 }
@@ -329,15 +431,13 @@ const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 /** Schedule one radio transmission on `ctx` (realtime or offline). */
 function scheduleRadio(ctx: BaseAudioContext, out: AudioNode, buf: AudioBuffer, speaker: Speaker) {
-  shaperCurves ??= { capcom: radioCurve(1.6), crew: radioCurve(2.6) };
-  const crew = speaker === "crew";
+  const P = PROFILES[speaker];
   const t0 = ctx.currentTime + 0.05;
-  const lead = crew ? 0.18 : 0.38; // Quindar tone + gap before the voice
-  const vStart = t0 + lead;
+  const vStart = t0 + P.lead;
   const vEnd = vStart + buf.duration;
-  const squelchAt = crew ? vEnd + 0.08 : vEnd + 0.42; // after Houston's closing Quindar tone
-  const squelchLen = crew ? 0.26 : 0.16;
-  const end = squelchAt + squelchLen + 0.04;
+  const squelchAt = P.quindar ? vEnd + 0.42 : vEnd + 0.08; // Houston's squelch comes after the closing Quindar tone
+  const squelchLen = speaker === "capcom" ? 0.16 : 0.26;
+  const end = (P.squelch ? squelchAt + squelchLen : vEnd + 0.1) + 0.04;
 
   const bus = ctx.createGain();
   bus.connect(out);
@@ -362,29 +462,42 @@ function scheduleRadio(ctx: BaseAudioContext, out: AudioNode, buf: AudioBuffer, 
     nodes.push(n);
   };
 
-  // voice through the comms chain
+  // AGC: voice and static share one compressor, so the static ducks under speech
+  const agc = ctx.createDynamicsCompressor();
+  agc.threshold.value = -30;
+  agc.ratio.value = 6;
+  agc.knee.value = 6;
+  agc.attack.value = 0.008;
+  agc.release.value = 0.25;
+  const makeup = ctx.createGain();
+  makeup.gain.value = 1.35;
+  agc.connect(makeup).connect(bus);
+
+  // voice through the comms band: two filters per edge for the steep skirts of a real radio channel
   const src = ctx.createBufferSource();
   src.buffer = buf;
-  const hp = ctx.createBiquadFilter();
-  hp.type = "highpass";
-  hp.frequency.value = crew ? 450 : 300;
-  const lp = ctx.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = crew ? 2700 : 3400;
+  let node: AudioNode = src;
+  for (const [type, f] of [
+    ["highpass", P.hp],
+    ["highpass", P.hp],
+    ["lowpass", P.lp],
+    ["lowpass", P.lp],
+  ] as const) {
+    const bq = ctx.createBiquadFilter();
+    bq.type = type;
+    bq.frequency.value = f;
+    bq.Q.value = 0.6;
+    node = node.connect(bq);
+  }
   const shaper = ctx.createWaveShaper();
-  shaper.curve = shaperCurves[speaker];
+  shaper.curve = radioCurve(P.drive);
   shaper.oversample = "2x";
-  const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -26;
-  comp.ratio.value = 4;
-  comp.attack.value = 0.004;
-  comp.release.value = 0.12;
   const vox = ctx.createGain();
   // signal fading: the voice level wavers a little; crew lines also drop out briefly
-  const base = 0.95;
+  const base = 0.8;
   vox.gain.setValueAtTime(base, vStart);
-  for (let t = vStart + 0.15; t < vEnd; t += rand(0.12, 0.22)) vox.gain.linearRampToValueAtTime(base * rand(crew ? 0.82 : 0.9, 1.04), t);
-  if (crew && buf.duration > 2) {
+  if (P.waver < 1) for (let t = vStart + 0.15; t < vEnd; t += rand(0.12, 0.22)) vox.gain.linearRampToValueAtTime(base * rand(P.waver, 1.04), t);
+  if (P.dropouts && buf.duration > 2) {
     for (let i = 0; i < (buf.duration > 4 ? 2 : 1); i++) {
       const d = rand(vStart + 0.5, vEnd - 0.4);
       vox.gain.setValueAtTime(base, d);
@@ -394,47 +507,44 @@ function scheduleRadio(ctx: BaseAudioContext, out: AudioNode, buf: AudioBuffer, 
     }
   }
   vox.gain.linearRampToValueAtTime(base, vEnd);
-  src.connect(hp).connect(lp).connect(shaper).connect(comp).connect(vox).connect(bus);
+  node.connect(shaper).connect(vox).connect(agc);
   src.start(vStart);
   nodes.push(src);
 
-  // static bed while the channel is open
+  // static bed while the channel is open (through the AGC)
   const hiss = ctx.createBufferSource();
   hiss.buffer = noise(ctx);
   hiss.loop = true;
   const bp = ctx.createBiquadFilter();
   bp.type = "bandpass";
-  bp.frequency.value = crew ? 1800 : 2400;
+  bp.frequency.value = P.hissBand;
   bp.Q.value = 0.6;
   const hg = ctx.createGain();
-  const level = crew ? 0.11 : 0.06;
+  const level = P.hiss;
+  const closeAt = P.squelch ? squelchAt : vEnd;
   hg.gain.setValueAtTime(0, t0);
   hg.gain.linearRampToValueAtTime(level, t0 + 0.04);
-  // the static drifts up and down like a fading signal
-  for (let t = t0 + 0.2; t < squelchAt - 0.1; t += rand(0.15, 0.35)) hg.gain.linearRampToValueAtTime(level * rand(0.5, crew ? 2.2 : 1.6), t);
-  hg.gain.linearRampToValueAtTime(level, squelchAt);
+  for (let t = t0 + 0.2; t < closeAt - 0.1; t += rand(0.15, 0.35)) hg.gain.linearRampToValueAtTime(level * rand(0.5, P.drift), t);
+  hg.gain.linearRampToValueAtTime(level, closeAt);
   hg.gain.setValueAtTime(level, end - 0.05);
   hg.gain.linearRampToValueAtTime(0, end);
-  hiss.connect(bp).connect(hg).connect(bus);
+  hiss.connect(bp).connect(hg).connect(agc);
   hiss.start(t0);
   hiss.stop(end + 0.05);
   nodes.push(hiss);
 
   // mic key-up: a short rush of noise as the channel opens
-  burst(t0, crew ? 0.12 : 0.08, crew ? 0.5 : 0.3, 2200, 0.7, 0.004);
+  if (P.keyUp) burst(t0, speaker === "capcom" ? 0.08 : 0.12, P.keyUp, 2200, 0.7, 0.004);
 
-  // crackle: short filtered pops while the line is open, more of it from the Moon
-  const pops = Math.round(buf.duration * (crew ? 3 : 0.9));
-  for (let i = 0; i < pops; i++) {
-    const at = rand(vStart, vEnd);
-    burst(at, rand(0.004, 0.018), crew ? rand(0.15, 0.4) : rand(0.08, 0.2), rand(1800, 4200), 1.2, 0.0015);
-  }
+  // crackle: short filtered pops while the line is open
+  const pops = Math.round(buf.duration * P.pops);
+  for (let i = 0; i < pops; i++) burst(rand(vStart, vEnd), rand(0.004, 0.018), rand(P.pop * 0.5, P.pop * 1.4), rand(1800, 4200), 1.2, 0.0015);
 
   // squelch tail: the "kssh" when the transmitter unkeys
-  burst(squelchAt, squelchLen, crew ? 0.6 : 0.35, 2800, 0.8, 0.004);
+  if (P.squelch) burst(squelchAt, squelchLen, P.squelch, 2800, 0.8, 0.004);
 
   // Quindar tones on Houston's transmissions
-  if (!crew) {
+  if (P.quindar) {
     for (const [f, at] of [
       [2525, t0],
       [2475, vEnd + 0.12],
@@ -522,6 +632,30 @@ async function fetchLine(text: string, speaker: Speaker, lineId?: string): Promi
   }
 }
 
+// text+speaker → cached audio URL, so a line already fetched starts with no network round trip
+const urlCache = new Map<string, Promise<string | null>>();
+function lineUrl(text: string, speaker: Speaker): Promise<string | null> {
+  const key = `${speaker}|${text}`;
+  let p = urlCache.get(key);
+  if (!p) {
+    p = fetchLine(text, speaker);
+    p.then((u) => u || urlCache.delete(key));
+    urlCache.set(key, p);
+  }
+  return p;
+}
+
+/** Fetch and decode a line ahead of time so it starts on cue (countdowns, callouts). */
+export function preloadLine(text: string, speaker: Speaker) {
+  loadProvider().then(() => {
+    const g = audioGraph();
+    if (provider !== "remote" || !g) return;
+    lineUrl(text, speaker)
+      .then((u) => (u ? loadBuffer(g.ctx, u) : null))
+      .catch(() => {});
+  });
+}
+
 /** Ask the API to synthesize lines ahead of time (no-op with the system voice). */
 export function prefetchVoice(lines: { text: string; speaker?: Speaker }[]) {
   loadProvider().then(() => {
@@ -530,32 +664,61 @@ export function prefetchVoice(lines: { text: string; speaker?: Speaker }[]) {
   });
 }
 
+/** Who is on the loop right now: drives the on-screen transmission caption. */
+export const useTransmission = create<{ label: string | null; text: string | null; speaker: Speaker | null }>(() => ({
+  label: null,
+  text: null,
+  speaker: null,
+}));
+
+const DEFAULT_LABEL: Record<Speaker, string> = { capcom: "Houston", crew: "Commander", crew2: "Lunar Module Pilot", pao: "Mission Control" };
+
+export interface SpeakOpts {
+  speaker?: Speaker;
+  /** Caption label, e.g. "Launch Control". */
+  label?: string;
+}
+
 /** Speak a mission-control line. Resolves when finished. */
-export async function speak(text: string, lineId?: string, opts: { speaker?: Speaker } = {}): Promise<void> {
+export async function speak(text: string, lineId?: string, opts: SpeakOpts = {}): Promise<void> {
   const my = ++token;
   radio?.stop();
+  const speaker = opts.speaker ?? inferSpeaker(text);
+  const showCaption = () => my === token && useTransmission.setState({ label: opts.label ?? DEFAULT_LABEL[speaker], text, speaker });
+  const clearCaption = () => my === token && useTransmission.setState({ label: null, text: null, speaker: null });
+  try {
+    await speakInner(text, lineId, speaker, my, showCaption);
+  } finally {
+    clearCaption();
+  }
+}
+
+async function speakInner(text: string, lineId: string | undefined, speaker: Speaker, my: number, onStart: () => void): Promise<void> {
   if (provider === null) await loadProvider();
   if (my !== token) return;
   if (provider === "remote") {
-    const speaker = opts.speaker ?? inferSpeaker(text);
-    const url = await fetchLine(text, speaker, lineId);
+    void lineId;
+    const url = await lineUrl(text, speaker);
     const g = audioGraph();
     if (my !== token) return;
     if (url && g) {
       try {
         const buf = await loadBuffer(g.ctx, url);
         if (my !== token) return;
+        onStart();
         return playRadio(buf, speaker);
       } catch {
         /* fall through to the system voice */
       }
     }
   }
-  return speakSystem(text, my);
+  onStart();
+  return speakSystem(text.replace(/\[[^\]]*\]\s*/g, ""), my); // drop ElevenLabs v3 audio tags like [excited]
 }
 
 export function stopVoice() {
   token++;
+  useTransmission.setState({ label: null, text: null, speaker: null });
   radio?.stop();
   if (hasTTS() && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel();
 }

@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { MINIGAMES, type MinigameResult } from "../../minigames";
+import { say } from "../../core/comms";
 import { useGame, usePhaseData } from "../../core/useGame";
+import { CHECKLIST_DONE } from "../../data/missionComms";
 import { Button, Panel, Stat } from "../../ui/kit";
 import { phaseLabel } from "../../ui/phaseLabel";
 
@@ -20,6 +22,14 @@ export function ChecklistHud() {
     const t = setTimeout(() => setSkip(true), 45000);
     return () => clearTimeout(t);
   }, []);
+  // checklist done: Launch Control goes to the automatic sequence, then the mission's own launch call
+  const finished = !!d.result;
+  useEffect(() => {
+    if (!finished) return;
+    const launch = plan?.voice_lines.find((l) => l.id === "launch_1")?.text;
+    say([...CHECKLIST_DONE, ...(launch ? [{ who: "capcom" as const, text: launch }] : [])], { once: `checklist-done:${plan?.id}` });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the result appears
+  }, [finished]);
 
   if (!plan) return <div className="absolute inset-0 grid place-items-center"><Panel className="text-sm text-dim">Loading checklist...</Panel></div>;
   // dev only: ?style=quiz|order_steps|memory_match|switch_panel previews a minigame

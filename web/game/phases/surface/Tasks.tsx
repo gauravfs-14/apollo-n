@@ -4,7 +4,8 @@
 import { useFrame } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { speak } from "../../core/audio";
+import { commsIdle, say } from "../../core/comms";
+import { EGRESS, FIRST_STEP, SURFACE_CHATTER } from "../../data/missionComms";
 import { useGame } from "../../core/useGame";
 import type { MissionPlan, SurfaceTask } from "../../types";
 import { EARTH_DIR, PLAY_RADIUS, SUN_DIR, type Ground } from "./ground";
@@ -46,7 +47,40 @@ export function hintLevel(difficulty: MissionPlan["difficulty"], mistakes: numbe
 
 export const REPAIR = { angle: 0, start: 0, held: 0, active: false };
 
+/** The real Apollo 11 EVA loop: down the ladder, the first step, then chatter in quiet stretches. */
+function useEvaComms() {
+  const exiting = useSurface((s) => s.exiting);
+  const { plan } = useGame();
+  const seed = plan?.seed ?? 0;
+  const id = plan?.id;
+  useEffect(() => {
+    say(EGRESS, { once: `egress:${id}` });
+  }, [id]);
+  const stepped = useRef(false);
+  useEffect(() => {
+    if (exiting || stepped.current) return;
+    stepped.current = true;
+    say(FIRST_STEP, { once: `first-step:${id}` });
+  }, [exiting, id]);
+  useEffect(() => {
+    let next = seed % SURFACE_CHATTER.length;
+    let quietSince = Date.now();
+    const iv = setInterval(() => {
+      if (!commsIdle()) {
+        quietSince = Date.now();
+        return;
+      }
+      if (Date.now() - quietSince < 25000 || useSurface.getState().finale) return;
+      say(SURFACE_CHATTER[next]);
+      next = (next + 1) % SURFACE_CHATTER.length;
+      quietSince = Date.now();
+    }, 3000);
+    return () => clearInterval(iv);
+  }, [seed]);
+}
+
 export function Tasks({ ground }: { ground: Ground }) {
+  useEvaComms();
   const game = useGame();
   const { plan, state } = game;
   const done = useMemo(() => new Set(((state?.phaseData.surface?.done as string[] | undefined) ?? [])), [state?.phaseData.surface?.done]);
@@ -102,7 +136,7 @@ export function Tasks({ ground }: { ground: Ground }) {
     useSurface.getState().say(t.title + " complete");
     chirp(520, 980, 0.3, 0.12);
     const line = (LINES as Record<string, Line>)[`task_${t.type}`] ?? LINES.task_generic;
-    speak(line.text, `surface_${t.id}`, line);
+    say({ who: "capcom", text: line.text });
   }, []);
 
   const mistake = useCallback((msg: string) => {
@@ -132,7 +166,7 @@ export function Tasks({ ground }: { ground: Ground }) {
     p.flagPos.y = ground.heightAt(p.flagPos.x, p.flagPos.z);
     setFlag([p.flagPos.x, p.flagPos.y, p.flagPos.z]);
     useSurface.getState().set({ finale: true, prompt: null, progress: null, signal: null, bars: null, guides: [] });
-    speak(LINES.finale.text, "surface_finale", LINES.finale);
+    say({ who: "capcom", text: LINES.finale.text }, { interrupt: true });
     chirp(440, 1320, 0.8, 0.12);
   }, [fin, plan, ground]);
 

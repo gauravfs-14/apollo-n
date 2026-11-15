@@ -3,6 +3,8 @@
 // All of them are prefetched when a mission starts so playback never waits.
 import type { MissionPlan } from "../types";
 import type { Speaker } from "./audio";
+import { fill, WHO } from "./comms";
+import { allScriptLines, SITE_BASES } from "../data/missionComms";
 
 export interface Line {
   text: string;
@@ -12,11 +14,6 @@ export interface Line {
 export const LINES = {
   voiceCheck: { text: "Houston here. Voice check, loud and clear.", speaker: "capcom" },
   launchFallback: { text: "All stations report go. You are clear for launch.", speaker: "capcom" },
-  descentStart: { text: "Powered descent. Radar lock.", speaker: "crew" },
-  contact: { text: "Contact light. Engine stop.", speaker: "crew" },
-  landedOk: { text: "Houston, the lander is down and stable.", speaker: "crew" },
-  landedBoulder: { text: "Houston, we are down. A leg took a hit.", speaker: "crew" },
-  landedTipped: { text: "Houston, the lander has tipped over. Stand by.", speaker: "crew" },
   task_navigate_to: { text: "Houston to crew: you are at the rim, good view into the dark. Next objective is open.", speaker: "capcom" },
   task_deploy_relay: { text: "Houston: relay is up and we have signal. Nice work. Go find that ice.", speaker: "capcom" },
   task_scan: { text: "Houston: strong reading. That is the signal we were looking for. Outstanding.", speaker: "capcom" },
@@ -33,6 +30,16 @@ export function missionLines(plan: MissionPlan): Line[] {
   ];
 }
 
+/** Scripted radio lines from the real transcripts, filled in for this mission (every candidate base). */
+function scriptLines(plan?: MissionPlan): Line[] {
+  const out: Line[] = [];
+  for (const l of allScriptLines()) {
+    const bases = l.text.includes("{BASE}") ? Object.values(SITE_BASES) : [""];
+    for (const BASE of bases) out.push({ text: fill(l.text, { N: plan?.number ?? 1, LM: "Eagle", BASE }), speaker: WHO[l.who].speaker });
+  }
+  return out;
+}
+
 export function allLines(plan?: MissionPlan): Line[] {
-  return [...Object.values(LINES), ...(plan ? missionLines(plan) : [])];
+  return [...Object.values(LINES), ...(plan ? [...missionLines(plan), ...scriptLines(plan)] : [])];
 }

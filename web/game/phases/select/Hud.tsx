@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../core/api";
-import { speak } from "../../core/audio";
+import { say } from "../../core/comms";
 import { useGame, usePhaseData } from "../../core/useGame";
 import { Button, PhaseTitle } from "../../ui/kit";
 import type { Difficulty } from "../../types";
@@ -46,7 +46,7 @@ export function SelectHud() {
     action("select", "set_plan", { plan });
     api(`/missions/${plan.id}/chosen`, {}).catch(() => {});
     const brief = plan.voice_lines.find((v) => v.id === "brief_1");
-    if (brief) void speak(brief.text, `${plan.id}:brief_1`);
+    if (brief) say({ who: "capcom", text: brief.text }, { interrupt: true });
     complete("select", 100);
   };
 

@@ -11,7 +11,9 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Effects } from "../../core/Effects";
-import { sfx, speak, stopSfx } from "../../core/audio";
+import { sfx, stopSfx } from "../../core/audio";
+import { clearComms, runCues } from "../../core/comms";
+import { launchCues } from "../../data/missionComms";
 import { useQuality } from "../../core/perf";
 import { useGame } from "../../core/useGame";
 import { Earth } from "../../three/Earth";
@@ -22,7 +24,6 @@ import { Particles, type EmitSpec, type ParticlesApi } from "../../three/ship/fx
 import { Plume } from "../../three/ship/Plume";
 import { Rocket, S1_ENGINES, type RocketRefs } from "../../three/ship/Rocket";
 import { T, useLaunchClock } from "./clock";
-import { LINES } from "../../core/voiceLines";
 
 export const LAUNCH_HDRI = "/hdri/kiara_1_dawn_1k.hdr";
 const RS = 0.9; // rocket scale
@@ -53,6 +54,8 @@ export function LaunchScene() {
   const light = useRef<THREE.PointLight>(null);
   const flash = useRef<THREE.Sprite>(null);
   const glowAt = useRef(new THREE.Vector3(0, PAD_H, 0));
+  const cues = useMemo(() => launchCues(T.liftoff), []);
+  const fired = useRef(new Set<number>());
   const rng = useRng();
 
   const st = useMemo(() => ({
@@ -104,14 +107,10 @@ export function LaunchScene() {
     const rk = rocket.current;
     if (!rk) return;
 
-    // ---- audio / voice cues ----
-    if (!st.spoke && t > T.speak) {
-      st.spoke = true;
-      const line = plan?.voice_lines.find((l) => l.id === "launch_1")?.text ?? LINES.launchFallback.text;
-      speak(line, "launch_1");
-    }
-    const sec = Math.ceil(T.liftoff - t);
-    if (t > T.countStart && sec <= 5 && sec >= 1 && sec !== st.lastBeep) { st.lastBeep = sec; sfx("beep", { volume: 0.3 }); }
+    // ---- audio / voice cues: the real countdown and ascent calls ----
+    if (store.skipped) {
+      if (!st.spoke) { st.spoke = true; clearComms(); }
+    } else runCues(cues, t, fired.current);
     if (!st.ign && t > T.ignition) { st.ign = true; sfx("ignition", { volume: 0.9 }); }
     if (!st.roar && t > T.liftoff - 0.5) { st.roar = true; sfx("rocket_roar", { volume: 0.9 }); }
     if (!st.rumble && t > T.liftoff) { st.rumble = true; sfx("rumble", { volume: 0.9 }); }
@@ -216,14 +215,14 @@ export function LaunchScene() {
       const ts = t - T.spaceCut;
       const s1 = t >= T.sep1, s2 = t >= T.sep2;
       if (!st.sep1 && s1) {
-        st.sep1 = true; sfx("whoosh", { volume: 0.7 }); sfx("boom", { volume: 0.6 });
+        st.sep1 = true; sfx("staging", { volume: 0.8 }); sfx("whoosh", { volume: 0.5 });
         st.s1p.set(0, 0, 0); st.s1v.set(-9, 0.6, 1.8);
         for (let i = 0; i < 40 * rate; i++) {
           fire.current?.emit(1, { pos: [0, 52 * RS, 0], posJitter: [4, 3, 4], vel: [(R() - 0.5) * 30, (R() - 0.5) * 30, (R() - 0.5) * 30], life: 0.9, size0: 4, size1: 22, color: [1, 0.85, 0.6], glow: 1 });
         }
       }
       if (!st.sep2 && s2) {
-        st.sep2 = true; sfx("whoosh", { volume: 0.6 }); sfx("boom", { volume: 0.5 });
+        st.sep2 = true; sfx("staging", { volume: 0.7 }); sfx("whoosh", { volume: 0.4 });
         st.s2p.set(0, 0, 0); st.s2v.set(-6, -0.5, -1.4);
         for (let i = 0; i < 24 * rate; i++) {
           fire.current?.emit(1, { pos: [0, 78 * RS, 0], posJitter: [3, 2, 3], vel: [(R() - 0.5) * 20, (R() - 0.5) * 20, (R() - 0.5) * 20], life: 0.8, size0: 3, size1: 14, color: [1, 0.9, 0.7], glow: 1 });
