@@ -166,6 +166,8 @@ function makeEvt(id: EventId, seed: number, L: number, planId: string): Evt {
 
 // ---------------------------------------------------------------- scheduler (host only)
 const forced = new Map<PhaseId, EventId>();
+const started = new Set<string>();
+const resolved = new Set<string>();
 
 function fire(phase: PhaseId, id: EventId, seed?: number) {
   const st = useStore.getState().state;
@@ -525,6 +527,9 @@ function ActiveEvent({ ev, phase }: { ev: Evt; phase: PhaseId }) {
   // start: sound, shake, radio (every client)
   useEffect(() => {
     t0.current = performance.now();
+    // dev StrictMode runs effects twice: an event starts (trace, sound, shake, radio) only once per key
+    if (started.has(ev.key)) return;
+    started.add(ev.key);
     traceEvent(`event start: ${ev.id}`);
     if (ev.id === "solar_flare" || ev.id === "master_alarm" || ev.id === "micrometeoroid") stinger("alarm", 0.5);
     else sfx("beep", { volume: 0.35 });
@@ -559,6 +564,8 @@ function ActiveEvent({ ev, phase }: { ev: Evt; phase: PhaseId }) {
   // result (every client sees the same state)
   useEffect(() => {
     if (!ev.res) return;
+    if (resolved.has(ev.key)) return;
+    resolved.add(ev.key);
     traceEvent(`event ${ev.res}: ${ev.id}`);
     if (ev.res === "ok") {
       stinger("resolved", 0.6);

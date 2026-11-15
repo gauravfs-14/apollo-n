@@ -39,6 +39,8 @@ for (const [phase, ev] of CASES) {
   if (ev === "solar_flare") await p.waitForTimeout(18000);
   const r = await p.evaluate(() => { const s = window.__apolloStore.getState().state; const f = window.__fps; return { res: s.phaseData[s.phase]?.juiceEvt?.res, hp: s.hp, fps: Math.round((f.n * 1000) / (performance.now() - f.t0)), worst: Math.round(f.worst) }; });
   if (ev === "solar_flare") await p.screenshot({ path: `/tmp/jx-${ev}-fail.png` });
+  const starts = await p.evaluate(() => window.__comms.filter((l) => l.includes("event start")).length);
+  console.log("event start lines:", starts);
   console.log(phase, ev, "hp", hp0, "->", r.hp, "res", r.res, "fps", r.fps, "worst frame ms", r.worst);
   await p.close();
 }
