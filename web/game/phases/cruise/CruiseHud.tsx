@@ -138,7 +138,7 @@ export function CruiseHud() {
   useEffect(() => {
     if (!hurdle) return;
     if (H.idx !== idx || H.type !== hurdle.type) resetH(idx, hurdle.type);
-    H.checks = data.checks ?? [];
+    H.checks = stage === "brief" && H.idx === idx ? Array.from(new Set([...H.checks, ...(data.checks ?? [])])) : (data.checks ?? []);
     if (stage === "play") {
       if (!H.d.step && H.d.t === undefined) H.d = initD({ type: hurdle.type, level, seed, fx, solo: !!solo });
       if (data.hs && data.hs.idx === idx && !actor) adopt(data.hs.d as never);
@@ -163,7 +163,7 @@ export function CruiseHud() {
     traceEvent(`cruise: hurdle ${idx + 1} ${stage} (${hurdle.type})`);
   }, [idx, stage, hurdle?.type]);
   useEffect(() => {
-    H.checks = data.checks ?? H.checks;
+    H.checks = Array.from(new Set([...H.checks, ...(data.checks ?? [])])); // union: never drop a tick that arrived by event
     bump();
   }, [data.checks?.length]);
   useEffect(() => () => {
@@ -201,7 +201,7 @@ export function CruiseHud() {
   }, [patch]);
 
   // --- checks done -> the problem appears (actor starts it)
-  const left = checksFor(idx).filter((c) => !(data.checks ?? H.checks).includes(`${idx}:${c.id}`));
+  const left = checksFor(idx).filter((c) => !H.checks.includes(`${idx}:${c.id}`));
   useEffect(() => {
     if (stage !== "brief" || !actor || !hurdle || left.length > 0 || !revealed) return;
     const t = setTimeout(() => patch("cruise", { idx, stage: "play", results }), 1200);
@@ -332,7 +332,7 @@ export function CruiseHud() {
                 <div className="text-sm text-white">Everyone pitches in. Do the three checks, then Houston calls.</div>
                 <ul className="space-y-1 text-sm">
                   {checksFor(idx).map((c) => {
-                    const done = (data.checks ?? H.checks).includes(`${idx}:${c.id}`);
+                    const done = H.checks.includes(`${idx}:${c.id}`);
                     return (
                       <li key={c.id} className={`flex items-center gap-2 ${done ? "text-go" : "text-white"}`}>
                         <span className={`inline-block h-3.5 w-3.5 rounded-sm border ${done ? "border-go bg-go/40" : "border-white/40"}`} />
