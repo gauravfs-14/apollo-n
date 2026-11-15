@@ -6,7 +6,7 @@
 //   TLI burn   after the second separation the burn window opens: SPACE starts it and SPACE cuts it off
 //              at the target speed (easy: automatic cutoff). The burn is time-compressed (about 11 s for 3 km/s).
 import type { Difficulty } from "../../types";
-import { T } from "./clock";
+import { T } from "./timeline";
 
 export const TLI = { v0: 7800, target: 10900, rate: 280 } as const; // m/s, m/s, m/s per second
 
