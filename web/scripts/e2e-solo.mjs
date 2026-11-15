@@ -174,37 +174,19 @@ await step("checklist", async () => {
     await forceSkip("checklist", `style ${style} has no scripted solver`);
     return;
   }
-  await page.getByText("CHECKLIST COMPLETE").waitFor({ timeout: 30000 });
+  await page.getByText("CHECKLIST COMPLETE").first().waitFor({ timeout: 30000 });
   await page.waitForTimeout(500);
   await shot("checklist", "-done");
-  await click(page.getByRole("button", { name: /Continue to launch/ }));
+  // the checklist auto-advances to the launch once it is complete
 });
 
 await step("launch", async () => {
   await enter("launch", "checklist", 20000, 4000);
   await shot("launch", "-b");
-  // fly it: the countdown is real; then stage (SPACE) when a stage burns out, start the TLI burn when the window opens and cut it off at the target speed
-  const TARGET = 10900;
-  const t0 = Date.now();
-  let shotFlight = false;
-  while ((await getPhase(page)) === "launch" && Date.now() - t0 < 150000) {
-    const s = await page.evaluate(() => {
-      const c = window.__launchClock?.getState();
-      return c ? { t: c.t, ...c.sim } : null;
-    });
-    if (s) {
-      let need = "none";
-      if (s.burnEndAt >= 0) need = "none";
-      else if (s.burnAt >= 0) need = s.v >= TARGET - 40 ? "cutoff" : "none";
-      else if (s.readyAt >= 0 && s.t >= s.readyAt) need = "ignite";
-      else if ((s.s1CutAt >= 0 && s.s1SepAt < 0) || (s.s2CutAt >= 0 && s.s2SepAt < 0)) need = "stage";
-      if (need !== "none") await page.keyboard.press("Space");
-      if (!shotFlight && s.t > 27) { shotFlight = true; await shot("launch", "-flight"); }
-      if (s.burnAt >= 0 && !log.launchBurnShot) { log.launchBurnShot = true; await shot("launch", "-burn"); }
-      if (s.result && !log.launchResult) { log.launchResult = s.result; await page.waitForTimeout(600); await shot("launch", "-result"); }
-    }
-    await page.waitForTimeout(40);
-  }
+  // the launch is a pure cinematic: watch the liftoff, then use the Skip button (solo: acts at once)
+  await page.waitForFunction(() => (window.__launchClock?.getState().t ?? 0) > 20, null, { timeout: 40000 });
+  await shot("launch", "-flight");
+  await click(page.getByRole("button", { name: /^Skip/ }));
 });
 
 await step("cruise", async () => {
@@ -312,7 +294,7 @@ await step("report", async () => {
 await step("memory-final", async () => {
   await memSnap("report", "end");
   // back to mission select: the scene is just the Moon again, so counts should return to the baseline
-  await click(page.getByRole("button", { name: "New mission" }));
+  await click(page.getByRole("button", { name: "Back to map" }));
   await waitPhase(page, "select", 15000);
   await page.waitForTimeout(3500);
   await memSnap("select", "after-session");
