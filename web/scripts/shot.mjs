@@ -11,7 +11,7 @@ const base = process.env.WEB_URL ?? "http://localhost:3000";
 
 const browser = await chromium.launch({
   headless: true,
-  args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist", "--enable-unsafe-webgpu", "--autoplay-policy=no-user-gesture-required"],
+  args: ["--use-angle=metal", "--mute-audio", "--enable-gpu", "--ignore-gpu-blocklist", "--enable-unsafe-webgpu", "--autoplay-policy=no-user-gesture-required"],
 });
 const page = await browser.newPage({ viewport: { width: w, height: h } });
 const errors = [];

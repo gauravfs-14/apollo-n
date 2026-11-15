@@ -1,6 +1,6 @@
 // Checks that mission-control lines reach speechSynthesis after a click. Usage: node scripts/voice-test.mjs
 import { chromium } from "playwright";
-const b = await chromium.launch({ headless: false, args: ["--use-angle=metal"] });
+const b = await chromium.launch({ headless: false, args: ["--use-angle=metal", "--mute-audio"] });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
 await p.addInitScript(() => {
   window.__said = [];

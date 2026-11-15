@@ -1,6 +1,6 @@
 import { chromium } from "/Users/gchhetri/Developer/PERSONAL/appolo-n/web/node_modules/playwright/index.mjs";
 const out = process.argv[2]; const q = process.argv[3] ?? "high"; const extra = process.argv[4] ?? "";
-const browser = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
+const browser = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--mute-audio", "--enable-gpu", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 await page.addInitScript((q) => localStorage.setItem("apollo.quality", q), q);
 await page.goto(`http://localhost:3000/play/DEV-F${Date.now() % 100000}?mode=solo&phase=surface&perf${extra}`, { waitUntil: "load" });

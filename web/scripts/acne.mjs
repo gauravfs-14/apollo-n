@@ -1,7 +1,7 @@
 // Dev: screenshot rocks from several yaws to check shadow acne. Usage: node scripts/acne.mjs <prefix> [quality]
 import { chromium } from "playwright";
 const prefix = process.argv[2] ?? "/tmp/acne"; const q = process.argv[3] ?? "high";
-const browser = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
+const browser = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--mute-audio", "--enable-gpu", "--ignore-gpu-blocklist"] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 await page.addInitScript((q) => localStorage.setItem("apollo.quality", q), q);
 await page.goto(`http://localhost:3000/play/DEV-A${Date.now() % 100000}?mode=solo&phase=surface&perf`, { waitUntil: "load" });

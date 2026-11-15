@@ -1,21 +1,16 @@
 "use client";
 // Tiny Web Audio synth for scanner beeps, drill, relay chirps. No asset files, fails silently.
-let ctx: AudioContext | null = null;
+import { audioGraph } from "../../core/audio";
 
+// Uses the game's shared AudioContext (see audioGraph) instead of opening its own.
 function ac(): AudioContext | null {
-  if (typeof window === "undefined") return null;
-  if (!ctx) {
-    const C = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!C) return null;
-    try {
-      ctx = new C();
-    } catch {
-      return null;
-    }
-  }
-  if (ctx.state === "suspended") ctx.resume().catch(() => {});
-  return ctx;
+  const g = audioGraph();
+  if (!g) return null;
+  if (g.ctx.state === "suspended") g.ctx.resume().catch(() => {});
+  return g.ctx;
 }
+
+const out = () => audioGraph()!.out;
 
 export function unlockAudio() {
   ac();
@@ -32,7 +27,7 @@ export function beep(freq: number, dur = 0.07, vol = 0.12, type: OscillatorType 
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(g).connect(c.destination);
+  o.connect(g).connect(out());
   o.start(t);
   o.stop(t + dur + 0.02);
 }
@@ -49,7 +44,7 @@ export function chirp(from: number, to: number, dur = 0.25, vol = 0.1) {
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(g).connect(c.destination);
+  o.connect(g).connect(out());
   o.start(t);
   o.stop(t + dur + 0.02);
 }
@@ -70,6 +65,6 @@ export function thud(vol = 0.08, freq = 180, dur = 0.12) {
   const g = c.createGain();
   g.gain.setValueAtTime(0, c.currentTime);
   g.gain.linearRampToValueAtTime(vol, c.currentTime + 0.004); // no hard edge: avoids a click
-  src.connect(f).connect(g).connect(c.destination);
+  src.connect(f).connect(g).connect(out());
   src.start();
 }

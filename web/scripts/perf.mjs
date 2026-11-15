@@ -22,7 +22,7 @@ const TARGET = { fps: 55, p95: 25, calls: 300, tris: 1.5e6 };
 
 const browser = await chromium.launch({
   headless: true,
-  args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"],
+  args: ["--use-angle=metal", "--mute-audio", "--enable-gpu", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"],
 });
 
 const median = (a) => (a.length ? [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)] : 0);

@@ -1,5 +1,5 @@
 """Drive Zen (Firefox engine) over WebDriver BiDi to check that stage music starts after a click.
-Uses a throwaway profile with Firefox's default autoplay blocking. Run from api/: uv run python ../web/scripts/zen-music-test.py"""
+Uses a throwaway profile with Firefox's default autoplay blocking, muted (media.volume_scale 0). Run from api/: uv run python ../web/scripts/zen-music-test.py"""
 import asyncio, itertools, json, os, shutil, subprocess, tempfile, time
 import websockets
 
@@ -19,7 +19,7 @@ async def cmd(ws, method, params):
 
 async def main():
     prof = tempfile.mkdtemp(prefix="zen-apollo-")
-    open(os.path.join(prof, "user.js"), "w").write('user_pref("media.autoplay.default", 1);\nuser_pref("media.autoplay.blocking_policy", 0);\n')
+    open(os.path.join(prof, "user.js"), "w").write('user_pref("media.autoplay.default", 1);\nuser_pref("media.autoplay.blocking_policy", 0);\nuser_pref("media.volume_scale", "0.0");\n')
     proc = subprocess.Popen([ZEN, "--headless", "--no-remote", "--profile", prof, "--remote-debugging-port", "9333"],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
@@ -50,17 +50,31 @@ async def main():
             await cmd(ws, "browsingContext.navigate", {"context": ctx, "url": url, "wait": "complete"})
             await asyncio.sleep(wait)
 
+        # count AudioContexts each page opens (each one is an extra output stream)
+        await cmd(ws, "script.addPreloadScript", {"functionDeclaration": "() => { window.__ctxCount = 0; const C = window.AudioContext; window.AudioContext = class extends C { constructor(...a) { super(...a); window.__ctxCount++; } }; }"})
         await go(BASE + "/", 3)
         print("menu before click:", await music())
+        t0 = time.monotonic()
         await click(1200, 120)
-        await asyncio.sleep(3)
-        print("menu after click: ", await music())
-        for phase in ["build", "report"]:
+        seen = {}
+        while time.monotonic() - t0 < 8:
+            m = json.loads(await music() or "null") or {}
+            t = round(time.monotonic() - t0, 2)
+            if m.get("playing") and "playing" not in seen:
+                seen["playing"] = t
+            if m.get("t", 0) > 0 and "position>0" not in seen:
+                seen["position>0"] = t
+            if m.get("gain", 0) > 0.05 and "audible" not in seen:
+                seen["audible"] = t
+            await asyncio.sleep(0.05)
+        print("menu after click:", await music(), "timeline (s after click):", seen)
+        print("AudioContexts opened on the menu page:", (await ev("window.__ctxCount"))["value"])
+        for phase in ["build", "surface", "report"]:
             await go(f"{BASE}/play/ZEN-{phase.upper()}{int(time.time()) % 1000}?mode=solo&phase={phase}", 3)
             before = await music()
             await click(640, 300)
             await asyncio.sleep(3)
-            print(f"{phase}: before click {before} -> after {await music()}")
+            print(f"{phase}: before click {before} -> after {await music()}; AudioContexts: {(await ev('window.__ctxCount'))['value']}")
         await ws.close()
     finally:
         proc.terminate()

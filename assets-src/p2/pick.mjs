@@ -2,7 +2,7 @@
 // Usage: node pick.mjs build /tmp/out.png [quality]
 import { chromium } from "/Users/gchhetri/Developer/PERSONAL/appolo-n/web/node_modules/playwright/index.mjs";
 const [phase, out, quality = "high"] = process.argv.slice(2);
-const b = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"] });
+const b = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--mute-audio", "--enable-gpu", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"] });
 const p = await b.newPage({ viewport: { width: 1440, height: 900 } });
 const errs = [];
 p.on("pageerror", (e) => errs.push(String(e)));

@@ -1,6 +1,6 @@
 // Solo end-to-end: build -> drop -> (crew stub) -> board -> checklist -> launch.
 import { chromium } from "/Users/gchhetri/Developer/PERSONAL/appolo-n/web/node_modules/playwright/index.mjs";
-const b = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
+const b = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--mute-audio", "--enable-gpu", "--ignore-gpu-blocklist"] });
 const p = await b.newPage({ viewport: { width: 1440, height: 900 } });
 const errs = [];
 p.on("pageerror", (e) => errs.push(String(e)));

@@ -4,7 +4,7 @@ import fs from "node:fs";
 
 export const BASE = process.env.WEB_URL ?? "http://localhost:3000";
 export const OUT = process.env.E2E_OUT ?? "/tmp/e2e";
-export const ARGS = ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"];
+export const ARGS = ["--use-angle=metal", "--mute-audio", "--enable-gpu", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"];
 
 export async function launch() {
   fs.mkdirSync(OUT, { recursive: true });
