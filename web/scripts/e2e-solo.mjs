@@ -99,19 +99,21 @@ await step("menu", async () => {
   await page.waitForTimeout(2500);
   await page.screenshot({ path: `${OUT}/00-menu.png` });
   await page.getByPlaceholder("Astronaut").fill("QA Pilot");
-  await click(page.getByRole("button", { name: "Solo mission" }));
+  await click(page.getByRole("button", { name: /journey/i }));
   await page.waitForURL(/\/play\//, { timeout: 15000 });
 });
 
 // ---- select
 await step("select", async () => {
   await enter("select", "menu", 20000, 500);
-  await page.getByRole("button", { name: "Select", exact: true }).first().waitFor({ timeout: 120000 });
+  // journey map: a fresh profile has level 1 available and the rest locked, then "Play level 1"
+  await page.getByRole("button", { name: /Play level 1/ }).waitFor({ timeout: 120000 });
   await page.waitForTimeout(1500);
+  const lv = await page.locator("button[data-level]").evaluateAll((b) => b.map((x) => x.getAttribute("data-state")));
+  if (lv[0] !== "available" || lv.slice(1).some((x) => x !== "locked")) throw new Error("journey map states wrong: " + lv.join(","));
   await memSnap("select", "settled"); // baseline for the after-session comparison
-  await shot("select", "-cards");
-  const t = Date.now();
-  await click(page.getByRole("button", { name: "Select", exact: true }));
+  await shot("select", "-map");
+  await click(page.getByRole("button", { name: /Play level 1/ }));
   log.selectToBuildMs = await waitPhase(page, "build", 20000);
 });
 
@@ -191,7 +193,28 @@ await step("checklist", async () => {
 await step("launch", async () => {
   await enter("launch", "checklist", 20000, 4000);
   await shot("launch", "-b");
-  await click(page.getByRole("button", { name: "Skip", exact: true }));
+  // fly it: the countdown is real; then stage (SPACE) when a stage burns out, start the TLI burn when the window opens and cut it off at the target speed
+  const TARGET = 10900;
+  const t0 = Date.now();
+  let shotFlight = false;
+  while ((await getPhase(page)) === "launch" && Date.now() - t0 < 150000) {
+    const s = await page.evaluate(() => {
+      const c = window.__launchClock?.getState();
+      return c ? { t: c.t, ...c.sim } : null;
+    });
+    if (s) {
+      let need = "none";
+      if (s.burnEndAt >= 0) need = "none";
+      else if (s.burnAt >= 0) need = s.v >= TARGET - 40 ? "cutoff" : "none";
+      else if (s.readyAt >= 0 && s.t >= s.readyAt) need = "ignite";
+      else if ((s.s1CutAt >= 0 && s.s1SepAt < 0) || (s.s2CutAt >= 0 && s.s2SepAt < 0)) need = "stage";
+      if (need !== "none") await page.keyboard.press("Space");
+      if (!shotFlight && s.t > 27) { shotFlight = true; await shot("launch", "-flight"); }
+      if (s.burnAt >= 0 && !log.launchBurnShot) { log.launchBurnShot = true; await shot("launch", "-burn"); }
+      if (s.result && !log.launchResult) { log.launchResult = s.result; await page.waitForTimeout(600); await shot("launch", "-result"); }
+    }
+    await page.waitForTimeout(40);
+  }
 });
 
 await step("cruise", async () => {
@@ -232,12 +255,15 @@ await step("site", async () => {
 
 await step("landing", async () => {
   await enter("landing", "site", 20000, 3000);
-  await page.waitForTimeout(6000);
+  await page.waitForTimeout(5000);
   await shot("landing", "-descent");
-  await click(page.getByRole("button", { name: "Skip", exact: true }));
-  await page.getByRole("button", { name: /Continue to the surface/ }).waitFor({ timeout: 30000 });
+  // a real pilot flies with W/S and the arrows (scripts/flight-landing.mjs does that and checks good and bad touchdowns);
+  // here the autopilot flies so the whole mission can be walked unattended
+  await page.evaluate(() => window.__landing?.getState().request("auto"));
+  await page.getByRole("button", { name: /Continue to the surface/ }).waitFor({ timeout: 90000 });
   await page.waitForTimeout(800);
   await shot("landing", "-score");
+  log.landing = await page.evaluate(() => { const r = window.__landSim?.result; return r ? { reason: r.reason, score: r.score.total } : null; });
   await click(page.getByRole("button", { name: /Continue to the surface/ }));
 });
 

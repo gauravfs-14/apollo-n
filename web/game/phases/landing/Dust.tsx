@@ -3,7 +3,7 @@
 // Regolith blown out by the engine: a fast, low radial sheet. Vacuum physics: no drag, ballistic under 1.62 m/s^2,
 // particles hop and slide outward along the ground (that is why Apollo dust streamed so far).
 import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { useQuality } from "../../core/perf";
 import type { TerrainData } from "../../three/terrain";

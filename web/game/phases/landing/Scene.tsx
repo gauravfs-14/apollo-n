@@ -1,47 +1,51 @@
 "use client";
 /* eslint-disable react-hooks/immutability */
-// Powered descent of the crew's own lander onto the spot they chose. The touchdown is one seeded sample of the
-// Monte Carlo landings (position, tilt, outcome); final attitude follows the real DEM under the feet.
-import { useGLTF } from "@react-three/drei";
+// Powered descent, flown by the player (sim.ts) over the real LOLA terrain onto the spot the crew chose.
+// The pilot's client simulates and broadcasts the lander ten times a second; the other crew render it smoothly.
+// Dust, plume, contact lights and the chase camera are driven by the flight state.
 import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Effects } from "../../core/Effects";
 import { sfx } from "../../core/audio";
-import { clearComms, say } from "../../core/comms";
-import { altitudeCall, contact, descentStart, goForLanding, landed as landedReport } from "../../data/missionComms";
-import { preload } from "../../core/comms";
+import { clearComms, preload, say, traceEvent } from "../../core/comms";
+import { isRevealed, useLoadingHold, useRevealed } from "../../core/loading";
+import { useQuality } from "../../core/perf";
 import { useStore } from "../../core/store";
 import { useGame, usePhaseData } from "../../core/useGame";
-import { Boulders, GroundBounce, LunarSky, RenderInfo, SunLight, Terrain, missionTime, skyAt, useTerrainData, type TerrainData } from "../../three/terrain";
+import {
+  altitudeCall, autopilotCall, contactLight, descentStart, driftCall, engineStop, fuelCall, fuelOut, goForLanding, touchdownReport,
+} from "../../data/missionComms";
+import { perkEffects, usePerk } from "../../data/perks";
+import { COST } from "../../core/hp";
+import { flightDamage } from "../../flight/damage";
+import { shipStats } from "../../data/parts";
+import { devDifficulty } from "../../flight/difficulty";
+import { GroundRing } from "../../flight/GroundRing";
+import { axis, held, installKeys, take } from "../../flight/input";
+import { useFlightSync } from "../../flight/sync";
 import { Lander, getDefaultParts } from "../../three/ship/Lander";
-import { legFootX } from "../../three/ship/builders";
+import {
+  Beacon, Boulders, GroundBounce, LunarSky, RenderInfo, SunLight, Terrain, missionTime, scatterBoulders, skyAt, useTerrainData,
+  type TerrainData,
+} from "../../three/terrain";
 import { landerFromBuild, type SimOut } from "../site/api";
 import { Dust, type DustState } from "./Dust";
-import { pickOutcome, type Outcome } from "./outcome";
 import { Plume } from "./Plume";
-import { DESCENT, TOTAL, useLanding } from "./store";
-import { useLoadingHold } from "../../core/loading";
-import { isRevealed, useRevealed } from "../../core/loading";
-import { traceEvent } from "../../core/comms";
+import { useLanding, type LandHud } from "./store";
+import {
+  FT, G, bodyBasis, footPlane, fuelSeconds, landParams, newLand, stepLand, upVec,
+  type Ground, type LandInput, type LandParams, type LandSim,
+} from "./sim";
 
-const A0 = 450; // start altitude above the touchdown point (m)
-const H0 = 300; // start horizontal distance (m)
+const R2D = 180 / Math.PI;
 const D2R = Math.PI / 180;
 const ss = (a: number, b: number, v: number) => {
   const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
-const compass = (deg: number, out: THREE.Vector3) => out.set(Math.sin(deg * D2R), 0, -Math.cos(deg * D2R));
-const T_CONTACT = DESCENT * (1 - Math.pow(0.15 / A0, 1 / 2.6));
-const FT = 3.281;
-/** Sink rate (ft/s) at height h (m) on the descent profile alt = A0·(1 − t/DESCENT)^2.6. */
-const sinkAt = (h: number) => (2.6 * A0 / DESCENT) * Math.pow(h / A0, 1.6 / 2.6) * FT;
-// the calls, made at the heights they name, with the lander's real sink rate there
-const CALLS = [
-  { alt: 250, line: goForLanding() },
-  ...[400, 200, 100, 40].map((ft, i, a) => ({ alt: ft / FT, line: altitudeCall(ft, sinkAt(ft / FT), i === a.length - 1) })),
-];
+const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
+const CALL_FT = [400, 200, 100, 40];
 
 interface SiteData {
   site_id: string;
@@ -49,12 +53,8 @@ interface SiteData {
   sim: SimOut;
 }
 
-useGLTF.preload("/models/rock_moon_a.glb");
-
 /** y offset so the lowest contact point rests on the DEM, for a given pose. */
-function groundedY(
-  data: TerrainData, x: number, z: number, q: THREE.Quaternion, local: THREE.Vector3[], tmp: THREE.Vector3,
-) {
+function groundedY(data: TerrainData, x: number, z: number, q: THREE.Quaternion, local: THREE.Vector3[], tmp: THREE.Vector3) {
   let y = -1e9;
   for (const p of local) {
     tmp.copy(p).applyQuaternion(q);
@@ -63,227 +63,291 @@ function groundedY(
   return y;
 }
 
-function leanQuat(dx: number, dz: number, tiltDeg: number, yawRad: number, out: THREE.Quaternion, tq: THREE.Quaternion) {
-  const T = tiltDeg * D2R;
-  const up = new THREE.Vector3(Math.sin(T) * dx, Math.cos(T), Math.sin(T) * dz);
-  out.setFromUnitVectors(new THREE.Vector3(0, 1, 0), up);
-  tq.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawRad);
-  out.multiply(tq);
-}
-
-function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: TerrainData; outcome: Outcome; parts: Record<string, string>; sky: ReturnType<typeof skyAt>; footR: number; siteRock: boolean }) {
-  const root = useRef<THREE.Group>(null);
-  const thr = useRef(0);
-  const dust = useRef<DustState>({ x: 0, z: 0, strength: 0 });
-  const lights = useRef<THREE.Group>(null);
+function Descent({
+  data, ground, P, target, heading, parts, siteName, ringR, onFocus, penalty,
+}: {
+  data: TerrainData; ground: Ground; P: LandParams; target: { x: number; z: number }; heading: number;
+  parts: Record<string, string>; siteName: string; ringR: number; onFocus: (x: number, z: number) => void; penalty: number;
+}) {
+  const { actsAs } = useGame();
+  const pilot = actsAs("pilot");
   const { camera } = useThree();
   const cam = camera as THREE.PerspectiveCamera;
-  const t = useRef(typeof location !== "undefined" ? Number(new URLSearchParams(location.search).get("t")) || 0 : 0); // ?t= jumps the timeline (dev)
-  const flags = useRef({ started: false, contact: false, ended: false, reported: false, lastUi: 0 });
-  const calls = useRef(new Set<number>());
-  // the descent loop opens when the scene is on screen
   const revealed = useRevealed("landing");
-  useEffect(() => {
-    if (!revealed) return;
-    const st = useStore.getState().state;
-    const siteId = (st?.phaseData.site as { site_id?: string } | undefined)?.site_id;
-    const siteName = st?.plan?.destination.candidate_sites.find((c) => c.id === siteId)?.name ?? "the landing site";
-    say(descentStart(siteName), { once: `descent:${st?.plan?.id}` });
-    CALLS.forEach((c) => preload(c.line)); // ready before each height is reached
-  }, [revealed]);
-  const q0 = useMemo(() => new THREE.Quaternion(), []);
-  const q1 = useMemo(() => new THREE.Quaternion(), []);
-  const tq = useMemo(() => new THREE.Quaternion(), []);
-  const tmp = useMemo(() => new THREE.Vector3(), []);
-  const v1 = useMemo(() => new THREE.Vector3(), []);
-  const v2 = useMemo(() => new THREE.Vector3(), []);
-  const prev = useRef({ alt: A0, hx: 0, hz: 0 });
-  const camAz = sky.sunAzDeg + 80;
-  const approachAz = camAz + 110;
+  const root = useRef<THREE.Group>(null);
+  const lights = useRef<THREE.Group>(null);
+  const thr = useRef(0);
+  const dust = useRef<DustState>({ x: 0, z: 0, strength: 0 });
+  const [sim] = useState(() => newLand(1, target, ground, P, heading)); // one flight per mount: a quality change must not restart it
+  const st = useMemo(() => ({
+    ev: new Set<string>(), tgt: null as LandSim | null, tgtAt: 0, lastUi: 0, since: 0, att: 1, prevAlt: 1e9, lastAuto: false,
+    n: [0, 1, 0] as readonly [number, number, number], settled: false, lastFocus: [1e9, 1e9] as [number, number], camInit: false, orbit: 0,
+    q0: new THREE.Quaternion(), qT: new THREE.Quaternion(), qOut: new THREE.Quaternion(), m4: new THREE.Matrix4(), tmpQ: new THREE.Quaternion(),
+    ex: new THREE.Vector3(), ey: new THREE.Vector3(), ez: new THREE.Vector3(), a: new THREE.Vector3(), b: new THREE.Vector3(),
+    camP: new THREE.Vector3(), camL: new THREE.Vector3(), want: new THREE.Vector3(), look: new THREE.Vector3(), tmp: new THREE.Vector3(),
+    up: [0, 1, 0] as [number, number, number], basis: new Array<number>(9).fill(0),
+    inp: { thr: 0, cut: false, full: false, lf: 0, lr: 0 } as LandInput,
+  }), []);
+  const landed = useLanding((x) => !!x.s?.down);
+  const retryAllowed = P.hoverAvail; // easy and normal
+  const info = useMemo(() => ({ limit: P.limit, hoverAvail: P.hoverAvail, autoAvail: P.autoAvail, vSafe: P.vSafe, vCrash: P.vCrash, fuel0: P.fuel0, retryAllowed, penalty }), [P, retryAllowed, penalty]);
 
   // contact points in lander-local space: four footpads, four deck corners, the top of the mast
   const local = useMemo(() => {
-    const v = ((parts.legs ?? "legs_a").slice(-1).charCodeAt(0) - 97 + 3) % 3;
-    const r = 2.02 + legFootX(v);
     const pts: THREE.Vector3[] = [];
     for (let k = 0; k < 4; k++) {
       const a = Math.PI / 4 + (k * Math.PI) / 2;
-      pts.push(new THREE.Vector3(Math.sin(a) * r, 0.05, Math.cos(a) * r));
+      pts.push(new THREE.Vector3(Math.sin(a) * P.padR, 0.05, Math.cos(a) * P.padR));
       pts.push(new THREE.Vector3(Math.sin(a) * 2.7, 3.3, Math.cos(a) * 2.7));
     }
     pts.push(new THREE.Vector3(0, 6.8, 0));
     return pts;
-  }, [parts.legs]);
-  void footR;
+  }, [P.padR]);
 
-  const gx = outcome.x;
-  const gz = outcome.z;
-  const gy = data.heightAt(gx, gz);
-  const finalTilt = (s: number) => {
-    if (outcome.reason === "tipped") return outcome.tilt + (82 - outcome.tilt) * ss(T_CONTACT + 0.5, T_CONTACT + 3.6, s);
-    if (outcome.reason === "boulder") return outcome.tilt + 2.2 * ss(T_CONTACT + 0.2, T_CONTACT + 1.2, s);
-    return outcome.tilt;
-  };
+  const sync = useFlightSync<LandSim, { k: string }>(
+    "land",
+    pilot,
+    () => sim,
+    (snap, at) => {
+      const first = !st.tgt || snap.att !== sim.att;
+      st.tgt = snap; st.tgtAt = at;
+      const { x, y, z, vx, vy, vz, lf, lr, thr: th, ...rest } = snap;
+      Object.assign(sim, rest);
+      if (first) Object.assign(sim, { x, y, z, vx, vy, vz, lf, lr, thr: th });
+    },
+    (c) => {
+      if (c.k === "auto" && !sim.down) { sim.auto = true; sim.hover = true; sim.assisted ||= !P.autoAvail; }
+    },
+  );
+  const reqRef = useRef(sync.sendCmd);
+  useEffect(() => { reqRef.current = sync.sendCmd; });
 
+  useEffect(() => installKeys(), []);
   useEffect(() => {
-    useLanding.setState({ t: 0, skipRequested: false, contact: false, ready: true, tele: { alt: A0, vs: 0, hs: 0, thr: 0 } });
+    useLanding.setState({ ready: true, s: null, info, request: (k) => reqRef.current({ k }) });
     // the descent engine is felt through the structure, not a launch roar: a low rumble under the radio
     sfx("rumble", { volume: 0.35 });
-    return () => {
-      useLanding.setState({ ready: false });
-    };
-  }, []);
+    if (process.env.NODE_ENV !== "production") Object.assign(window, { __landSim: sim, __landTarget: target });
+    return () => useLanding.setState({ ready: false, s: null });
+  }, [info, sim, target]);
+  useEffect(() => {
+    if (!revealed) return;
+    const state = useStore.getState().state;
+    say(descentStart(siteName), { once: `descent:${state?.plan?.id}` });
+  }, [revealed, siteName]);
 
   useFrame((_, dtRaw) => {
     const dt = Math.min(dtRaw, 0.05);
-    const ui = useLanding.getState();
-    if (ui.skipRequested && t.current < TOTAL) {
-      t.current = TOTAL;
-      flags.current.contact = true;
-      clearComms();
-      useLanding.setState({ contact: true });
-    } else if (isRevealed("landing")) t.current = Math.min(TOTAL, t.current + dt); // starts when visible
-    const tt = t.current;
-    const s = Math.min(1, tt / DESCENT);
-    const lift = tt >= T_CONTACT ? 0 : A0 * Math.pow(1 - s, 2.6);
-    const horiz = tt >= T_CONTACT ? 0 : H0 * Math.pow(1 - s, 2);
-    compass(approachAz, v1);
-    const px = gx + v1.x * horiz;
-    const pz = gz + v1.z * horiz;
+    const live = isRevealed("landing");
 
-    // attitude: retro-pitched while braking, then settles onto the real ground normal
-    const pitch = 26 * Math.pow(1 - s, 1.6);
-    const landed = ss(0.9, 1.0, s);
-    if (landed < 1) {
-      // braking: the thrust axis leans back toward where the lander came from
-      leanQuat(v1.x, v1.z, pitch, outcome.yaw, q0, tq);
-      leanQuat(outcome.dx, outcome.dz, finalTilt(tt), outcome.yaw, q1, tq);
-      q0.slerp(q1, landed);
-    } else {
-      leanQuat(outcome.dx, outcome.dz, finalTilt(tt), outcome.yaw, q0, tq);
+    // ---- the flight
+    if (pilot && live) {
+      if (sim.down) {
+        if (take("KeyR") && retryAllowed && sim.result && sim.result.reason !== "ok") {
+          Object.assign(sim, newLand(sim.att + 1, target, ground, P, heading, sim.retries + 1));
+          clearComms();
+        }
+      } else {
+        const inp = st.inp;
+        inp.thr = axis(["KeyS"], ["KeyW"]);
+        inp.lf = axis(["ArrowDown"], ["ArrowUp"]);
+        inp.lr = axis(["ArrowLeft"], ["ArrowRight"]);
+        inp.cut = held("KeyX");
+        inp.full = held("ShiftLeft", "ShiftRight");
+        if (take("KeyH") && P.hoverAvail && !sim.auto) {
+          sim.hover = !sim.hover;
+          if (sim.hover) sim.vt = clamp(sim.vy, -12, 3);
+        }
+        if (take("KeyP") && P.autoAvail) {
+          sim.auto = !sim.auto;
+          sim.hover = sim.auto || P.hoverAvail;
+        }
+        const touched = inp.thr !== 0 || inp.lf !== 0 || inp.lr !== 0 || inp.cut;
+        if (sim.auto && touched) { sim.auto = false; sim.hover = P.hoverAvail; sim.vt = clamp(sim.vy, -12, 3); }
+        stepLand(sim, dt, inp, ground, P, target);
+      }
+    } else if (!pilot && st.tgt && !sim.down) {
+      // follow the pilot: dead-reckon from the last snapshot and ease onto it
+      const g = st.tgt, age = (performance.now() - st.tgtAt) / 1000;
+      const k = Math.min(1, dt * 8);
+      sim.vx = g.vx; sim.vy = g.vy - G * 0.0; sim.vz = g.vz;
+      sim.x += sim.vx * dt; sim.y += sim.vy * dt; sim.z += sim.vz * dt;
+      sim.x += (g.x + g.vx * age - sim.x) * k;
+      sim.y += (g.y + g.vy * age - sim.y) * k;
+      sim.z += (g.z + g.vz * age - sim.z) * k;
+      sim.lf += (g.lf - sim.lf) * k; sim.lr += (g.lr - sim.lr) * k; sim.thr += (g.thr - sim.thr) * k;
+    } else if (!pilot && st.tgt && sim.down) {
+      Object.assign(sim, { x: st.tgt.x, y: st.tgt.y, z: st.tgt.z, lf: st.tgt.lf, lr: st.tgt.lr, thr: 0 });
     }
-    const g = root.current;
-    if (g) {
-      g.quaternion.copy(q0);
-      const yy = groundedY(data, px, pz, q0, local, tmp) + lift + (tt > T_CONTACT && tt < T_CONTACT + 0.6 ? -0.1 * Math.exp(-(tt - T_CONTACT) * 7) : 0);
-      g.position.set(px, yy, pz);
+    if (sim.att !== st.att) { // a retry: start the new attempt's radio and settle state afresh
+      st.att = sim.att; st.ev.clear(); st.since = 0; st.settled = false; st.prevAlt = 1e9; st.camInit = false; st.orbit = 0;
     }
+    if (sim.down) st.since += dt;
 
-    // engine + dust
-    const burning = tt < T_CONTACT + 0.35;
-    const t1 = burning ? (0.5 + 0.4 * (1 - s) + 0.06 * Math.sin(tt * 37)) * (1 - ss(T_CONTACT, T_CONTACT + 0.35, tt)) : 0;
-    thr.current = ui.skipRequested ? 0 : t1;
-    dust.current.x = px;
-    dust.current.z = pz;
-    dust.current.strength = thr.current * ss(80, 14, lift);
+    const hvx = sim.vx, hvz = sim.vz;
+    const vh = Math.hypot(hvx, hvz);
+    const alt = sim.alt;
 
-    // the crew's altitude calls, as the lander passes each height
-    if (!ui.skipRequested) {
-      CALLS.forEach((c, i) => {
-        if (lift <= c.alt && tt < T_CONTACT && !calls.current.has(i)) {
-          calls.current.add(i);
-          say(c.line);
+    // ---- radio: every line is what the lander is doing now, on every client, from the same state
+    const once = (k: string, fn: () => void) => { if (!st.ev.has(k)) { st.ev.add(k); fn(); } };
+    if (live && !sim.down) {
+      if (alt < 250 && sim.vy < 0) once("go", () => say(goForLanding()));
+      CALL_FT.forEach((ft, i) => {
+        const m = ft / FT;
+        const sink = -sim.vy * FT;
+        // the call is built from the real sink rate when the height is reached: get the likely numbers ready twice on the way down
+        const pre = (k: string) => once(k, () => [-2, 0, 2].forEach((d) => preload(altitudeCall(ft, Math.max(0, Math.round(sink) + d), false))));
+        if (alt < m + 90 && alt > m + 40) pre(`pre${ft}`);
+        if (alt < m + 35 && alt > m) pre(`prex${ft}`);
+        if (st.prevAlt > m && alt <= m && sim.vy < -0.3) once(`alt${ft}`, () => {
+          traceEvent(`${ft} feet, sink ${Math.round(sink)} ft/s`);
+          say(altitudeCall(ft, sink, i === CALL_FT.length - 1 && sim.thr > 0.1));
+        });
+      });
+      if (sim.fuel > 0) {
+        // too late to matter below 15 m (and the contact call comes first)
+        const sec = alt >= 15 ? fuelSeconds(sim) : 1e9;
+        if (sec <= 60) once("f60", () => { traceEvent("fuel: 60 seconds"); say(fuelCall(60)); });
+        if (sec <= 30) once("f30", () => { traceEvent("fuel: 30 seconds"); say(fuelCall(30)); });
+      } else once("f0", () => { traceEvent("fuel out"); say(fuelOut(), { interrupt: true }); flightDamage(COST.major, "Out of fuel", pilot); });
+      if (alt < 150 / FT * 3 && alt > 6 && vh > 2.5) {
+        const fwd = hvx * heading0(sim).x + hvz * heading0(sim).z, rt = -hvx * heading0(sim).z + hvz * heading0(sim).x;
+        const dir = Math.abs(fwd) > Math.abs(rt) ? (fwd > 0 ? "forward" : "back") : rt > 0 ? "right" : "left";
+        once("drift", () => { traceEvent(`drifting ${dir} ${(vh * FT).toFixed(0)} ft/s`); say(driftCall(dir, vh * FT)); });
+      }
+      if (sim.auto !== st.lastAuto) { st.lastAuto = sim.auto; traceEvent(sim.auto ? "autopilot engaged" : "autopilot off"); say(autopilotCall(sim.auto)); }
+      if (sim.contact) once("contact", () => { traceEvent("contact light"); sfx("hiss", { volume: 0.1 }); say(contactLight()); });
+    }
+    st.prevAlt = alt;
+    if (sim.down && sim.result) {
+      once("down", () => {
+        const r = sim.result!;
+        const hit = r.reason === "crashed" ? [COST.fatal, "The lander crashed"] : r.reason === "tipped" ? [COST.severe, `Tipped over (${r.tilt.toFixed(0)} deg, legs allow ${r.limit.toFixed(0)})`]
+          : r.reason === "hard" ? [r.vV > P.vSafe * 1.6 ? COST.severe : COST.major, `Hard landing (${(r.vV * FT).toFixed(0)} ft/s)`] : r.reason === "boulder" ? [COST.major, "A foot landed on a boulder"] : null;
+        if (hit) flightDamage(hit[0] as number, hit[1] as string, pilot);
+        sfx("thunk", { volume: r.reason === "crashed" ? 1 : 0.7 });
+        traceEvent(`touchdown: ${r.reason}, ${(r.vV * FT).toFixed(1)} ft/s down, ${(r.vH * FT).toFixed(1)} ft/s sideways, tilt ${r.tilt.toFixed(1)}, ${Math.round(r.miss)} m off`);
+        if (live) {
+          if (r.reason === "crashed") say(touchdownReport({ reason: r.reason, downFps: r.vV * FT, fwdFps: r.vH * FT, tiltDeg: r.tilt, missM: r.miss }), { interrupt: true });
+          else say([engineStop(), ...touchdownReport({ reason: r.reason, downFps: r.vV * FT, fwdFps: r.vH * FT, tiltDeg: r.tilt, missM: r.miss })]);
         }
       });
     }
 
-    // contact lights + voice
-    if (!flags.current.contact && tt >= T_CONTACT) {
-      flags.current.contact = true;
-      useLanding.setState({ contact: true });
-      sfx("thunk", { volume: 0.7 });
-      traceEvent("touchdown (contact)");
-      sfx("hiss", { volume: 0.15 });
-      if (!ui.skipRequested) say(contact(), { interrupt: true });
+    // ---- pose
+    const g = root.current;
+    const up = upVec(sim, st.up);
+    bodyBasis(sim, up, st.basis);
+    const b = st.basis;
+    st.ex.set(b[0], b[1], b[2]); st.ey.set(b[3], b[4], b[5]); st.ez.set(b[6], b[7], b[8]);
+    st.m4.makeBasis(st.ex, st.ey, st.ez);
+    st.q0.setFromRotationMatrix(st.m4);
+    if (sim.down && !st.settled) {
+      st.settled = true;
+      const n = footPlane(ground, sim.x, sim.z, P.padR);
+      st.n = n;
     }
-    if (!flags.current.reported && tt >= T_CONTACT + 2.2 && !ui.skipRequested) {
-      flags.current.reported = true;
-      say(landedReport(outcome.reason as "ok" | "boulder" | "tipped", outcome.tilt));
+    if (g) {
+      if (!sim.down) {
+        g.quaternion.copy(st.q0);
+        g.position.set(sim.x, sim.y, sim.z);
+      } else {
+        const r = sim.result;
+        const n = st.n;
+        if (r && r.reason === "tipped") {
+          // topples toward the downhill side (or the way it was leaning)
+          const hm = Math.hypot(n[0], n[2]);
+          const dx = hm > 0.02 ? n[0] / hm : r.tx, dz = hm > 0.02 ? n[2] / hm : r.tz;
+          const th = 82 * D2R;
+          st.a.set(dx * Math.sin(th), Math.cos(th), dz * Math.sin(th));
+          st.qT.setFromUnitVectors(st.ey, st.a).multiply(st.q0);
+          st.qOut.copy(st.q0).slerp(st.qT, ss(0.3, 3.4, st.since));
+        } else if (r && r.reason === "crashed") {
+          const th = 38 * D2R;
+          st.a.set(r.tx * Math.sin(th), Math.cos(th), r.tz * Math.sin(th));
+          st.qT.setFromUnitVectors(st.ey, st.a).multiply(st.q0);
+          st.qOut.copy(st.q0).slerp(st.qT, ss(0, 0.7, st.since));
+        } else {
+          st.a.set(n[0], n[1], n[2]);
+          st.qT.setFromUnitVectors(st.ey, st.a).multiply(st.q0);
+          st.qOut.copy(st.q0).slerp(st.qT, ss(0, 0.9, st.since));
+        }
+        g.quaternion.copy(st.qOut);
+        const yy = groundedY(data, sim.x, sim.z, st.qOut, local, st.tmp);
+        g.position.set(sim.x, st.since < 0.25 ? sim.y + (yy - sim.y) * ss(0, 0.25, st.since) : yy, sim.z);
+      }
     }
-    if (lights.current) lights.current.visible = tt >= T_CONTACT && Math.sin(tt * 9) > -0.35;
 
-    // cameras
-    cam.near = 0.3;
-    let fov = 45;
-    if (s < 0.45) {
-      // chase cam above and beside the lander, tilted down so the real ground and horizon stay in frame
-      const gp = g!.position;
-      const u = Math.min(70, Math.max(14, lift * 0.3));
-      const d = Math.min(62, Math.max(42, 40 + lift * 0.1));
-      fov = 46;
-      compass(camAz, v2).multiplyScalar(d);
-      const cx = gp.x + v2.x;
-      const cz = gp.z + v2.z;
-      cam.position.set(cx, Math.max(gp.y + u, data.heightAt(cx, cz) + 6), cz);
-      // aim a little below the lander so it sits in the upper part of the frame with terrain beneath
-      const dep = Math.min(Math.atan2(cam.position.y - gp.y, d) + 13 * D2R, 82 * D2R);
-      v1.set(-v2.x, 0, -v2.z).normalize().multiplyScalar(Math.cos(dep)).setY(-Math.sin(dep));
-      cam.lookAt(tmp.copy(cam.position).addScaledVector(v1, 100));
-    } else if (s < 0.75) {
-      // low ground-level shot as it settles: horizon behind, lander large
-      fov = 50;
-      compass(camAz, v2).multiplyScalar(72);
-      cam.position.set(gx + v2.x, data.heightAt(gx + v2.x, gz + v2.z) + 3.5, gz + v2.z);
-      v1.set(gx, gy + (g!.position.y - gy) * 0.8 + 2, gz);
-      cam.lookAt(v1);
-    } else if (s < 0.93) {
-      fov = 42;
-      compass(camAz + 25, v2).multiplyScalar(68);
-      cam.position.set(gx + v2.x, data.heightAt(gx + v2.x, gz + v2.z) + 2.4, gz + v2.z);
-      v1.copy(g!.position);
-      v1.y += 3;
-      cam.lookAt(v1);
-    } else {
-      fov = 50;
-      const o = (tt - DESCENT * 0.93) / (TOTAL - DESCENT * 0.93);
-      const rad = outcome.reason === "tipped" ? 42 : 30;
-      compass(camAz + 25 + 55 * o, v2).multiplyScalar(rad);
-      cam.position.set(gx + v2.x, data.heightAt(gx + v2.x, gz + v2.z) + 3.6 + 2.5 * o, gz + v2.z);
-      v1.copy(g!.position);
-      v1.y += 3;
-      cam.lookAt(v1);
+    // ---- engine, dust, lights
+    thr.current = sim.down ? 0 : sim.thr * (1 + 0.05 * Math.sin(sim.t * 37));
+    dust.current.x = sim.x;
+    dust.current.z = sim.z;
+    dust.current.strength = sim.down
+      ? (sim.result?.reason === "crashed" ? 0.9 * Math.exp(-st.since * 1.6) : 0)
+      : thr.current * ss(80, 14, alt);
+    if (lights.current) lights.current.visible = (sim.down || sim.contact) && Math.sin(sim.t * 9) > -0.35;
+
+    // ---- terrain detail and shadows follow the lander
+    if (Math.hypot(sim.x - st.lastFocus[0], sim.z - st.lastFocus[1]) > 70) {
+      st.lastFocus = [sim.x, sim.z];
+      onFocus(sim.x, sim.z);
     }
-    // rumble in the last stretch of the burn
-    if (thr.current > 0.05 && s > 0.3) {
-      const a = 0.04 * thr.current * ss(90, 5, lift);
+
+    // ---- camera: chase behind and above, looking toward the zone; low and to the side once down
+    cam.near = 0.3;
+    const fxh = sim.fx, fzh = sim.fz;
+    const gy = data.heightAt(sim.x, sim.z);
+    if (!sim.down) {
+      const d = clamp(40 + 0.2 * alt, 40, 95);
+      const u = clamp(8 + 0.16 * alt, 8, 45);
+      st.want.set(sim.x - fxh * d, sim.y + u, sim.z - fzh * d);
+      st.want.y = Math.max(st.want.y, data.heightAt(st.want.x, st.want.z) + 4);
+      // aim between the lander and the landing zone, so the zone is in frame during the approach
+      const w = 0.35 * ss(8, 60, alt);
+      st.look.set(sim.x + (target.x - sim.x) * w, sim.y + (data.heightAt(target.x, target.z) - sim.y) * w * 0.9 + 2, sim.z + (target.z - sim.z) * w);
+    } else {
+      st.orbit += dt * 0.12;
+      const a = Math.atan2(fzh, fxh) + Math.PI + 0.9 + st.orbit;
+      const rad = sim.result?.reason === "tipped" ? 46 : 36;
+      st.want.set(sim.x + Math.cos(a) * rad, 0, sim.z + Math.sin(a) * rad);
+      st.want.y = data.heightAt(st.want.x, st.want.z) + 4;
+      st.look.set(sim.x, gy + 3, sim.z);
+    }
+    if (!st.camInit) { st.camInit = true; st.camP.copy(st.want); st.camL.copy(st.look); }
+    const kp = 1 - Math.exp(-dt * (sim.down ? 1.6 : 4.5));
+    st.camP.lerp(st.want, kp);
+    st.camL.lerp(st.look, 1 - Math.exp(-dt * 6));
+    cam.position.copy(st.camP);
+    if (thr.current > 0.05 && alt < 90) {
+      const a = 0.05 * thr.current * ss(90, 5, alt);
       cam.position.x += (Math.random() - 0.5) * a;
       cam.position.y += (Math.random() - 0.5) * a;
     }
-    if (Math.abs(cam.fov - fov) > 0.01) {
-      cam.fov = fov;
-      cam.updateProjectionMatrix();
-    }
+    cam.lookAt(st.camL);
+    const fov = sim.down ? 50 : 46;
+    if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
 
-    // telemetry for the HUD (10 Hz)
+    // ---- telemetry for the HUD (10 Hz)
     const now = performance.now();
-    if (now - flags.current.lastUi > 100) {
-      flags.current.lastUi = now;
-      const p = prev.current;
-      const d = Math.max(1e-3, (now - (flags.current.lastUi - 100)) / 1000);
-      void d;
-      useLanding.setState({
-        t: tt,
-        tele: {
-          alt: Math.max(0, lift),
-          vs: (lift - p.alt) / 0.1,
-          hs: Math.hypot(px - p.hx, pz - p.hz) / 0.1,
-          thr: thr.current,
-        },
-      });
-      prev.current = { alt: lift, hx: px, hz: pz };
-    }
-    if (tt >= TOTAL && !flags.current.ended) {
-      flags.current.ended = true;
-      useLanding.setState({ t: TOTAL });
-
+    if (now - st.lastUi > 100) {
+      st.lastUi = now;
+      const n = footPlane(ground, sim.x, sim.z, P.padR);
+      const rx = -fzh, rz = fxh;
+      const tx = target.x - sim.x, tz = target.z - sim.z;
+      const hud: LandHud = {
+        t: sim.t, att: sim.att, alt, vy: sim.vy, hs: vh, vf: hvx * fxh + hvz * fzh, vr: hvx * rx + hvz * rz, thr: sim.thr,
+        fuelPct: (100 * sim.fuel) / P.fuel0, fuelSec: fuelSeconds(sim),
+        leanF: sim.lf * R2D, leanR: sim.lr * R2D,
+        slopeF: Math.atan2(n[0] * fxh + n[2] * fzh, n[1]) * R2D, slopeR: Math.atan2(n[0] * rx + n[2] * rz, n[1]) * R2D,
+        tgtF: tx * fxh + tz * fzh, tgtR: tx * rx + tz * rz, hover: sim.hover, auto: sim.auto, vt: sim.vt,
+        contact: sim.contact, down: sim.down, since: st.since, result: sim.result, retries: sim.retries, assisted: sim.assisted,
+      };
+      useLanding.setState({ s: hud });
     }
   });
 
-  const pad = useMemo(() => {
-    const v = ((parts.legs ?? "legs_a").slice(-1).charCodeAt(0) - 97 + 3) % 3;
-    return 2.02 + legFootX(v);
-  }, [parts.legs]);
-
+  const pad = P.padR;
+  const tgtY = data.heightAt(target.x, target.z);
   return (
     <>
       <group ref={root}>
@@ -302,41 +366,23 @@ function Descent({ data, outcome, parts, sky, footR, siteRock }: { data: Terrain
         </group>
       </group>
       <Dust data={data} state={dust} />
-      {siteRock && <FootRock data={data} outcome={outcome} pad={pad} />}
+      {/* the landing zone: a beam to find it from far away, a ring on the ground at the scale of the lander, and the wider scatter ring */}
+      {!landed && <Beacon position={[target.x, tgtY, target.z]} color="#b87a14" height={140} size={5} />}
+      <GroundRing data={data} x={target.x} z={target.z} radius={15} width={0.8} color="#ffb020" opacity={0.75} tone={1.3} />
+      <GroundRing data={data} x={target.x} z={target.z} radius={ringR} width={0.7} color="#6fd3ff" opacity={0.4} tone={1.2} segments={160} />
     </>
   );
 }
 
-/** A real boulder under one footpad when the outcome was "boulder". */
-function FootRock({ data, outcome, pad }: { data: TerrainData; outcome: Outcome; pad: number }) {
-  const g = useGLTF("/models/rock_moon_a.glb");
-  const obj = useMemo(() => {
-    let mesh: THREE.Mesh | null = null;
-    g.scene.traverse((o) => {
-      if (!mesh && (o as THREE.Mesh).isMesh) mesh = o as THREE.Mesh;
-    });
-    const src = mesh as unknown as THREE.Mesh;
-    const geo = src.geometry.clone();
-    geo.computeBoundingBox();
-    const bb = geo.boundingBox!;
-    const ext = Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z);
-    geo.translate(-(bb.max.x + bb.min.x) / 2, -bb.min.y - 0.15 * (bb.max.y - bb.min.y), -(bb.max.z + bb.min.z) / 2);
-    geo.scale(1 / ext, 1 / ext, 1 / ext);
-    const m = new THREE.Mesh(geo, (src.material as THREE.Material).clone());
-    m.castShadow = true;
-    m.receiveShadow = true;
-    return m;
-  }, [g]);
-  const a = outcome.yaw + Math.PI / 4;
-  const x = outcome.x + Math.sin(a) * pad;
-  const z = outcome.z + Math.cos(a) * pad;
-  obj.position.set(x, data.heightAt(x, z), z);
-  obj.scale.set(1.7, 1.2, 1.5);
-  return <primitive object={obj} />;
+const hv = { x: 0, z: 0 };
+function heading0(s: LandSim) {
+  hv.x = s.fx; hv.z = s.fz;
+  return hv;
 }
 
 export function Scene() {
   const { plan } = useGame();
+  const q = useQuality();
   const sd = usePhaseData<SiteData>("site");
   const build = usePhaseData<{ parts: Record<string, string> }>("build");
   const siteId = sd.site_id ?? plan?.destination.candidate_sites[0]?.id ?? "site_a";
@@ -347,23 +393,61 @@ export function Scene() {
     () => (data ? skyAt(data.ephemeris, data.meta.center.lat, data.meta.center.lon, missionTime(plan)) : null),
     [data, plan],
   );
-  const outcome = useMemo(
-    () => (data ? pickOutcome(sd.sim, sd.probe, plan?.seed ?? 1, data, lander.leg_span_m / 2) : null),
-    [data, sd.sim, sd.probe, plan?.seed, lander.leg_span_m],
+  const diff = devDifficulty(plan?.difficulty);
+  const target = useMemo(() => {
+    if (sd.probe) return { x: sd.probe.x, z: sd.probe.z };
+    // no probe (a dev jump straight into this phase): the flattest spot near the middle of the map
+    if (!data) return { x: 0, z: 0 };
+    let best = { x: 0, z: 0 }, bestS = 1e9;
+    for (let x = -300; x <= 300; x += 20) for (let z = -300; z <= 300; z += 20) {
+      const v = data.slopeDegAt(x, z, 4) + 0.01 * Math.hypot(x, z);
+      if (data.inside(x, z, 120) && v < bestS) { bestS = v; best = { x, z }; }
+    }
+    return best;
+  }, [sd.probe, data]);
+  const fx = perkEffects(usePerk());
+  const P = useMemo(
+    () => landParams(diff, {
+      limitDeg: sd.sim?.tilt_limit_deg ?? lander.max_tilt_deg,
+      deltaV: shipStats(parts as never).deltaV || 2500,
+      fuelMult: fx.hoverTime,
+      padR: lander.leg_span_m / 2,
+    }),
+    [diff, sd.sim?.tilt_limit_deg, lander.max_tilt_deg, lander.leg_span_m, parts, fx.hoverTime],
   );
-  useLoadingHold(!data || !sky || !outcome, "Loading the landing site terrain · NASA LOLA");
-  if (!data || !sky || !outcome) return null;
-  const focusY = data.heightAt(outcome.x, outcome.z);
+  // the boulders drawn around the zone are the ones that can damage a foot (same deterministic list as <Boulders/>)
+  const seed = plan?.seed ?? 1;
+  const ground = useMemo<Ground | null>(() => {
+    if (!data) return null;
+    const list = scatterBoulders(data, target.x, target.z, 220, seed + (data.siteId.charCodeAt(5) ?? 0) * 977, Math.round(1000 * q.instances));
+    return { h: data.heightAt, boulders: list.filter((b) => b.size >= 0.5), half: data.size / 2 };
+  }, [data, target, seed, q.instances]);
+  const heading = useMemo(() => {
+    if (!sky) return 0;
+    // look across the Sun (long shadows show the relief); the seed picks which side
+    const az = (sky.sunAzDeg + (seed % 2 ? 90 : -90)) * D2R;
+    return Math.atan2(-Math.cos(az), Math.sin(az));
+  }, [sky, seed]);
+  const [foc, setFoc] = useState<{ x: number; z: number } | null>(null);
+  const onFocus = useCallback((x: number, z: number) => setFoc({ x, z }), []);
+  const f = foc ?? target;
+  const focus2 = useMemo<[number, number]>(() => [f.x, f.z], [f.x, f.z]);
+  const focus3 = useMemo<[number, number, number]>(() => [f.x, data ? data.heightAt(f.x, f.z) : 0, f.z], [f.x, f.z, data]);
+  const ringR = Math.min(180, Math.max(40, sd.sim?.ellipse?.radius95_m ?? 120));
+  const siteName = plan?.destination.candidate_sites.find((c) => c.id === siteId)?.name ?? "the landing site";
+  useLoadingHold(!data || !sky || !ground, "Loading the landing site terrain · NASA LOLA");
+  if (!data || !sky || !ground) return null;
   return (
     <>
-      <SunLight sky={sky} shadows focus={[outcome.x, focusY, outcome.z]} radius={95} />
+      <SunLight sky={sky} shadows focus={focus3} radius={95} />
       <GroundBounce sky={sky} />
       <LunarSky sky={sky} stars={0.85} />
-      <Terrain data={data} sky={sky} detail shadows focus={[outcome.x, outcome.z]} fill={0.13} maxSegments={300} edgeFade />
-      <Boulders data={data} focus={[outcome.x, outcome.z]} shadows seed={plan?.seed ?? 1} />
-      <Descent data={data} outcome={outcome} parts={parts} sky={sky} footR={lander.leg_span_m / 2} siteRock={outcome.reason === "boulder"} />
+      <Terrain data={data} sky={sky} detail shadows focus={focus2} fill={0.13} maxSegments={300} edgeFade />
+      <Boulders data={data} focus={[target.x, target.z]} shadows seed={seed} />
+      <Descent data={data} ground={ground} P={P} target={target} heading={heading} parts={parts} siteName={siteName} ringR={ringR} onFocus={onFocus} penalty={diff === "normal" ? 8 : 0} />
       <RenderInfo />
       <Effects bloom={0.8} ao={false} />
     </>
   );
 }
+

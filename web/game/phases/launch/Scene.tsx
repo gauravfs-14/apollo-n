@@ -1,11 +1,12 @@
 "use client";
-/* eslint-disable react-hooks/refs, react-hooks/immutability, react-hooks/purity */
-// The money shot. Timeline in clock.ts:
-//   0-8 s    pad at dawn, countdown, venting steam
-//   8 s      ignition: plume + billowing exhaust smoke
-//   11 s     liftoff, camera shake, tower cleared, gravity turn
-//   24 s     cut to space: Earth curve + atmosphere, staging at 30 s and 36 s
-//   36-44 s  translunar injection burn with the Moon ahead
+/* eslint-disable react-hooks/immutability */
+// The money shot, flown by the player (flight.ts). Timeline in clock.ts:
+//   0-12 s   pad at dawn, countdown, venting steam, ignition at 3 s
+//   12 s     liftoff, camera shake, tower cleared, gravity turn: the player follows the pitch guide
+//   24 s     cut to space: Earth curve + atmosphere
+//   30 s     first stage burns out: stage (commander); second stage burns, stage again
+//   then     translunar injection burn with the Moon ahead: start it and cut it off at the target speed
+// The pilot's client simulates and sends the flight ten times a second; the other crew render the same flight.
 import { Environment } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -13,7 +14,13 @@ import * as THREE from "three";
 import { Effects } from "../../core/Effects";
 import { sfx, stopSfx } from "../../core/audio";
 import { clearComms, runCues, say } from "../../core/comms";
-import { LAUNCH_EVENTS, launchCues } from "../../data/missionComms";
+import { guidanceCall, launchCues, stagingDone, stagingVariants, tliCutoff, tliGo, tliIgnition } from "../../data/missionComms";
+import { COST } from "../../core/hp";
+import { flightDamage } from "../../flight/damage";
+import { devDifficulty } from "../../flight/difficulty";
+import { axis, installKeys, take } from "../../flight/input";
+import { useFlightSync } from "../../flight/sync";
+import { TLI, enginesOn, launchParams, needOf, needRole, newLaunch, stepLaunch, type LaunchSim } from "./flight";
 import { useQuality } from "../../core/perf";
 import { useGame } from "../../core/useGame";
 import { Earth } from "../../three/Earth";
@@ -25,11 +32,12 @@ import { Plume } from "../../three/ship/Plume";
 import { Rocket, S1_ENGINES, type RocketRefs } from "../../three/ship/Rocket";
 import { T, useLaunchClock } from "./clock";
 import { isRevealed } from "../../core/loading";
-import { traceEvent } from "../../core/comms";
+import { preload, traceEvent } from "../../core/comms";
 
 export const LAUNCH_HDRI = "/hdri/kiara_1_dawn_1k.hdr";
 const RS = 0.9; // rocket scale
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
 const sm = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 const SUN = new THREE.Vector3(-0.75, 0.32, 0.5).normalize();
 const SPACE_SUN: [number, number, number] = [-0.5, 0.5, 0.7]; // behind-left of the camera so the Moon ahead shows a lit gibbous face and the Earth below its day side
@@ -43,7 +51,14 @@ function useRng() {
 
 export function LaunchScene() {
   const q = useQuality();
-  const { plan, isHost, complete } = useGame();
+  const { plan, isHost, complete, actsAs } = useGame();
+  const pilot = actsAs("pilot");
+  const commander = actsAs("commander");
+  const diff = devDifficulty(plan?.difficulty);
+  const P = useMemo(() => launchParams(diff), [diff]);
+  const sim = useMemo<LaunchSim>(() => newLaunch(), []);
+  const flightRef = useRef({ pilot, commander, host: isHost, P });
+  useEffect(() => { flightRef.current = { pilot, commander, host: isHost, P }; });
   const { camera, scene } = useThree();
   const persp = camera as THREE.PerspectiveCamera;
   const [space, setSpace] = useState(false);
@@ -62,9 +77,19 @@ export function LaunchScene() {
 
   const st = useMemo(() => ({
     t: 0, done: false, spoke: false, ign: false, roar: false, rumble: false, sep1: false, sep2: false, cut: false,
-    lastBeep: -1, acc: 0, acc2: 0, steam: 0, lastPush: 0, completed: false, s1v: new THREE.Vector3(), s1p: new THREE.Vector3(),
-    s2p: new THREE.Vector3(), s2v: new THREE.Vector3(), s1spin: 0, s2spin: 0, camLook: new THREE.Vector3(0, 60, 0), tmp: new THREE.Vector3(), tmp2: new THREE.Vector3(),
+    lastBeep: -1, errV: 0, remoteAt: 0, remoteT: -1, ev: new Set<string>(), warnSince: -1, warnLast: -99, warned: 0, acc: 0, acc2: 0, steam: 0, lastPush: 0, completed: false, s1v: new THREE.Vector3(), s1p: new THREE.Vector3(),
+    act: false, skipSent: false, s2p: new THREE.Vector3(), s2v: new THREE.Vector3(), s1spin: 0, s2spin: 0, camLook: new THREE.Vector3(0, 60, 0), tmp: new THREE.Vector3(), tmp2: new THREE.Vector3(),
   }), []);
+  const { sendCmd } = useFlightSync<LaunchSim, { k: string; n?: string }>(
+    "launch",
+    pilot,
+    () => sim,
+    (snap, at) => { Object.assign(sim, snap); st.remoteAt = at; st.remoteT = snap.t; },
+    (c) => { if (c.k === "act" && needOf(sim) === c.n) st.act = true; else if (c.k === "skip") store0().skip(); },
+  );
+  const sendRef = useRef(sendCmd);
+  useEffect(() => { sendRef.current = sendCmd; });
+  useEffect(() => installKeys(), []);
   const spec = useMemo<EmitSpec>(() => ({ pos: [0, 0, 0], posJitter: [0, 0, 0], vel: [0, 0, 0], velJitter: [0, 0, 0], life: 1, size0: 1, size1: 1 }), []);
 
   // the pad haze must not wash out the Moon and Earth (thousands of metres away) once we are in space
@@ -81,8 +106,17 @@ export function LaunchScene() {
     useLaunchClock.getState().reset();
     // dev only: ?lt=<seconds> starts the cinematic at that time (for screenshots)
     const lt = process.env.NODE_ENV !== "production" ? Number(new URLSearchParams(location.search).get("lt")) : 0;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (lt > 0) { st.t = lt; if (lt >= T.spaceCut) setSpace(true); st.cut = lt >= T.spaceCut; st.spoke = st.ign = st.roar = st.rumble = true; st.sep1 = lt >= T.sep1; st.sep2 = lt >= T.sep2; }
+    if (lt > 0) {
+      // run the ascent up to that time with a perfect pilot (screenshots)
+      for (let tt = T.liftoff; tt < lt; tt += 0.05) {
+        const n = needOf(sim);
+        stepLaunch(sim, tt, 0.05, 0, n === "stage" || n === "ignite" || (n === "cutoff" && sim.v >= TLI.target), { ...P, assist: 2 });
+      }
+      st.t = lt;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (lt >= T.spaceCut) setSpace(true); st.cut = lt >= T.spaceCut; st.spoke = st.ign = st.roar = st.rumble = true;
+      st.sep1 = sim.s1SepAt >= 0 && lt >= sim.s1SepAt; st.sep2 = sim.s2SepAt >= 0 && lt >= sim.s2SepAt;
+    }
     persp.fov = 32;
     persp.updateProjectionMatrix();
     scene.fog = new THREE.Fog("#b9a28e", 1400, 14000);
@@ -93,7 +127,7 @@ export function LaunchScene() {
       scene.fog = null;
       stopSfx();
     };
-  }, [persp, scene, st]);
+  }, [persp, scene, st, sim, P]);
 
   const maxP = q.tier === "high" ? 900 : q.tier === "medium" ? 560 : 260;
   const rate = q.tier === "high" ? 1 : q.tier === "medium" ? 0.7 : 0.4;
@@ -104,17 +138,72 @@ export function LaunchScene() {
   useFrame((state, rawDt) => {
     const store = useLaunchClock.getState();
     const dt = Math.min(rawDt, 0.05);
-    if (store.skipped && st.t < T.end - 0.2) st.t = T.end - 0.2;
-    if (isRevealed("launch") || store.skipped) st.t += dt; // the clock starts when the scene is on screen
+    const fl = flightRef.current;
+    if (isRevealed("launch")) {
+      st.t += dt; // the clock starts when the scene is on screen
+      if (!fl.pilot && st.remoteT >= 0) {
+        // the other crew follow the pilot's clock (gently: the countdown must not jump)
+        const d = st.remoteT + (performance.now() - st.remoteAt) / 1000 - st.t;
+        if (Math.abs(d) > 3) st.t += d; else st.t += clamp(d, -0.25 * dt, 0.25 * dt);
+      }
+    }
     const t = st.t;
-    if (((t * 10) | 0) !== ((t - dt) * 10 | 0)) store.set(t);
     const tp = t - T.liftoff;
+
+    // ---- the flight: the pilot simulates, everyone else renders the pilot's state
+    if (store.skipped && !st.skipSent) {
+      st.skipSent = true;
+      if (fl.pilot) { sim.skip = true; sim.endAt = Math.max(t, sim.t) + 0.7; } // the others get it in the pilot's next snapshot
+    }
+    const need = needOf(sim);
+    let act = st.act;
+    st.act = false;
+    if (take("Space", "Enter", "KeyB") && need !== "none") {
+      const mine = needRole(need) === "commander" ? fl.commander : fl.pilot;
+      if (mine) { if (fl.pilot) act = true; else sendRef.current({ k: "act", n: need }); }
+    }
+    if (fl.pilot) {
+      const steer = axis(["ArrowLeft", "ArrowUp", "KeyA", "KeyW"], ["ArrowRight", "ArrowDown", "KeyD", "KeyS"]);
+      stepLaunch(sim, t, dt, steer, act, fl.P);
+    }
+    st.errV += (sim.err - st.errV) * (fl.pilot ? 1 : Math.min(1, dt * 12));
+    const errRad = clamp(st.errV, -0.6, 0.6);
+    const en = enginesOn(sim, t);
+    const s1At = sim.s1SepAt, s2At = sim.s2SepAt;
+    const quiet = store.skipped || sim.skip;
+    if (((t * 10) | 0) !== ((t - dt) * 10 | 0)) store.set(t, sim);
+
+    // ---- flight radio: every line says what has just happened (on every client, from the same state)
+    if (!quiet) {
+      const once = (k: string, fn: () => void) => { if (!st.ev.has(k)) { st.ev.add(k); fn(); } };
+      if (sim.s1CutAt >= 0) once("s1cut", () => { traceEvent("first stage burnout: stage now"); stagingVariants(1).forEach(preload); });
+      if (sim.s2CutAt >= 0) once("s2cut", () => { traceEvent("second stage burnout: stage now"); stagingVariants(2).forEach(preload); });
+      if (sim.readyAt >= 0 && t >= sim.readyAt) once("ready", () => { traceEvent("TLI window open (GO for translunar injection)"); preload(tliIgnition()); say(tliGo(TLI.target)); });
+      if (sim.burnAt >= 0) once("burn", () => { traceEvent(`TLI ignition (${sim.autoBurn ? "automatic" : "player"})`); sfx("ignition", { volume: 0.5 }); say(tliIgnition()); });
+      if (sim.burnEndAt >= 0) once("cut", () => {
+        const dv = sim.v - TLI.target;
+        traceEvent(`TLI cutoff at ${(sim.v / 1000).toFixed(2)} km/s (${dv >= 0 ? "+" : ""}${Math.round(dv)} m/s from target)`);
+        say(tliCutoff(sim.v, dv, fl.P.tol), { interrupt: true });
+        const e = Math.abs(dv);
+        if (e > fl.P.tol * 6) flightDamage(COST.severe, `TLI burn ${Math.round(e)} m/s off target`, fl.pilot);
+        else if (e > fl.P.tol * 3) flightDamage(COST.major, `TLI burn ${Math.round(e)} m/s off target`, fl.pilot);
+      });
+      // Houston only speaks up about a pitch error that has really persisted
+      const errDeg = (sim.err * 180) / Math.PI;
+      if (tp > 2 && sim.burnEndAt < 0 && (en.s1 || en.s2 || en.s3) && Math.abs(errDeg) > fl.P.warn) {
+        if (st.warnSince < 0) st.warnSince = t;
+        else if (t - st.warnSince > 1.6 && t - st.warnLast > 12 && st.warned < 2) {
+          st.warned++; st.warnLast = t; flightDamage(COST.minor, `Pitch ${Math.abs(errDeg).toFixed(0)} degrees off the guide`, fl.pilot); traceEvent(`pitch error ${errDeg.toFixed(0)} deg for 1.6 s: Houston calls it`); say(guidanceCall(errDeg));
+        }
+      } else st.warnSince = -1;
+    }
+
     const alt = altitude(tp);
     const rk = rocket.current;
     if (!rk) return;
 
     // ---- audio / voice cues: the real countdown and ascent calls ----
-    if (store.skipped) {
+    if (quiet) {
       if (!st.spoke) { st.spoke = true; clearComms(); }
     } else runCues(cues, t, fired.current);
     if (!st.ign && t > T.ignition) { st.ign = true; sfx("ignition", { volume: 0.7 }); traceEvent("engines ignite"); }
@@ -133,7 +222,7 @@ export function LaunchScene() {
     if (!space && t < T.spaceCut + 0.05) {
       // ---------------- PAD MODE ----------------
       const y = PAD_H + alt;
-      const pitch = tp > 6 ? Math.min(0.5, 0.0045 * (tp - 6) * (tp - 6)) : 0;
+      const pitch = (tp > 6 ? Math.min(0.5, 0.0045 * (tp - 6) * (tp - 6)) : 0) + (tp > 0 ? errRad : 0);
       const sway = t > T.ignition && tp < 0 ? Math.sin(t * 38) * 0.0009 * (t - T.ignition) : 0;
       rk.root.position.set(Math.sin(pitch) * alt * 0.25, y, 0);
       rk.root.rotation.set(0, 0, -pitch + sway);
@@ -219,45 +308,53 @@ export function LaunchScene() {
     } else {
       // ---------------- SPACE MODE ----------------
       const ts = t - T.spaceCut;
-      const s1 = t >= T.sep1, s2 = t >= T.sep2;
+      const s1 = s1At >= 0 && t >= s1At, s2 = s2At >= 0 && t >= s2At;
       if (!st.sep1 && s1) {
-        st.sep1 = true; sfx("staging", { volume: 0.6 }); traceEvent("first stage separates"); if (!store.skipped) say(LAUNCH_EVENTS.staging);
+        st.sep1 = true; sfx("staging", { volume: 0.6 });
+        traceEvent(`first stage separates (${sim.s1Delay.toFixed(1)} s after burnout${sim.auto1 ? ", automatic" : ""})`);
+        if (!quiet) say(stagingDone(1, sim.s1Delay));
+        if (!quiet && sim.s1Delay > 4) flightDamage(COST.major, "Staging missed: forced separation", fl.pilot);
+        else if (!quiet && sim.s1Delay > 2) flightDamage(COST.minor, "Staging late", fl.pilot);
         st.s1p.set(0, 0, 0); st.s1v.set(-9, 0.6, 1.8);
         for (let i = 0; i < 40 * rate; i++) {
           fire.current?.emit(1, { pos: [0, 52 * RS, 0], posJitter: [4, 3, 4], vel: [(R() - 0.5) * 30, (R() - 0.5) * 30, (R() - 0.5) * 30], life: 0.9, size0: 4, size1: 22, color: [1, 0.85, 0.6], glow: 1 });
         }
       }
       if (!st.sep2 && s2) {
-        st.sep2 = true; sfx("staging", { volume: 0.5 }); traceEvent("second stage separates"); if (!store.skipped) say(LAUNCH_EVENTS.stage2);
+        st.sep2 = true; sfx("staging", { volume: 0.5 });
+        traceEvent(`second stage separates (${sim.s2Delay.toFixed(1)} s after burnout${sim.auto2 ? ", automatic" : ""})`);
+        if (!quiet) say(stagingDone(2, sim.s2Delay));
+        if (!quiet && sim.s2Delay > 4) flightDamage(COST.major, "Staging missed: forced separation", fl.pilot);
+        else if (!quiet && sim.s2Delay > 2) flightDamage(COST.minor, "Staging late", fl.pilot);
         st.s2p.set(0, 0, 0); st.s2v.set(-6, -0.5, -1.4);
         for (let i = 0; i < 24 * rate; i++) {
           fire.current?.emit(1, { pos: [0, 78 * RS, 0], posJitter: [3, 2, 3], vel: [(R() - 0.5) * 20, (R() - 0.5) * 20, (R() - 0.5) * 20], life: 0.8, size0: 3, size1: 14, color: [1, 0.9, 0.7], glow: 1 });
         }
       }
       // rocket: heading +X, slight nose-down pitch with Earth curve
-      const head = -Math.PI / 2 + 0.18;
+      const head = -(1.39 + errRad);
       rk.root.position.set(ts * 30, 0, 0);
       rk.root.rotation.set(0, 0, head);
       rk.root.scale.setScalar(RS);
       rk.les.visible = ts < 1.2;
       if (rk.les.visible) rk.les.position.set(0, ts * 6, 0); else rk.les.position.set(0, 0, 0);
       // separated stages drift away (local frame): -Y is 'back' along the flight axis
-      rk.s1.visible = t < T.sep1 + 6;
-      rk.s2.visible = t < T.sep2 + 6;
+      rk.s1.visible = !s1 || t < s1At + 6;
+      rk.s2.visible = !s2 || t < s2At + 6;
       if (s1) {
-        const k = t - T.sep1;
+        const k = t - s1At;
         rk.s1.position.set(st.s1v.x * k * 0.5 + Math.sin(k * 0.5) * 2, -k * k * 4.5 - k * 6, st.s1v.z * k);
         rk.s1.rotation.set(k * 0.12, 0, k * 0.07);
       }
       if (s2) {
-        const k = t - T.sep2;
+        const k = t - s2At;
         rk.s2.position.set(st.s2v.x * k * 0.5, -k * k * 3.5 - k * 5, st.s2v.z * k);
         rk.s2.rotation.set(k * 0.09, 0, -k * 0.05);
       }
       // engines: S-II burns between separations, S-IVB burns after
-      flame.current = t < T.sep1 ? (0.9 + Math.random() * 0.1) : 0;
-      flame2.current = t >= T.sep1 + 0.8 && !s2 ? clamp01((t - T.sep1 - 0.8) / 1.0) * (0.9 + Math.random() * 0.1) : 0;
-      flame3.current = s2 ? clamp01((t - T.sep2 - 0.6) / 1.2) * (0.92 + Math.random() * 0.08) : 0;
+      flame.current = en.s1 ? (0.9 + Math.random() * 0.1) : 0;
+      flame2.current = en.s2 && !s2 ? clamp01((t - s1At - 0.8) / 1.0) * (0.9 + Math.random() * 0.1) : 0;
+      flame3.current = en.s3 ? clamp01((t - sim.burnAt) / 0.6) * (0.92 + Math.random() * 0.08) : 0;
       if (light.current) {
         light.current.intensity = 0;
       }
@@ -271,16 +368,16 @@ export function LaunchScene() {
       const p = rk.root.position;
       const centreY = flame3.current > 0 || s2 ? 90 * RS : 60 * RS;
       st.tmp2.set(0, centreY, 0).applyAxisAngle(AXIS_Z, head).add(p);
-      const orbit = sm(T.sep2, T.end, t);
+      const orbit = s2 ? sm(0, 12, t - s2At) : 0;
       const ang = -0.9 + Math.sin(ts * 0.18) * 0.12 + orbit * 1.55;
-      const dist = 150 - sm(T.sep1 - 2, T.sep1 + 2, t) * 10 - orbit * 25;
+      const dist = 150 - (s1 ? sm(0, 4, t - s1At) : 0) * 10 - orbit * 25;
       state.camera.position.set(p.x - 30 + Math.sin(ang) * dist, 25 + orbit * 30, Math.cos(ang) * dist);
       state.camera.lookAt(st.tmp2);
       persp.fov = 42;
       persp.updateProjectionMatrix();
       glowAt.current.set(1e5, 1e5, 1e5);
       if (flash.current) {
-        const f = t > T.sep1 && t < T.sep1 + 0.5 ? 1 - (t - T.sep1) / 0.5 : 0;
+        const f = s1 && t < s1At + 0.5 ? 1 - (t - s1At) / 0.5 : 0;
         flash.current.visible = f > 0;
         flash.current.material.opacity = f;
         flash.current.position.copy(st.tmp2);
@@ -288,11 +385,12 @@ export function LaunchScene() {
     }
 
     // ---- completion ----
-    if (t >= T.end && !st.completed) {
+    if (sim.endAt >= 0 && t >= sim.endAt && !st.completed) {
       st.completed = true;
-      store.set(t);
-      if (isHost || !plan) complete("launch", 100);
-      else setTimeout(() => complete("launch", 100), 5000);
+      store.set(t, sim);
+      const score = sim.result?.total ?? 60; // skipped: a fair middling score
+      if (fl.pilot || !plan) complete("launch", score);
+      else if (fl.host) setTimeout(() => complete("launch", score), 6000); // the pilot's client has gone quiet: host closes it
     }
   });
 
@@ -354,3 +452,4 @@ export function LaunchScene() {
 }
 
 const AXIS_Z = new THREE.Vector3(0, 0, 1);
+const store0 = () => useLaunchClock.getState();

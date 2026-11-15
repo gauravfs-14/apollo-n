@@ -48,7 +48,7 @@ const guest = await newPlayer("guest", "Guesty");
 let code;
 
 // ---- room + join
-await click(host.page.getByRole("button", { name: "Host crew room" }));
+await click(host.page.getByRole("button", { name: "Host a room" }));
 await host.page.waitForURL(/\/play\/APOLLO-/, { timeout: 15000 });
 code = new URL(host.page.url()).pathname.split("/").pop();
 console.log("room", code);
@@ -65,12 +65,10 @@ await shot(host, "01-select");
 await shot(guest, "01-select");
 
 // ---- select: only the host chooses
-await host.page.getByRole("button", { name: "Select", exact: true }).first().waitFor({ timeout: 120000 });
-const guestHasSelect = await guest.page.getByRole("button", { name: "Select", exact: true }).count();
-check("guest has no Select button (host-only)", guestHasSelect === 0);
-const guestCards = await until(async () => (await guest.page.locator("article").count()) >= 3, 30000);
-check("guest sees the host's mission cards", guestCards);
-await click(host.page.getByRole("button", { name: "Select", exact: true }));
+await host.page.getByRole("button", { name: /Play level 1/ }).waitFor({ timeout: 120000 });
+check("guest has no Play button (host-only)", (await guest.page.getByRole("button", { name: /Play level/ }).count()) === 0);
+check("guest sees the crew's level", await until(async () => (await guest.page.getByText(/Crew is on level 1/).count()) > 0, 30000));
+await click(host.page.getByRole("button", { name: /Play level 1/ }));
 check("both reach build", (await waitPhase(host.page, "build", 15000)) >= 0 && (await waitPhase(guest.page, "build", 15000)) >= 0);
 
 // ---- build: host picks, guest sees; only host/commander locks in
@@ -195,8 +193,29 @@ await click(host.page.getByRole("button", { name: "Skip", exact: true })); // ot
 
 // ---- launch / cruise
 check("both reach launch", (await waitPhase(host.page, "launch", 15000)) >= 0 && (await waitPhase(guest.page, "launch", 10000)) >= 0);
-await host.page.waitForTimeout(3500);
-await click(host.page.getByRole("button", { name: "Skip", exact: true }));
+// fly it as a crew: the guest (pilot) steers and flies the TLI burn, the host (commander) stages
+{
+  const TARGET = 10900;
+  const read = (pg) => pg.evaluate(() => { const c = window.__launchClock?.getState(); return c ? { t: c.t, ...c.sim } : null; });
+  const t0 = Date.now();
+  let checkedSync = false;
+  while ((await getPhase(host.page)) === "launch" && Date.now() - t0 < 150000) {
+    const g = await read(guest.page);
+    const h = await read(host.page);
+    if (g) {
+      if ((g.s1CutAt >= 0 && g.s1SepAt < 0) || (g.s2CutAt >= 0 && g.s2SepAt < 0)) await host.page.keyboard.press("Space");
+      if (g.burnEndAt < 0 && g.readyAt >= 0 && g.t >= g.readyAt && g.burnAt < 0) await guest.page.keyboard.press("Space");
+      if (g.burnAt >= 0 && g.burnEndAt < 0 && g.v >= TARGET - 40) await guest.page.keyboard.press("Space");
+      if (!checkedSync && g.burnAt >= 0 && h) {
+        checkedSync = true;
+        check("host sees the pilot's flight (burn state and speed within 400 m/s)", h.burnAt >= 0 && Math.abs(h.v - g.v) < 400, `host v ${Math.round(h.v)} pilot v ${Math.round(g.v)}`);
+        await shot(host, "04b-launch-burn");
+        await shot(guest, "04b-launch-burn");
+      }
+    }
+    await host.page.waitForTimeout(40);
+  }
+}
 check("both reach cruise", (await waitPhase(host.page, "cruise", 20000)) >= 0 && (await waitPhase(guest.page, "cruise", 10000)) >= 0);
 await host.page.waitForTimeout(2500);
 const h0 = plan.cruise[0];
@@ -232,8 +251,13 @@ await click(guest.page.getByRole("button", { name: "Confirm landing site" }));
 // ---- landing: both watch, pilot opens the hatch
 check("both reach landing", (await waitPhase(host.page, "landing", 20000)) >= 0 && (await waitPhase(guest.page, "landing", 10000)) >= 0);
 await host.page.waitForTimeout(4000);
-await click(guest.page.getByRole("button", { name: "Skip", exact: true }));
-await guest.page.getByRole("button", { name: /Continue to the surface/ }).waitFor({ timeout: 30000 });
+await guest.page.evaluate(() => window.__landing?.getState().request("auto")); // the pilot hands the landing to the autopilot (real flying: scripts/flight-landing.mjs)
+await guest.page.getByRole("button", { name: /Continue to the surface/ }).waitFor({ timeout: 90000 });
+{
+  const pos = (pg) => pg.evaluate(() => { const s = window.__landSim; return s ? { x: s.x, z: s.z, down: s.down, reason: s.result?.reason } : null; });
+  const gp = await pos(guest.page), hp = await pos(host.page);
+  check("host sees the same landing as the pilot", !!hp?.down && Math.hypot(gp.x - hp.x, gp.z - hp.z) < 5 && gp.reason === hp.reason, JSON.stringify({ gp, hp }));
+}
 await shot(host, "07-landing");
 check("host (non-pilot) has no Continue while a pilot is connected", (await host.page.getByRole("button", { name: /Continue to the surface/ }).count()) === 0);
 await click(guest.page.getByRole("button", { name: /Continue to the surface/ }));

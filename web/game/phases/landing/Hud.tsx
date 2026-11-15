@@ -1,22 +1,13 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { DamageNotes } from "../../flight/damage";
+import { press } from "../../flight/input";
+import { ControlsHelp, TiltPad } from "../../flight/ui";
+import { useSkipVote } from "../../core/skip";
 import { rolesOf } from "../../core/roles";
-import { useGame, usePhaseData } from "../../core/useGame";
+import { useGame } from "../../core/useGame";
 import { Button, Meter, Panel, PhaseTitle, Stat } from "../../ui/kit";
-import type { SimOut } from "../site/api";
-import { landerFromBuild } from "../site/api";
-import { pickOutcome, scoreLanding } from "./outcome";
-import { TOTAL, useLanding } from "./store";
-import { loadTerrain } from "../../three/terrain";
 import { phaseLabel } from "../../ui/phaseLabel";
-
-interface SiteData {
-  site_id: string;
-  probe: { x: number; z: number };
-  sim: SimOut;
-  score: number;
-  safe_pct: number;
-}
+import { useLanding } from "./store";
 
 function Stars({ n }: { n: number }) {
   return (
@@ -32,108 +23,139 @@ function Stars({ n }: { n: number }) {
 
 // Feet and ft/s, the units the crew call out.
 const FT = 3.281;
+const ft = (m: number) => Math.round(Math.abs(m) * FT);
 
 export function LandingHud() {
-  const { plan, complete, actsAs, isHost, state } = useGame();
-  const sd = usePhaseData<SiteData>("site");
-  const build = usePhaseData<{ parts: Record<string, string> }>("build");
-  const t = useLanding((s) => s.t);
-  const tele = useLanding((s) => s.tele);
-  const contact = useLanding((s) => s.contact);
-  const ready = useLanding((s) => s.ready);
-  const skip = useLanding((s) => s.skip);
+  const { complete, actsAs, isHost, state, plan } = useGame();
+  const s = useLanding((x) => x.s);
+  const info = useLanding((x) => x.info);
+  const request = useLanding((x) => x.request);
   const isPilot = actsAs("pilot");
-  const lander = useMemo(() => landerFromBuild(build.parts), [build.parts]);
-  const [outcomeScore, setOutcome] = useState<ReturnType<typeof scoreLanding> | null>(null);
-  const [waited, setWaited] = useState(0);
-  const [out, setOut] = useState<ReturnType<typeof pickOutcome> | null>(null);
+  const autoVote = useSkipVote("landing", () => request("auto")); // crew vote in multiplayer
+  const down = !!s?.down;
+  const result = s?.result ?? null;
+  const showResult = down && !!result && (s?.since ?? 0) > 2.2;
 
-  useEffect(() => {
-    let alive = true;
-    const siteId = sd.site_id ?? plan?.destination.candidate_sites[0]?.id ?? "site_a";
-    loadTerrain(siteId).then((d) => {
-      if (!alive) return;
-      const o = pickOutcome(sd.sim, sd.probe, plan?.seed ?? 1, d, lander.leg_span_m / 2);
-      setOutcome(scoreLanding(o, sd.sim?.ellipse?.radius95_m ?? 150));
-      setOut(o);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [sd.site_id, sd.sim, sd.probe, plan, lander.leg_span_m]);
-
-  const done = t >= TOTAL - 2.4;
-  useEffect(() => {
-    if (!done) return;
-    const i = setInterval(() => setWaited((w) => w + 1), 1000);
-    return () => clearInterval(i);
-  }, [done]);
+  const waited = s?.since ?? 0;
+  const flown = s?.t ?? 0;
   const anyPilot = state?.players.some((p) => rolesOf(p).includes("pilot") && p.connected) ?? false;
   const canContinue = isPilot || (isHost && (!anyPilot || waited > 20));
+  const diff = plan?.difficulty ?? "normal";
+
+  if (!s || !info) {
+    return <div className="absolute inset-0"><PhaseTitle step={phaseLabel("landing")} title="Touchdown" /></div>;
+  }
+  const tooFast = !down && s.alt < 60 && -s.vy > info.vSafe * 1.4;
+  const lowFuel = s.fuelPct < 20 && s.fuelPct > 0;
+  const sink = Math.max(0, -s.vy);
+  const score = result ? Math.max(0, Math.min(s.assisted && diff !== "easy" ? 60 : 100, result.score.total - (diff === "normal" ? 8 : 0) * s.retries)) : 0;
 
   return (
     <div className="absolute inset-0">
-      <PhaseTitle step={phaseLabel("landing")} title="Touchdown" subtitle={sd.probe ? "Landing on the spot you chose." : undefined} />
+      <PhaseTitle step={phaseLabel("landing")} title="Touchdown" subtitle="Land on the amber ring. Slow and level wins." />
+      <DamageNotes />
 
-      {!done && ready && (
-        <div className="absolute bottom-6 left-6 w-60">
+      {!down && (
+        <div className="absolute bottom-6 left-6 w-64">
           <Panel>
-            <div className="grid grid-cols-2 gap-3">
-              <Stat label="Altitude (ft)" value={Math.round(tele.alt * FT)} tone="data" />
-              <Stat label="Down (ft/s)" value={Math.max(0, -tele.vs * FT).toFixed(0)} tone="data" />
-              <Stat label="Forward (ft/s)" value={(tele.hs * FT).toFixed(0)} tone="data" />
-              <Stat label="Engine" value={`${Math.round(tele.thr * 100)}%`} tone="data" />
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+              <Stat label="Altitude (ft)" value={ft(s.alt)} tone="data" />
+              <Stat label="Down (ft/s)" value={(sink * FT).toFixed(0)} tone={tooFast ? "nogo" : sink > info.vSafe ? "default" : "go"} />
+              <Stat label="Forward (ft/s)" value={(s.vf * FT).toFixed(0)} tone="data" />
+              <Stat label="Sideways (ft/s)" value={(s.vr * FT).toFixed(0)} tone="data" />
             </div>
-            <div className="mt-3">
-              <Meter value={tele.thr} tone="amber" />
+            <div className="mt-3 flex items-center gap-3">
+              <TiltPad lean={[s.leanF, s.leanR]} slope={[s.slopeF, s.slopeR]} limit={info.limit} vel={[s.vf, s.vr]} />
+              <div className="flex-1 space-y-2 text-xs">
+                <div>
+                  <div className="flex justify-between text-[11px] text-dim"><span>Fuel</span><span className={`num ${lowFuel ? "text-nogo" : "text-white"}`}>{Math.round(s.fuelPct)}%</span></div>
+                  <Meter value={s.fuelPct / 100} tone={lowFuel ? "nogo" : s.fuelPct < 40 ? "amber" : "go"} />
+                </div>
+                <div>
+                  <div className="flex justify-between text-[11px] text-dim"><span>Engine</span><span className="num text-white">{Math.round(s.thr * 100)}%</span></div>
+                  <Meter value={s.thr} tone="amber" />
+                </div>
+                <div className="text-[11px] leading-snug text-dim">
+                  Zone: {ft(s.tgtF)} ft {s.tgtF >= 0 ? "ahead" : "behind"}, {ft(s.tgtR)} ft {s.tgtR >= 0 ? "right" : "left"}
+                </div>
+              </div>
             </div>
-            <div className={`mt-3 rounded-md px-2 py-1 text-center text-xs font-medium ${contact ? "bg-cyan/20 text-cyan" : "bg-white/5 text-dim"}`}>
-              {contact ? "CONTACT LIGHT" : "Searching for ground"}
+            <div className={`mt-3 rounded-md px-2 py-1 text-center text-xs font-medium ${s.contact ? "bg-cyan/20 text-cyan" : s.auto ? "bg-amber/15 text-amber" : "bg-white/5 text-dim"}`}>
+              {s.contact ? "CONTACT LIGHT" : s.auto ? "Autopilot flying" : s.hover ? `Hover assist: holding ${(Math.max(-s.vt, 0) * FT).toFixed(0)} ft/s down` : "Manual throttle"}
             </div>
           </Panel>
         </div>
       )}
 
-      {!done && t > 3 && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
-          <Button variant="ghost" onClick={skip}>
-            Skip
-          </Button>
+      {!down && (tooFast || lowFuel || s.fuelPct <= 0) && (
+        <div className="pointer-events-none absolute left-1/2 top-24 -translate-x-1/2 rounded-md bg-nogo/80 px-3 py-1 text-sm font-medium text-white">
+          {s.fuelPct <= 0 ? "OUT OF FUEL" : tooFast ? "TOO FAST: add throttle" : "LOW FUEL"}
         </div>
       )}
 
-      {done && outcomeScore && out && (
+      {!down && (
+        <div className="absolute bottom-6 right-6 flex flex-col items-end gap-2">
+          {isPilot && (info.hoverAvail || info.autoAvail) && (
+            <div className="flex gap-2">
+              {info.hoverAvail && <Button variant={s.hover && !s.auto ? "primary" : "ghost"} onClick={() => press("KeyH")} className="!px-3 !py-1.5">Hover assist (H)</Button>}
+              {info.autoAvail && <Button variant={s.auto ? "primary" : "ghost"} onClick={() => press("KeyP")} className="!px-3 !py-1.5">Autopilot (P)</Button>}
+            </div>
+          )}
+          {flown > 40 && !s.auto && (
+            <Button variant="ghost" onClick={autoVote.request} disabled={autoVote.disabled}>{autoVote.pending ? autoVote.label : "Let the autopilot land"}</Button>
+          )}
+          {isPilot ? (
+            <ControlsHelp
+              rows={[
+                [["W", "S"], s.hover || s.auto ? "Sink rate: less / more" : "Throttle up / down"],
+                [["Shift"], "Full throttle (hold)"],
+                [["X"], "Engine cut"],
+                [["Up", "Down"], "Lean forward / back"],
+                [["Left", "Right"], "Lean left / right"],
+                ...(info.hoverAvail ? [[["H"], "Hover assist"] as [string[], string]] : []),
+                ...(info.autoAvail ? [[["P"], "Autopilot (any key takes over)"] as [string[], string]] : []),
+              ]}
+              note="Leaning tilts the thrust, so lean toward where you want to go and the other way to stop. Touch down slowly, level, on the ring."
+            />
+          ) : (
+            <Panel className="w-64 !p-3 text-xs text-dim">The pilot is flying the lander.</Panel>
+          )}
+        </div>
+      )}
+
+      {showResult && result && (
         <div className="absolute right-6 top-1/2 w-[22rem] -translate-y-1/2">
           <Panel>
             <div className="text-[11px] text-dim">Landing score</div>
             <div className="flex items-center justify-between">
-              <div className={`num text-5xl leading-none ${outcomeScore.total >= 65 ? "text-go" : outcomeScore.total >= 35 ? "text-amber" : "text-nogo"}`}>{outcomeScore.total}</div>
-              <Stars n={outcomeScore.stars} />
+              <div className={`num text-5xl leading-none ${score >= 65 ? "text-go" : score >= 35 ? "text-amber" : "text-nogo"}`}>{score}</div>
+              <Stars n={result.score.stars} />
             </div>
-            <p className="mt-2 text-sm leading-snug text-white/90">{outcomeScore.status}</p>
-            <div className="mt-3 space-y-2.5">
-              {outcomeScore.parts.map((p) => (
+            <p className="mt-2 text-sm leading-snug text-white/90">{result.score.status}</p>
+            <div className="mt-3 space-y-2">
+              {result.score.parts.map((p) => (
                 <div key={p.label}>
                   <div className="flex items-baseline justify-between text-xs">
                     <span className="text-white/85">{p.label}</span>
                     <span className="num text-dim">{p.points} / {p.max}</span>
                   </div>
                   <Meter value={p.points / p.max} tone={p.points / p.max > 0.66 ? "go" : p.points / p.max > 0.33 ? "amber" : "nogo"} />
-                  <div className="mt-0.5 text-[11px] text-dim">{p.text}</div>
+                  <div className="mt-0.5 text-[11px] leading-snug text-dim">{p.text}</div>
                 </div>
               ))}
             </div>
-            <p className="mt-3 text-[11px] leading-snug text-dim">
-              This touchdown was one of your 300 practice landings, picked by the mission seed. Spot score {sd.score ?? "-"} and {sd.safe_pct != null ? Math.round(sd.safe_pct) : "-"}% safe landings
-              decided the odds.
-            </p>
-            {canContinue ? (
-              <Button className="mt-3 w-full" onClick={() => complete("landing", outcomeScore.total)}>
-                Continue to the surface
-              </Button>
-            ) : (
-              <p className="mt-3 text-xs text-dim">Waiting for the pilot to open the hatch.</p>
-            )}
+            {s.retries > 0 && diff === "normal" && <p className="mt-2 text-[11px] text-dim">Each retry costs 8 points on normal.</p>}
+            {s.assisted && diff !== "easy" && <p className="mt-2 text-[11px] text-dim">The autopilot flew part of this landing: score capped at 60.</p>}
+            <div className="mt-3 flex gap-2">
+              {isPilot && info.retryAllowed && result.reason !== "ok" && (
+                <Button variant="ghost" className="flex-1" onClick={() => press("KeyR")}>Try again (R)</Button>
+              )}
+              {canContinue ? (
+                <Button className="flex-1" onClick={() => complete("landing", score)}>Continue to the surface</Button>
+              ) : (
+                <p className="flex-1 self-center text-xs text-dim">Waiting for the pilot to open the hatch.</p>
+              )}
+            </div>
           </Panel>
         </div>
       )}
