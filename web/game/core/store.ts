@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import type { GameState, Player, Role, ServerMsg } from "../types";
 import { setMasterVolume } from "./audio";
+import { rolesOf } from "./roles";
 
 export type Quality = "low" | "medium" | "high";
 /** User choice in settings: "auto" lets the FPS monitor move between tiers, anything else pins the tier. */
@@ -98,12 +99,12 @@ export function emitLocal(msg: Parameters<Listener>[0]) {
   listeners.forEach((fn) => fn(msg));
 }
 
-/** Does this player act for `role`? Solo: every role. Multi: own role, plus unclaimed roles for the host. */
+/** Does this player act for `role`? Solo: every role. Multi: any role you hold, plus roles whose holders are all offline for the host. */
 export function actsAs(state: GameState | null, me: Player | undefined, role: Role): boolean {
   if (!state || !me) return false;
   if (state.mode === "solo") return true;
-  if (me.role === role) return true;
-  const claimed = state.players.some((p) => p.role === role && p.connected);
+  if (rolesOf(me).includes(role)) return true;
+  const claimed = state.players.some((p) => rolesOf(p).includes(role) && p.connected);
   return !claimed && me.isHost;
 }
 

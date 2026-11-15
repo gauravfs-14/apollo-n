@@ -3,6 +3,7 @@
 // Suit-up room: four astronauts in a NASA crew-portrait line-up in front of a hangar window onto Earth.
 // One soft key light, cool fill, coloured rim lights for separation, softbox reflections in the gold visors.
 import { Environment, Html, Lightformer, MeshReflectorMaterial } from "@react-three/drei";
+import { rolesOf } from "../../core/roles";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useMemo } from "react";
 import * as THREE from "three";
@@ -65,7 +66,7 @@ function Lineup() {
   return (
     <>
       {ROLES.map((role, i) => {
-        const holder = players?.find((p) => p.role === role);
+        const holder = players?.find((p) => rolesOf(p).includes(role));
         const mine = holder?.id === meId;
         const active = hover === role || mine;
         const label = holder?.name ?? uiNames[role] ?? crew.names?.[role];

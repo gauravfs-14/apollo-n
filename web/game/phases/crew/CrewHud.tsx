@@ -1,13 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useGame } from "../../core/useGame";
 import { Button, Panel, PhaseTitle } from "../../ui/kit";
 import { ROLES, type Role } from "../../types";
+import { holderOf as holderIn, rolesOf, rolesText } from "../../core/roles";
 import { defaultNames, hashSeed, laterFor, ROLE_INFO, type CrewData } from "./data";
 import { useCrewUi } from "./hover";
 import { phaseLabel } from "../../ui/phaseLabel";
-
-const WAIT_BEFORE_FORCE_MS = 15000;
 
 export function CrewHud() {
   const { state, plan, me, isHost, patch, complete, send } = useGame();
@@ -19,7 +18,9 @@ export function CrewHud() {
   const [salt, setSalt] = useState(0);
   const [typed, setTyped] = useState<Partial<Record<Role, string>>>({});
   const players = state?.players ?? [];
-  const holderOf = (r: Role) => players.find((p) => p.role === r);
+  const holderOf = (r: Role) => holderIn(players, r);
+  const pickerOf = (r: Role) => players.find((p) => p.picked === r && !p.released);
+  const labels = Object.fromEntries(ROLES.map((r) => [r, ROLE_INFO[r].label])) as Record<Role, string>;
 
   const base = saved ?? defaultNames(seed, salt);
   const nameOf = (r: Role) => typed[r] ?? base[r];
@@ -28,66 +29,56 @@ export function CrewHud() {
     setUiNames(Object.fromEntries(ROLES.map((r) => [r, nameOf(r)])));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `shown` captures the names
   }, [shown, setUiNames]);
-  const connected = players.filter((p) => p.connected);
-  const waitingOn = connected.filter((p) => !p.role);
-  const ready = !multi || waitingOn.length === 0;
-
-  // never soft-lock: after a while the host may start without the stragglers
-  const [canForce, setCanForce] = useState(false);
-  const blockedSince = useRef<number | null>(null);
-  useEffect(() => {
-    if (ready) {
-      blockedSince.current = null;
-      setCanForce(false); // eslint-disable-line react-hooks/set-state-in-effect -- timer-driven UI flag
-      return;
-    }
-    blockedSince.current ??= Date.now();
-    const t = setTimeout(() => setCanForce(true), Math.max(0, WAIT_BEFORE_FORCE_MS - (Date.now() - blockedSince.current)));
-    return () => clearTimeout(t);
-  }, [ready, waitingOn.length]);
+  const myRoles = rolesOf(me);
 
   function start() {
     const names = {} as Record<Role, string>;
-    const ai: Role[] = [];
     for (const r of ROLES) {
       const h = holderOf(r);
       names[r] = (multi && h ? h.name : nameOf(r).trim()) || defaultNames(seed)[r];
-      if (multi && !h) ai.push(r);
     }
-    patch("crew", { names, ai } satisfies CrewData);
+    patch("crew", { names, ai: [] } satisfies CrewData); // every role is held by a real player in multi
     complete("crew", 100);
   }
 
   const pick = (role: Role | null) => send({ type: "pick_role", role });
-  const myRole = me?.role;
+  const myPick = me?.picked;
 
   return (
     <>
       <PhaseTitle
         step={phaseLabel("crew")}
         title="Meet your crew"
-        subtitle={multi ? "Pick your role. Roles nobody picks are flown by AI crew, run by the host." : "Name your four astronauts. Each one has a job later in the mission."}
+        subtitle={multi ? "Ask for the role you want. The rest are shared out evenly, so everyone has a job." : "Name your four astronauts. Each one has a job later in the mission."}
       />
 
       <div className="absolute right-5 top-14 w-72">
         <Panel className="space-y-3">
           {multi ? (
-            <div className="text-sm">
-              <div className="text-white">{players.length} in the room</div>
-              <div className="mt-0.5 text-dim">
-                {ready
-                  ? `Everyone has a role. ${ROLES.filter((r) => !holderOf(r)).length} open role(s) will be AI crew.`
-                  : `Waiting for ${waitingOn.map((p) => p.name).join(", ")} to pick a role.`}
-              </div>
+            <div className="space-y-2 text-sm">
+              <div className="text-white">{players.filter((p) => !p.released).length} in the room</div>
+              {myRoles.length > 0 && (
+                <div className="rounded-md bg-white/5 px-2.5 py-1.5" data-testid="my-roles">
+                  <span className="text-white/60">You: </span>
+                  <span className="font-medium text-white">{rolesText(myRoles, labels)}</span>
+                </div>
+              )}
+              <ul className="space-y-1 text-[13px]">
+                {players.filter((p) => !p.released).map((p) => (
+                  <li key={p.id} className="flex items-baseline justify-between gap-2" data-testid="crew-line">
+                    <span className={`truncate ${p.connected ? "text-white/90" : "text-white/40"}`}>{p.name}{p.id === me?.id ? " (you)" : ""}</span>
+                    <span className="shrink-0 text-[12px] text-dim">{rolesText(rolesOf(p), labels)}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="text-xs text-dim">Four roles, shared evenly. It updates when someone joins or leaves.</div>
             </div>
           ) : (
-            <div className="text-sm text-dim">You hold every role. In a crew room, friends pick one each.</div>
+            <div className="text-sm text-dim">You hold every role. In a crew room, the roles are shared between friends.</div>
           )}
           {isHost ? (
             <>
-              <Button className="w-full" onClick={start} disabled={!ready && !canForce}>
-                {ready ? "Suit up and continue" : canForce ? "Start without them" : "Waiting for crew..."}
-              </Button>
+              <Button className="w-full" onClick={start}>Suit up and continue</Button>
               {!multi && (
                 <Button variant="ghost" className="w-full" onClick={() => { setTyped({}); saveSalt(); }}>
                   Shuffle names
@@ -95,7 +86,7 @@ export function CrewHud() {
               )}
             </>
           ) : (
-            <div className="text-sm text-dim">The host starts the mission when everyone has picked.</div>
+            <div className="text-sm text-dim">The host starts the mission when the crew is ready.</div>
           )}
         </Panel>
       </div>
@@ -104,7 +95,8 @@ export function CrewHud() {
         {ROLES.map((role) => {
           const info = ROLE_INFO[role];
           const holder = holderOf(role);
-          const mine = holder?.id === me?.id;
+          const mine = !!me && rolesOf(me).includes(role);
+          const picker = pickerOf(role);
           const later = laterFor(role, plan);
           return (
             <div
@@ -122,14 +114,13 @@ export function CrewHud() {
               {later && <p className="mt-1 text-[12px] text-dim">Later: <span className="text-white/80">{later}</span></p>}
 
               <div className="mt-3">
-                {!multi || (!holder && isHost) ? (
+                {!multi ? (
                   <input
                     aria-label={`${info.label} name`}
                     value={nameOf(role)}
                     maxLength={24}
                     onChange={(e) => setTyped((t) => ({ ...t, [role]: e.target.value }))}
-                    disabled={!!multi && !isHost}
-                    className="pointer-events-auto w-full rounded-md border border-line bg-black/40 px-2.5 py-1.5 text-sm text-white outline-none focus:border-amber/70"
+                                        className="pointer-events-auto w-full rounded-md border border-line bg-black/40 px-2.5 py-1.5 text-sm text-white outline-none focus:border-amber/70"
                   />
                 ) : (
                   <div className="rounded-md bg-white/5 px-2.5 py-1.5 text-sm">
@@ -137,19 +128,22 @@ export function CrewHud() {
                       <span className={holder.connected ? "text-white" : "text-white/40"}>
                         {holder.name}
                         {mine && <span className="ml-1.5 text-xs text-dim">you</span>}
+                        <span className="ml-1.5 text-xs text-dim">{picker ? "picked" : "assigned"}</span>
                       </span>
                     ) : (
-                      <span className="text-white/50">AI crew: {nameOf(role)}</span>
+                      <span className="text-white/50">Open</span>
                     )}
                   </div>
                 )}
                 {multi && (
                   <div className="mt-2">
-                    {mine ? (
-                      <Button variant="ghost" className="w-full py-1.5" onClick={() => pick(null)}>Free this role</Button>
-                    ) : !holder ? (
-                      <Button className="w-full py-1.5" onClick={() => pick(role)}>{myRole ? "Switch to this role" : "Take this role"}</Button>
-                    ) : null}
+                    {myPick === role ? (
+                      <Button variant="ghost" className="w-full py-1.5" onClick={() => pick(null)}>Drop my pick</Button>
+                    ) : picker ? (
+                      <div className="py-1.5 text-center text-xs text-dim">Picked by {picker.name}</div>
+                    ) : (
+                      <Button className="w-full py-1.5" onClick={() => pick(role)}>{mine ? "Make this my pick" : "Prefer this role"}</Button>
+                    )}
                   </div>
                 )}
               </div>

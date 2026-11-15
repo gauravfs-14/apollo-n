@@ -11,6 +11,7 @@ import type { Role } from "../../types";
 import { Avatar, type AvatarPose } from "./Avatar";
 import type { Ground } from "./ground";
 import { Label } from "./Label";
+import { rolesOf } from "../../core/roles";
 import { ROLE_COLOR, rt } from "./store";
 
 interface Remote {
@@ -140,7 +141,7 @@ export function Crew({ ground }: { ground: Ground }) {
   return (
     <>
       {others.map((p) => (
-        <RemoteAstronaut key={p.id} id={p.id} name={p.name} role={p.role} />
+        <RemoteAstronaut key={p.id} id={p.id} name={p.name} role={p.role ?? rolesOf(p)[0]} />
       ))}
       {npcRoles.map((r, i) => (
         <NpcAstronaut key={r} idx={i} role={r} ground={ground} />

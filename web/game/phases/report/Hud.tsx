@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { rolesOf } from "../../core/roles";
 import { api } from "../../core/api";
 import { say } from "../../core/comms";
 import { useGame } from "../../core/useGame";
@@ -168,7 +169,7 @@ export function ReportHud() {
           <ul className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-[13px]">
             {ROLES.map((r) => {
               const name = crew?.names?.[r];
-              const human = state.players.find((p) => p.role === r);
+              const human = state.players.find((p) => rolesOf(p).includes(r));
               const isAi = crew?.ai?.includes(r) ?? !human;
               return (
                 <li key={r} className="flex items-baseline justify-between gap-2">

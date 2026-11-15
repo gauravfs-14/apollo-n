@@ -1,6 +1,7 @@
 // Local mirror of api/app/game/state.py `apply()`. Used only when the server is
 // unreachable in solo mode. Keep the two in sync.
 import { PHASE_ORDER, ROLES, type ClientMsg, type GameState } from "../types";
+import { rebalance } from "./roles";
 
 /** Names are trimmed, capped at 24 chars and never empty (mirrors state.py clean_name). */
 export function cleanName(raw: unknown, fallback = "Astronaut"): string {
@@ -26,26 +27,32 @@ export function apply(s: GameState, playerId: string, msg: ClientMsg): GameState
     case "join": {
       if (me) {
         me.connected = true;
+        delete me.released;
         me.name = cleanName(msg.name, me.name);
       } else {
         if (st.mode === "solo" && st.players.length >= 1) {
           // A new tab/device takes over a solo game whose player has left.
           if (st.players[0].connected) return "Solo room is full";
           st.players[0] = { ...st.players[0], id: msg.id, name: cleanName(msg.name), connected: true };
+          rebalance(st);
           break;
         }
         if (st.players.length >= 4) return "Room is full (4 astronauts max)";
-        st.players.push({ id: msg.id, name: cleanName(msg.name), connected: true, isHost: st.players.length === 0 });
+        st.players.push({ id: msg.id, name: cleanName(msg.name), connected: true, isHost: st.players.length === 0, roles: [] });
       }
       // Never leave a room without a connected host: the (re)joining player takes over.
       if (!st.players.some((p) => p.isHost && p.connected)) for (const p of st.players) p.isHost = p.id === msg.id;
+      rebalance(st);
       break;
     }
     case "pick_role": {
       if (!me) return "Join first";
       if (msg.role && !ROLES.includes(msg.role)) return "Unknown role";
-      if (msg.role && st.players.some((p) => p.id !== me.id && p.role === msg.role)) return "Role already taken";
-      me.role = msg.role ?? undefined;
+      // only another player's explicit pick blocks it; automatically dealt roles move
+      if (msg.role && st.players.some((p) => p.id !== me.id && !p.released && p.picked === msg.role)) return "Role already taken";
+      if (msg.role) me.picked = msg.role;
+      else delete me.picked;
+      rebalance(st);
       break;
     }
     case "action": {

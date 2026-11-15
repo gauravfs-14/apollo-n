@@ -3,7 +3,7 @@
 Hardening (see api/tests/test_state.py for the reducer rules):
 - reconnect with the same player id keeps the same player (and gets a lost role back if it is still free)
 - host migration when the host drops; the (re)joining player becomes host if nobody connected is
-- a player gone for more than ROLE_TIMEOUT seconds loses the role (unclaimed -> the host plays it via actsAs)
+- a player gone for more than ROLE_TIMEOUT seconds is released from the crew balance (their roles are re-dealt among the others)
 - rooms idle for ROOM_TTL seconds with nobody connected are deleted by a janitor task
 - messages: size cap, per-socket token bucket, malformed JSON tolerated, unknown multiplayer rooms rejected (4404)
 """
@@ -57,7 +57,7 @@ class Room:
         self.lock = asyncio.Lock()
         self.last_active = time.monotonic()
         self.disconnected_at: dict[str, float] = {}  # player id -> monotonic time they dropped
-        self.lost_roles: dict[str, str] = {}  # player id -> role released after a timeout
+        self.lost_roles: dict[str, str] = {}  # player id -> explicit pick released after a timeout
 
     def touch(self) -> None:
         self.last_active = time.monotonic()
@@ -83,9 +83,11 @@ def sweep_room(room: Room, now: float) -> bool:
         p = next((p for p in room.state["players"] if p["id"] == pid), None)
         if p is None or p["connected"]:
             room.disconnected_at.pop(pid, None)
-        elif now - since >= ROLE_TIMEOUT and p.get("role"):
-            room.lost_roles[pid] = p["role"]
+        elif now - since >= ROLE_TIMEOUT and not p.get("released"):
+            if p.get("picked"):
+                room.lost_roles[pid] = p["picked"]
             room.state = release_role(room.state, pid)
+            room.disconnected_at.pop(pid, None)
             changed = True
     return changed
 
@@ -239,7 +241,7 @@ async def room_socket(ws: WebSocket, code: str) -> None:
                     continue
                 room.state = result
                 if t == "join":
-                    # reconnecting within/after the timeout: give a released role back if it is still free
+                    # reconnecting after the timeout: they were re-dealt roles by the join; restore their explicit pick if free
                     role = room.lost_roles.pop(player_id, None)
                     if role:
                         again = apply(room.state, player_id, {"type": "pick_role", "role": role})

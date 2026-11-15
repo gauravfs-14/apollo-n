@@ -2,6 +2,7 @@
 // Persistent game chrome on the play page: top bar (room, connection, crew), error toasts,
 // pause/settings menu and the multiplayer lobby card. Sits above every phase HUD.
 import { useRouter } from "next/navigation";
+import { rolesOf } from "../core/roles";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { disconnect, send } from "../core/net";
 import { useStore } from "../core/store";
@@ -60,7 +61,9 @@ function PlayerChip({ p, isMe }: { p: Player; isMe: boolean }) {
     >
       <span className={`h-1.5 w-1.5 rounded-full ${p.connected ? "bg-go" : "bg-white/30"}`} />
       <span className="max-w-24 truncate">{p.name}</span>
-      {p.role && <span className={`${ROLE_TEXT[p.role]} ${p.connected ? "" : "opacity-50"}`}>{ROLE_LABEL[p.role]}</span>}
+      {rolesOf(p).map((r) => (
+        <span key={r} className={`${ROLE_TEXT[r]} ${p.connected ? "" : "opacity-50"}`}>{ROLE_LABEL[r]}</span>
+      ))}
       {p.isHost && <span className="rounded bg-amber/20 px-1 text-[10px] font-medium text-amber">Host</span>}
     </span>
   );

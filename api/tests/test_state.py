@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.game.state import PHASE_ORDER, apply, clean_score, disconnect, new_state, release_role  # noqa: E402
+from app.game.state import PHASE_ORDER, ROLES, apply, clean_score, disconnect, new_state, release_role  # noqa: E402
 from app.routers.rooms import ROLE_TIMEOUT, ROOM_TTL, Bucket, Room, expired, sweep_room  # noqa: E402
 
 
@@ -59,11 +59,11 @@ def test_everyone_left_then_first_back_is_host():
 def test_roles_unique_and_validated():
     s = join(join(new_state("R", "multi"), "a"), "b")
     s = apply(s, "a", {"type": "pick_role", "role": "pilot"})
-    assert player(s, "a")["role"] == "pilot"
+    assert player(s, "a")["picked"] == "pilot" and "pilot" in player(s, "a")["roles"]
     assert apply(s, "b", {"type": "pick_role", "role": "pilot"}) == "Role already taken"
     assert apply(s, "b", {"type": "pick_role", "role": "captain"}) == "Unknown role"
     s = apply(s, "a", {"type": "pick_role", "role": None})
-    assert "role" not in player(s, "a")
+    assert "picked" not in player(s, "a")
 
 
 def test_actions_checked():
@@ -111,26 +111,90 @@ def test_solo_takeover():
     assert len(s["players"]) == 1 and s["players"][0]["id"] == "b" and s["players"][0]["isHost"]
 
 
+def roles(s):
+    return {p["id"]: p["roles"] for p in s["players"] if not p.get("released")}
+
+
+def covered(s):
+    """Every role held by exactly one player, shares as even as possible."""
+    held = [r for p in s["players"] for r in p["roles"]]
+    assert sorted(held) == sorted(ROLES), held
+    sizes = sorted(len(p["roles"]) for p in s["players"] if not p.get("released"))
+    assert sizes[-1] - sizes[0] <= 1, sizes
+
+
+def test_balance_as_players_join():
+    s = join(new_state("R", "multi"), "a")
+    assert roles(s) == {"a": ROLES}
+    s = join(s, "b")
+    covered(s)
+    assert [len(p["roles"]) for p in s["players"]] == [2, 2]
+    s = join(s, "c")
+    covered(s)
+    assert sorted(len(p["roles"]) for p in s["players"]) == [1, 1, 2]
+    assert len(player(s, "a")["roles"]) == 1  # the extra role goes to a guest, not the host
+    s = join(s, "d")
+    covered(s)
+    assert all(len(p["roles"]) == 1 for p in s["players"])
+
+
+def test_pick_honoured_and_deterministic():
+    s = join(join(new_state("R", "multi"), "a"), "b")
+    s = apply(s, "b", {"type": "pick_role", "role": "pilot"})
+    assert "pilot" in player(s, "b")["roles"] and player(s, "b")["role"] == "pilot"
+    covered(s)
+    s = join(s, "c")
+    covered(s)
+    assert "pilot" in player(s, "b")["roles"]  # a join never steals an explicit pick
+    s = apply(s, "c", {"type": "pick_role", "role": "commander"})  # taking a role someone only holds automatically
+    assert "commander" in player(s, "c")["roles"] and "commander" not in player(s, "a")["roles"]
+    covered(s)
+    assert apply(s, "a", {"type": "pick_role", "role": "commander"}) == "Role already taken"
+    # same inputs -> same answer
+    assert apply(s, "a", {"type": "pick_role", "role": "scientist"}) == apply(s, "a", {"type": "pick_role", "role": "scientist"})
+
+
+def test_everyone_picks_and_solo_unchanged():
+    s = join(new_state("R", "solo"), "a")
+    s = apply(s, "a", {"type": "pick_role", "role": "pilot"})
+    assert player(s, "a")["roles"] == ROLES
+    m = new_state("R", "multi")
+    for pid, r in zip("abcd", ROLES):
+        m = apply(join(m, pid), pid, {"type": "pick_role", "role": r})
+    assert roles(m) == {pid: [r] for pid, r in zip("abcd", ROLES)}
+
+
 def test_release_role_only_when_disconnected():
     s = join(join(new_state("R", "multi"), "a"), "b")
     s = apply(s, "b", {"type": "pick_role", "role": "engineer"})
-    assert "role" in player(release_role(s, "b"), "b")  # still connected: untouched
+    assert not player(release_role(s, "b"), "b").get("released")  # still connected: untouched
     s = disconnect(s, "b")
+    assert len(player(s, "b")["roles"]) == 2  # grace: keeps its roles until the timeout
     s = release_role(s, "b")
-    assert "role" not in player(s, "b")
-    s = apply(s, "a", {"type": "pick_role", "role": "engineer"})  # now free for someone else
-    assert player(s, "a")["role"] == "engineer"
+    assert player(s, "b")["roles"] == [] and player(s, "a")["roles"] == ROLES
+    covered(s)
 
 
-def test_room_sweep_releases_role_after_timeout_and_restores():
+def test_leave_after_timeout_then_reconnect():
     room = Room("R", "multi")
-    room.state = join(join(room.state, "a"), "b")
-    room.state = apply(room.state, "b", {"type": "pick_role", "role": "pilot"})
-    room.state = disconnect(room.state, "b")
-    room.disconnected_at["b"] = 100.0
-    assert sweep_room(room, 100.0 + ROLE_TIMEOUT - 1) is False and player(room.state, "b")["role"] == "pilot"
+    for pid in "abc":
+        room.state = join(room.state, pid)
+    room.state = apply(room.state, "c", {"type": "pick_role", "role": "scientist"})
+    room.state = disconnect(room.state, "c")
+    room.disconnected_at["c"] = 100.0
+    assert sweep_room(room, 100.0 + ROLE_TIMEOUT - 1) is False and "scientist" in player(room.state, "c")["roles"]
     assert sweep_room(room, 100.0 + ROLE_TIMEOUT + 1) is True
-    assert "role" not in player(room.state, "b") and room.lost_roles["b"] == "pilot"
+    assert player(room.state, "c")["roles"] == [] and room.lost_roles["c"] == "scientist"
+    covered(room.state)
+    assert [len(player(room.state, x)["roles"]) for x in "ab"] == [2, 2]
+    # reconnect: dealt in again, then the pick is restored (what the websocket handler does)
+    room.state = join(room.state, "c")
+    covered(room.state)
+    assert len(player(room.state, "c")["roles"]) >= 1
+    room.state = apply(room.state, "c", {"type": "pick_role", "role": room.lost_roles.pop("c")})
+    assert "scientist" in player(room.state, "c")["roles"]
+    covered(room.state)
+    assert sorted(len(p["roles"]) for p in room.state["players"]) == [1, 1, 2]
 
 
 def test_room_expiry():

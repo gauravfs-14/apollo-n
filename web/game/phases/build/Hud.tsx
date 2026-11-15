@@ -72,8 +72,9 @@ export function BuildHud() {
   const options = partsFor(slot);
   const hintsOn = mistakes >= HINT_AFTER[plan?.difficulty ?? "normal"];
 
-  const nobodyHasRole = !state?.players.some((p) => p.role);
-  const canPick = (s: ShipSlot) => state?.mode === "solo" || nobodyHasRole || actsAs(SLOT_ROLE[s]);
+  // crew roles are only chosen after the build, so until someone picks one every player may choose parts
+  const nobodyPicked = !state?.players.some((p) => p.picked);
+  const canPick = (s: ShipSlot) => state?.mode === "solo" || nobodyPicked || actsAs(SLOT_ROLE[s]);
   const canFinal = isHost || actsAs("commander");
 
   const best = useMemo(() => {

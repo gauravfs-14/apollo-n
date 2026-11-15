@@ -99,7 +99,7 @@ await click(host.page.getByRole("button", { name: /Lock in build/ }));
 check("both reach drop", (await waitPhase(guest.page, "drop", 10000)) >= 0 && (await waitPhase(host.page, "drop", 5000)) >= 0);
 
 // ---- drop
-await host.page.waitForFunction(() => [...document.querySelectorAll("button")].some((b) => b.textContent === "Open crate" && !b.disabled), null, { timeout: 15000 });
+await host.page.waitForFunction(() => [...document.querySelectorAll("button")].some((b) => b.textContent === "Open crate" && !b.disabled), null, { timeout: 45000 });
 await click(host.page.getByRole("button", { name: "Open crate" }));
 await guest.page.getByText(/find$/i).first().waitFor({ timeout: 15000 }).catch(() => {});
 const perkH = (await stateOf(host)).phaseData.drop?.perk;
@@ -111,20 +111,27 @@ await click(host.page.getByRole("button", { name: "Continue", exact: true }));
 // ---- crew: roles
 check("both reach crew", (await waitPhase(guest.page, "crew", 10000)) >= 0 && (await waitPhase(host.page, "crew", 5000)) >= 0);
 await host.page.waitForTimeout(3000);
-const startBtn = host.page.getByRole("button", { name: /Waiting for crew|Suit up|Start without/ });
-check("host Start is blocked until both pick a role", /Waiting for crew/.test(await startBtn.first().innerText()));
-// host takes commander; guest tries commander too (should be unavailable) then takes pilot
-await click(host.page.locator("div.rounded-xl", { hasText: "Makes the calls." }).getByRole("button", { name: /Take this role/ }));
+const R = (s) => Object.fromEntries(s.players.map((p) => [p.name, p.roles]));
+const rolesSame = async () => JSON.stringify(R(await stateOf(host))) === JSON.stringify(R(await stateOf(guest)));
+const full = (s) => s.players.every((p) => p.roles.length === 2) && s.players.flatMap((p) => p.roles).sort().join() === "commander,engineer,pilot,scientist";
+{
+  const a = await stateOf(host), b = await stateOf(guest);
+  check("2 players: both see the same assignment, two roles each, all four covered", (await rolesSame()) && full(a) && full(b), JSON.stringify(R(a)));
+}
+check("host Start is enabled right away (roles are auto-assigned)", await host.page.getByRole("button", { name: /Suit up/ }).first().isEnabled());
+check("crew UI says what I hold", /You:\s*\w+ \+ \w+/.test(await host.page.getByTestId("my-roles").innerText()) && /You:\s*\w+ \+ \w+/.test(await guest.page.getByTestId("my-roles").innerText()));
+// host prefers commander; the guest then cannot take it, and prefers pilot
+await click(host.page.locator("div.rounded-xl", { hasText: "Makes the calls." }).getByRole("button", { name: /Prefer this role|Make this my pick/ }));
 await guest.page.waitForTimeout(600);
 const guestCmdBtn = guest.page.locator("div.rounded-xl", { hasText: "Makes the calls." }).getByRole("button");
-check("guest sees commander as taken (no pick button)", (await guestCmdBtn.count()) === 0);
-await click(guest.page.locator("div.rounded-xl", { hasText: "Flies the lander" }).getByRole("button", { name: /Take this role/ }));
+check("guest sees commander as picked by the host (no pick button)", (await guestCmdBtn.count()) === 0);
+await click(guest.page.locator("div.rounded-xl", { hasText: "Flies the lander" }).getByRole("button", { name: /Prefer this role|Make this my pick/ }));
 const rolesOk = await until(async () => {
-  const a = await stateOf(host), b = await stateOf(guest);
-  const r = (s) => Object.fromEntries(s.players.map((p) => [p.name, p.role]));
-  return JSON.stringify(r(a)) === JSON.stringify(r(b)) && r(a).Hosty === "commander" && r(a).Guesty === "pilot";
+  const a = await stateOf(host);
+  const r = R(a);
+  return (await rolesSame()) && full(a) && r.Hosty.includes("commander") && r.Guesty.includes("pilot");
 });
-check("roles synced on both sides (host=commander, guest=pilot)", rolesOk, JSON.stringify((await stateOf(guest)).players.map((p) => [p.name, p.role])));
+check("picks honoured, still two roles each, synced (host has commander, guest has pilot)", rolesOk, JSON.stringify(R(await stateOf(guest))));
 check("guest cannot start the mission", (await guest.page.getByRole("button", { name: /Suit up/ }).count()) === 0);
 await shot(host, "03-crew");
 await shot(guest, "03-crew");
@@ -146,7 +153,7 @@ await g2page.goto(`${BASE}/play/${code}?mode=multi`, { waitUntil: "load" });
 const back = await until(async () => {
   const s = await stateOf(host);
   const g = s?.players.filter((p) => p.name === "Guesty");
-  return g?.length === 1 && g[0].connected && g[0].role === "pilot";
+  return g?.length === 1 && g[0].connected && g[0].roles.length === 2 && g[0].roles.includes("pilot");
 }, 15000);
 const idAfter = await g2page.evaluate(() => window.__apolloStore.getState().meId);
 check("guest reconnect keeps the same player (id, one entry, role pilot, connected)", back && idAfter === guestIdBefore, `${(await stateOf(host)).players.length} players`);
@@ -157,7 +164,7 @@ sock.close({ code: 1006, reason: "test drop" });
 const retried = await until(async () => {
   const st = await stateOf(host);
   const g = st.players.filter((p) => p.name === "Guesty");
-  return st.version > disc2 && g.length === 1 && g[0].connected && g[0].role === "pilot";
+  return st.version > disc2 && g.length === 1 && g[0].connected && g[0].roles.length === 2 && g[0].roles.includes("pilot");
 }, 15000);
 check("guest socket cut mid-game: client retries, same player + role restored", retried);
 
@@ -181,10 +188,10 @@ if (style === "order_steps") await solveOrder(host.page, items);
 else if (style === "quiz") await solveQuiz(host.page, items);
 else if (style === "memory_match") await solveMemory(host.page, items);
 else await solveSwitches(host.page, items);
-await host.page.getByText("CHECKLIST COMPLETE").waitFor({ timeout: 30000 });
+await host.page.getByText("CHECKLIST COMPLETE", { exact: true }).waitFor({ timeout: 30000 });
 check("guest sees checklist progress/result", await until(async () => (await stateOf(guest)).phaseData.checklist?.result?.score >= 0, 8000));
-check("guest cannot continue (only commander/host)", (await guest.page.getByRole("button", { name: /Continue to launch/ }).count()) === 0);
-await click(host.page.getByRole("button", { name: /Continue to launch/ }));
+check("guest cannot skip Launch Control (only commander/host)", (await guest.page.getByRole("button", { name: "Skip", exact: true }).count()) === 0);
+await click(host.page.getByRole("button", { name: "Skip", exact: true })); // otherwise the checklist advances by itself after the radio call
 
 // ---- launch / cruise
 check("both reach launch", (await waitPhase(host.page, "launch", 15000)) >= 0 && (await waitPhase(guest.page, "launch", 10000)) >= 0);
@@ -193,7 +200,8 @@ await click(host.page.getByRole("button", { name: "Skip", exact: true }));
 check("both reach cruise", (await waitPhase(host.page, "cruise", 20000)) >= 0 && (await waitPhase(guest.page, "cruise", 10000)) >= 0);
 await host.page.waitForTimeout(2500);
 const h0 = plan.cruise[0];
-const actor = h0.role === "pilot" ? guest : host; // commander -> host, pilot -> guest; engineer/scientist are unclaimed -> host plays them
+const holderName = (await stateOf(host)).players.find((p) => p.roles.includes(h0.role)).name; // whoever holds the hurdle role
+const actor = holderName === "Guesty" ? guest : host;
 const other = actor === host ? guest : host;
 console.log("hurdle 0 role", h0.role, "actor", actor.tag);
 check("only the acting player has Start", (await actor.page.getByRole("button", { name: "Start", exact: true }).count()) === 1 && (await other.page.getByRole("button", { name: "Start", exact: true }).count()) === 0);

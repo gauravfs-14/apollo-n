@@ -3,6 +3,7 @@
 // Boarding cinematic (about 12 s): crew walk-out at dawn, elevator ride up the tower, last steps to
 // the capsule, hatch closes. Skippable. Uses the real Astronaut rig and the shared launch pad.
 import { Environment } from "@react-three/drei";
+import { rolesOf } from "../../core/roles";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -33,7 +34,7 @@ export function BoardScene() {
   const persp = camera as THREE.PerspectiveCamera;
   const n = Math.min(4, Math.max(2, state?.players.length ?? 2));
   const roles = useMemo<Role[]>(() => {
-    const claimed = (state?.players ?? []).map((p) => p.role).filter(Boolean) as Role[];
+    const claimed = (state?.players ?? []).map((p) => p.role ?? rolesOf(p)[0]).filter(Boolean) as Role[];
     const rest = ROLES.filter((r) => !claimed.includes(r));
     return [...claimed, ...rest].slice(0, n);
   }, [state?.players, n]);

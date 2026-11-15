@@ -122,7 +122,14 @@ export interface MissionPlan {
 export interface Player {
   id: string;
   name: string;
+  /** Every role this player holds (always set by the server; 4 / players, shared evenly). */
+  roles: Role[];
+  /** The role they explicitly asked for in the crew phase, if any. Never taken away for balance. */
+  picked?: Role;
+  /** Primary role (picked, else the first held). Kept for older readers; prefer `roles`. */
   role?: Role;
+  /** Gone past the reconnect timeout: not part of the balance until they come back. */
+  released?: boolean;
   connected: boolean;
   isHost: boolean;
 }

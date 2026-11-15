@@ -1,5 +1,6 @@
 // Draws the downloadable mission card to a 2D canvas (no dependencies) and returns a PNG blob.
 import type { MissionPlan, Player } from "../../types";
+import { rolesOf } from "../../core/roles";
 import { RANK_COLOR, type Result } from "./score";
 
 function rng(seed: number) {
@@ -124,7 +125,7 @@ export async function renderShareCard(plan: MissionPlan, result: Result, players
   // crew
   ctx.font = "400 22px system-ui, -apple-system, Segoe UI, sans-serif";
   ctx.fillStyle = "rgba(233,237,242,0.8)";
-  const crew = players.map((p) => (p.role ? `${p.name} (${p.role})` : p.name)).join("   ");
+  const crew = players.map((p) => (rolesOf(p).length ? `${p.name} (${rolesOf(p).join(" + ")})` : p.name)).join("   ");
   wrap(ctx, `Crew: ${crew}`, pad, 520, 640, 30, 2);
 
   // footer
