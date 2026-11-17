@@ -3,6 +3,7 @@
 - "codex"  (default, dev): shells out to the local `codex exec` CLI, which uses the
            developer's ChatGPT sign-in. No API key needed. Not for production hosting.
 - "openai": OpenAI Responses API with OPENAI_API_KEY.
+- "disabled": use the game's bundled missions and director templates.
 
 Callers ask for JSON and get a parsed dict back (or an exception).
 """
@@ -153,6 +154,8 @@ async def _openai(prompt: str, timeout: float) -> str:
 
 async def complete_json(system: str, user: str, timeout: float = 120, background: bool = False) -> dict:
     """`background=True` for bulk work (mission pool); interactive calls leave a slot free for themselves."""
+    if PROVIDER == "disabled":
+        raise LLMError("Live mission writing is disabled; using bundled missions")
     prompt = f"{system}\n\n---\n\n{user}\n\nRespond with ONE JSON object only. No prose, no markdown."
     text = await (_openai(prompt, timeout) if PROVIDER == "openai" else _codex(prompt, timeout, background))
     return _extract_json(text)

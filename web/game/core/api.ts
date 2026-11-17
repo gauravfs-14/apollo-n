@@ -1,5 +1,8 @@
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-export const WS_BASE = API_BASE.replace(/^http/, "ws");
+// Cloud hosting proxies the API under the website's own origin.
+export const WS_BASE = (API_BASE.startsWith("/") && typeof window !== "undefined"
+  ? `${window.location.origin}${API_BASE}`
+  : API_BASE).replace(/^http/, "ws");
 
 export async function api<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {

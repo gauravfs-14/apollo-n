@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: apollo-n-hritik
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: LLM_PROVIDER
+        value: disabled
+      - key: VOICE_PROVIDER
+        value: system
+      - key: PUBLIC_API_URL
+        value: /api

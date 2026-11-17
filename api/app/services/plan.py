@@ -537,6 +537,8 @@ class Pool:
         return None
 
     def kick(self) -> None:
+        if llm.PROVIDER == "disabled":
+            return
         if self._task is None or self._task.done():
             self._task = asyncio.create_task(self._fill())
 
